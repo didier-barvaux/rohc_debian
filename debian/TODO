@@ -1,0 +1,6 @@
+TODO for rohc Debian package
+============================
+
+* Proper debian/copyright
+* Build the kernel module, on linux only
+* Add -dbg package

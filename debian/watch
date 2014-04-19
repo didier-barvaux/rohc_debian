@@ -1,0 +1,4 @@
+version=3
+# Launchpad page present oldest releases first..
+#https://launchpad.net/rohc/+download https://launchpad.net/rohc/.*/rohc-([\d\.]+).tar.bz2
+opts=pgpsigurlmangle=s/$/.asc/ http://rohc-lib.org/support/download/ http://rohc-lib.org/download/.*/.*/rohc-([\d\.]+).tar.xz

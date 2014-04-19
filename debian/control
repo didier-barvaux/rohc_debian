@@ -1,0 +1,67 @@
+Source: rohc
+Priority: optional
+Maintainer: Simon Paillard <spaillard@debian.org>
+Build-Depends: debhelper (>= 9), autotools-dev,
+# for tests only
+ libpcap0.8-dev,
+# for rohc-doc
+ doc-base, doxygen, texlive-latex-base, graphviz
+Standards-Version: 3.9.5
+Section: libs
+Homepage: http://rohc-lib.org/
+#Vcs-Git: git://git.debian.org/collab-maint/rohc.git
+#Vcs-Browser: http://git.debian.org/?p=collab-maint/rohc.git;a=summary
+
+Package: librohc-dev
+Section: libdevel
+Architecture: any
+Pre-Depends: ${misc:Pre-Depends}
+Depends: librohc0 (= ${binary:Version}), ${misc:Depends}
+Description: Files for development of applications which will use the ROHC library
+ RObust Header Compression (ROHC) is a standardized method defined by the IETF
+ in RFC3095 to compress the IP, UDP, RTP, and TCP headers of Internet packets.
+ This compression scheme differs from other compression schemes by the fact
+ that it performs well over links where the packet loss rate is high, such as
+ wireless links.
+Multi-Arch: same
+
+Package: librohc0
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: RObust Header Compression (ROHC) library
+ RObust Header Compression (ROHC) is a standardized method defined by the IETF
+ in RFC3095 to compress the IP, UDP, RTP, and TCP headers of Internet packets.
+ This compression scheme differs from other compression schemes by the fact
+ that it performs well over links where the packet loss rate is high, such as
+ wireless links.
+Multi-Arch: same
+
+Package: librohc-doc
+Section: doc
+Architecture: all
+Depends: ${misc:Depends}
+Description: API documentation of the ROHC library
+ RObust Header Compression (ROHC) is a standardized method defined by the IETF
+ in RFC3095 to compress the IP, UDP, RTP, and TCP headers of Internet packets.
+ This compression scheme differs from other compression schemes by the fact
+ that it performs well over links where the packet loss rate is high, such as
+ wireless links.
+Multi-Arch: foreign
+
+Package: rohc-tools
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Miscellaneous tools that come along the ROHC library
+ The following tools are included:
+  * rohc_fuzzer: library testing using fuzzing technique
+  * rohc_sniffer: library testing on live trafic
+  * rohc_test_performance: library testing on pcap
+  * rohctunnel: make a ROHC-over-UDP or ROHC-over-Ethernet tunnel
+ .
+ RObust Header Compression (ROHC) is a standardized method defined by the IETF
+ in RFC3095 to compress the IP, UDP, RTP, and TCP headers of Internet packets.
+ This compression scheme differs from other compression schemes by the fact
+ that it performs well over links where the packet loss rate is high, such as
+ wireless links.
+Multi-Arch: foreign
