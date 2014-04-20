@@ -1,0 +1,45 @@
+Description: Fix FTBFS on !i386 with unused-but-set-variable
+ When building the packet with --enable-fail-on-warning on plateform different
+ than i386, rohc build fails, as :
+ * test_performance.c fully covers only i386
+ * gcc since 4.6 includes unused-but-set-variable as -Werror
+ 
+ This is fixed in upstream 1.6.x branch,
+ commit "Build fix for test_performance application on x86_64/clang."
+Author: Didier Barvaux <didier@rohc-lib.org>
+Origin: upstream, http://bazaar.launchpad.net/~didier-barvaux/rohc/1.6.x/revision/769
+Forwarded: not-needed
+Last-Update: 2013-08-17
+
+--- rohc-1.6.1.orig/app/performance/test_performance.c
++++ rohc-1.6.1/app/performance/test_performance.c
+@@ -188,8 +188,8 @@ int main(int argc, char *argv[])
+ 	char *cid_type = NULL;
+ 	char *test_type = NULL; /* the name of the test to perform */
+ 	char *filename = NULL; /* the name of the PCAP capture used as input */
+-	bool use_large_cid;
+ #if __i386__
++	bool use_large_cid;
+ 	unsigned long packet_count = 0;
+ 	unsigned long overflows = 0;
+ 	unsigned long long time_elapsed = 0;
+@@ -270,7 +270,9 @@ int main(int argc, char *argv[])
+ 	/* check CID type */
+ 	if(!strcmp(cid_type, "smallcid"))
+ 	{
++#if __i386__
+ 		use_large_cid = false;
++#endif
+ 
+ 		/* the maximum number of ROHC contexts should be valid */
+ 		if(max_contexts < 1 || max_contexts > (ROHC_SMALL_CID_MAX + 1))
+@@ -283,7 +285,9 @@ int main(int argc, char *argv[])
+ 	}
+ 	else if(!strcmp(cid_type, "largecid"))
+ 	{
++#if __i386__
+ 		use_large_cid = true;
++#endif
+ 
+ 		/* the maximum number of ROHC contexts should be valid */
+ 		if(max_contexts < 1 || max_contexts > (ROHC_LARGE_CID_MAX + 1))
