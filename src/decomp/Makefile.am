@@ -1,0 +1,53 @@
+################################################################################
+# Name       : Makefile
+# Authors    : Didier Barvaux <didier.barvaux@toulouse.viveris.com>
+#              Didier Barvaux <didier@barvaux.org>
+# Description: create the ROHC decompression library
+################################################################################
+
+lib_LTLIBRARIES = librohc_decomp.la
+
+librohc_decomp_la_SOURCES = \
+	rohc_decomp.c \
+	feedback.c \
+	d_uncompressed.c \
+	d_generic.c \
+	d_ip.c \
+	d_udp.c \
+	d_udp_lite.c \
+	d_esp.c \
+	d_rtp.c
+
+librohc_decomp_la_LIBADD = \
+	-lrohc_common \
+	-lrohc_comp \
+	$(additional_platform_libs)
+
+librohc_decomp_la_LDFLAGS = \
+	$(configure_ldflags) \
+	-no-undefined \
+	-version-info $(ROHC_API_CURRENT):$(ROHC_API_REVISION):$(ROHC_API_AGE) \
+	-L$(top_builddir)/src/common/.libs \
+	-L$(top_builddir)/src/comp/.libs
+
+librohc_decomp_la_CFLAGS = \
+	$(configure_cflags)
+
+librohc_decomp_la_CPPFLAGS = \
+	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/src/common \
+	-I$(top_srcdir)/src/comp
+
+include_HEADERS = rohc_decomp.h
+
+noinst_HEADERS = \
+	rohc_decomp_internals.h \
+	feedback.h \
+	d_uncompressed.h \
+	d_generic.h \
+	d_ip.h \
+	d_udp.h \
+	d_udp_lite.h \
+	d_esp.h \
+	d_rtp.h
+
