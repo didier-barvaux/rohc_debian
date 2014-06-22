@@ -1,17 +1,20 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2010,2011,2012,2013,2014 Didier Barvaux
+ * Copyright 2007,2009,2010,2012 Viveris Technologies
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -24,6 +27,10 @@
  *
  * Description
  * -----------
+ *
+ * THIS PROGRAM IS DEPRECATED. IT WAS CREATED FOR TESTING PURPOSES. THE SNIFFER
+ * AND FUZZER TOOLS REPLACE IT FOR TESTING. THE IP/ROHC TUNNEL REPLACES IT AS
+ * TUNNELING SOLUTION THAT MAY BE USED IN PRODUCTION.
  *
  * The program creates a ROHC tunnel over UDP (resp. Ethernet). A ROHC tunnel
  * compresses the IP packets it receives from a virtual network interface and
@@ -102,7 +109,7 @@
  */
 
 
-#include "config.h" /* for HAVE_LINUX_IF_TUN_H */
+#include "config.h" /* for HAVE_LINUX_IF_TUN_H and PACKAGE_BUGREPORT */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -136,9 +143,9 @@
 #include <netpacket/packet.h>
 
 /* ROHC includes */
-#include "rohc.h"
-#include "rohc_comp.h"
-#include "rohc_decomp.h"
+#include <rohc/rohc.h>
+#include <rohc/rohc_comp.h>
+#include <rohc/rohc_decomp.h>
 
 
 
@@ -200,6 +207,11 @@ struct rohc_tunnel
 		} ethernet;
 
 	} params;
+
+
+#define FEEDBACK_SEND_MAX_LEN 500
+	uint8_t feedback_send_buf[FEEDBACK_SEND_MAX_LEN];
+	struct rohc_buf feedback_send;
 };
 
 
@@ -208,48 +220,48 @@ struct rohc_tunnel
  */
 
 int tun_create(char *name);
-int read_from_tun(int fd, unsigned char *packet, unsigned int *length);
-int write_to_tun(int fd, unsigned char *packet, unsigned int length);
+int read_from_tun(const int fd, struct rohc_buf *const packet);
+int write_to_tun(int fd, struct rohc_buf packet);
 
 int udp_create(struct in_addr laddr, int port);
-int read_from_udp(int sock, unsigned char *buffer, unsigned int *length);
-int write_to_udp(int sock, struct in_addr raddr, int port,
-                 unsigned char *packet, unsigned int length);
+int read_from_udp(int sock, struct rohc_buf *const packet);
+int write_to_udp(int sock,
+                 struct in_addr raddr,
+                 int port,
+                 struct rohc_buf packet);
 
 static int raw_create(const unsigned int itf_index);
-static int read_from_raw(const int sock,
-                         unsigned char *const buffer,
-                         unsigned int *const length);
+static int read_from_raw(const int sock, struct rohc_buf *const packet);
 static int write_to_raw(const int sock,
                         const uint8_t raddr[ETH_ALEN],
                         const unsigned int itf_index,
-                        unsigned char *const packet,
-                        const unsigned int length);
+                        struct rohc_buf packet);
 
 int tun2wan(struct rohc_comp *comp,
             int from, int to,
             const struct rohc_tunnel *const tunnel,
             int error, double ber, double pe2, double p2);
-int wan2tun(struct rohc_decomp *const decomp,
+int wan2tun(struct rohc_tunnel *const tunnel,
+            struct rohc_decomp *const decomp,
             const int from,
             const int to,
-            const rohc_tunnel_t tunnel_type);
-int flush_feedback(struct rohc_comp *comp,
-                   const int to,
-                   const struct rohc_tunnel *const tunnel);
+            struct rohc_comp *const comp);
+int flush_feedback(const int to,
+                   struct rohc_tunnel *const tunnel);
 
-void dump_packet(char *descr, unsigned char *packet, const size_t length);
+void dump_packet(const char *const descr, const struct rohc_buf packet);
 double get_probability(char *arg, int *error);
 int is_timeout(struct timeval first,
                struct timeval second,
                unsigned int max);
 
-static void print_rohc_traces(const rohc_trace_level_t level,
+static void print_rohc_traces(void *const priv_ctxt,
+                              const rohc_trace_level_t level,
                               const rohc_trace_entity_t entity,
                               const int profile,
                               const char *const format,
                               ...)
-	__attribute__((format(printf, 4, 5), nonnull(4)));
+	__attribute__((format(printf, 5, 6), nonnull(5)));
 
 static int gen_random_num(const struct rohc_comp *const comp,
                           void *const user_context)
@@ -282,27 +294,35 @@ void sighandler(int sig)
  */
 void usage(void)
 {
-	printf("ROHC tunnel: make a ROHC-over-UDP or ROHC-over-Ethernet tunnel\n\
+	printf("The ROHC tunnel creates one ROHC-over-UDP or ROHC-over-Ethernet\n\
+tunnel\n\
 \n\
-usage:\n\
-  rohctunnel [ version | help ]\n\
-  rohctunnel TUNNEL [ ERROR ] [ DIR ]\n\
+You need to be root (or to have POSIX capability CAP_NET_ADMIN) to create\n\
+ROHC tunnels.\n\
 \n\
-Tunnel parameters:\n\
-  TUNNEL := NAME TYPE PARAMS\n\
+THIS PROGRAM IS DEPRECATED. IT WAS CREATED FOR TESTING PURPOSES. THE SNIFFER\n\
+AND FUZZER TOOLS REPLACE IT FOR TESTING. THE IP/ROHC TUNNEL REPLACES IT AS\n\
+TUNNELING SOLUTION THAT MAY BE USED IN PRODUCTION.\n\
+\n\
+Usage: rohctunnel version\n\
+   or: rohctunnel help\n\
+   or: rohctunnel TUNNEL [ERROR] [DIR]\n\
+\n\
+Options:\n\
+  TUNNEL := NAME TYPE PARAMS    The tunnel definition\n\
   NAME   := STRING              The name of the tunnel\n\
-  TYPE   := { udp | ethernet }\n\
+  TYPE   := { udp | ethernet }  The type of the tunnel\n\
 \n\
 Tunnel parameters if TYPE = udp:\n\
-  PARAMS := remote RADDR local LADDR port PORT\n\
-  RADDR  := IPV4_ADDRESS      The IP address of the remote host\n\
-  LADDR  := IPV4_ADDRESS      The IP address of the local host\n\
-  PORT   := PORT              The UDP port to use (local and remote)\n\
+  PARAMS := REMOTE LOCAL PORT  Additional parameters for UDP\n\
+  REMOTE := remote IPV4        The IP address of the remote host\n\
+  LOCAL  := local IPV4         The IP address of the local host\n\
+  PORT   := port PORTN         The UDP port to use (local and remote)\n\
 \n\
 Tunnel parameters if TYPE = ethernet:\n\
-  PARAMS := remote RADDR local ITF\n\
-  RADDR  := MAC_ADDRESS       The Ethernet MAC address of the remote host\n\
-  ITF    := STRING            The local interface to use, eg. eth0\n\
+  PARAMS := REMOTE LOCAL    Additional parameters for Ethernet\n\
+  REMOTE := remote MAC      The Ethernet MAC address of the remote host\n\
+  LOCAL  := local ITF       The local interface to use, eg. eth0\n\
 \n\
 Error model (none if not specified):\n\
   ERROR  := error { none | uniform RATE | burst PE2 P2 }\n\
@@ -313,18 +333,24 @@ Error model (none if not specified):\n\
 Direction (bidirectional if not specified):\n\
   DIR    := dir { bidirectional | unidirectional }\n\
 \n\
+Miscellaneous:\n\
+  STRING := [a-zA-Z0-9]               A sequence of letters and numbers\n\
+  IPV4   := NUM.NUM.NUM.NUM           An IPv4 address\n\
+  MAC    := HEX:HEX:HEX:HEX:HEX:HEX   A MAC address\n\
+  PORTN  := [1,65535]                 An UDP port\n\
+  ITF    := STRING                    A network interface, eg. eth0\n\
+  NUM    := [0,255]                   A part of an IPv4 address\n\
+  HEX    := [0x00,0xff]               A part of a MAC address\n\
+\n\
 Examples:\n\
-  # rohctunnel rohc0 udp remote 192.168.0.20 local 192.168.0.21 port 5000\n\
-  # rohctunnel rohc0 udp remote 192.168.0.20 local 192.168.0.21 port 5000 \\\n\
-    dir unidirectional\n\
-  # rohctunnel rohc0 udp remote 192.168.0.20 local 192.168.0.21 port 5000 \\\n\
-    error uniform 1e-5 dir bidirectional\n\
-  # rohctunnel rohc0 udp remote 192.168.0.20 local 192.168.0.21 port 5000 \\\n\
-    error burst 1e-5 2e-5\n\
-  # rohctunnel rohc0 ethernet remote 01:02:03:04:05:06 local eth1\n\
-  # rohctunnel rohc0 ethernet remote 01:02:03:04:05:06 local eth1 \\\n\
-    error burst 1e-5 2e-5\n\
-");
+  # rohctunnel rohc0 udp remote 192.168.0.20 local 192.168.0.21 port 5000                                        ROHC-over-UDP tunnel with ROHC O-mode\n\
+  # rohctunnel rohc0 udp remote 192.168.0.20 local 192.168.0.21 port 5000 dir unidirectional                     ROHC-over-UDP tunnel with ROHC U-mode\n\
+  # rohctunnel rohc0 udp remote 192.168.0.20 local 192.168.0.21 port 5000 error uniform 1e-5 dir bidirectional   ROHC-over-UDP tunnel with ROHC O-mode and uniform BER\n\
+  # rohctunnel rohc0 udp remote 192.168.0.20 local 192.168.0.21 port 5000 error burst 1e-5 2e-5                  ROHC-over-UDP tunnel with ROHC O-mode and bursty BER\n\
+  # rohctunnel rohc0 ethernet remote 01:02:03:04:05:06 local eth1                                                ROHC-over-Ethernet tunnel with ROHC O-mode\n\
+  # rohctunnel rohc0 ethernet remote 01:02:03:04:05:06 local eth1 error burst 1e-5 2e-5                          ROHC-over-Ethernet tunnel with ROHC O-mode and bursty BER\n\
+\n\
+Report bugs to <" PACKAGE_BUGREPORT ">.\n");
 }
 
 
@@ -333,16 +359,16 @@ Examples:\n\
  */
 void version(void)
 {
-	printf("ROHC tunnel version %s\n", rohc_version());
+	printf("rohctunnel version %s\n", rohc_version());
 }
 
 
 /// The file descriptor where to write the compression statistics
-FILE *stats_comp;
+static FILE *stats_comp;
 /// The file descriptor where to write the decompression statistics
-FILE *stats_decomp;
+static FILE *stats_decomp;
 /// The sequence number for the UDP tunnel (used to discover lost packets)
-unsigned int seq;
+static unsigned int tunnel_seq;
 
 
 /**
@@ -368,7 +394,7 @@ int main(int argc, char *argv[])
 	double p2 = 0;
 
 	/* ROHC mode */
-	int is_umode;
+	rohc_mode_t mode;
 
 	size_t arg_count;
 
@@ -392,6 +418,11 @@ int main(int argc, char *argv[])
 	/*
 	 * Parse arguments:
 	 */
+
+	fprintf(stderr, "\n");
+	fprintf(stderr, "=== The ROHC over UDP tunnel is deprecated.\n");
+	fprintf(stderr, "=== Run with --help or see man page for more details.\n");
+	fprintf(stderr, "\n");
 
 	/* check the number of arguments:
 	 *   rohctunnel version            -> 2 arguments
@@ -551,10 +582,10 @@ int main(int argc, char *argv[])
 	}
 
 	/* get the error model and its parameters if present */
-	if(argc > arg_count && strcmp(argv[arg_count], "error") == 0)
+	if(((size_t) argc) > arg_count && strcmp(argv[arg_count], "error") == 0)
 	{
 		arg_count++;
-		if(argc <= arg_count)
+		if(((size_t) argc) <= arg_count)
 		{
 			fprintf(stderr, "the error keyword requires an argument: "
 			        "none, uniform or burst\n");
@@ -575,7 +606,7 @@ int main(int argc, char *argv[])
 			arg_count++;
 
 			/* check if parameters are present */
-			if(argc <= arg_count)
+			if(((size_t) argc) <= arg_count)
 			{
 				usage();
 				goto quit;
@@ -601,7 +632,7 @@ int main(int argc, char *argv[])
 			arg_count++;
 
 			/* check if parameters are present */
-			if(argc < arg_count + 2)
+			if(((size_t) argc) < (arg_count + 2))
 			{
 				usage();
 				goto quit;
@@ -642,10 +673,10 @@ int main(int argc, char *argv[])
 	}
 
 	/* get the direction mode if present */
-	if(argc > arg_count && strcmp(argv[arg_count], "dir") == 0)
+	if(((size_t) argc) > arg_count && strcmp(argv[arg_count], "dir") == 0)
 	{
 		arg_count++;
-		if(argc <= arg_count)
+		if(((size_t) argc) <= arg_count)
 		{
 			fprintf(stderr, "the dir keyword requires an argument: "
 			        "unidirectional or bidirectional\n");
@@ -655,12 +686,12 @@ int main(int argc, char *argv[])
 		if(strcmp(argv[arg_count], "unidirectional") == 0)
 		{
 			fprintf(stderr, "force unidirectional mode\n");
-			is_umode = 1;
+			mode = ROHC_U_MODE;
 		}
 		else if(strcmp(argv[arg_count], "bidirectional") == 0)
 		{
 			fprintf(stderr, "force bidirectional mode\n");
-			is_umode = 0;
+			mode = ROHC_O_MODE;
 		}
 		else
 		{
@@ -671,13 +702,22 @@ int main(int argc, char *argv[])
 	else
 	{
 		fprintf(stderr, "force bidirectional mode (default)\n");
-		is_umode = 0;
+		mode = ROHC_O_MODE;
 	}
 
 
 	/*
 	 * Network interface part:
 	 */
+
+	/* init the context that will store the feedbacks while waiting for them
+	 * to be sent (alone or piggybacked) */
+	tunnel.feedback_send.time.sec = 0;
+	tunnel.feedback_send.time.nsec = 0;
+	tunnel.feedback_send.data = tunnel.feedback_send_buf;
+	tunnel.feedback_send.max_len = FEEDBACK_SEND_MAX_LEN;
+	tunnel.feedback_send.offset = 3;
+	tunnel.feedback_send.len = 0;
 
 	/* create virtual network interface */
 	tun = tun_create(tun_name);
@@ -721,8 +761,12 @@ int main(int argc, char *argv[])
 	 * ROHC part:
 	 */
 
+	/* initialize the random generator */
+	seed = time(NULL);
+	srand(seed);
+
 	/* create the compressor and activate profiles */
-	comp = rohc_alloc_compressor(ROHC_SMALL_CID_MAX, 0, 0, 0);
+	comp = rohc_comp_new2(ROHC_SMALL_CID, ROHC_SMALL_CID_MAX, gen_random_num, NULL);
 	if(comp == NULL)
 	{
 		fprintf(stderr, "cannot create the ROHC compressor\n");
@@ -730,32 +774,25 @@ int main(int argc, char *argv[])
 	}
 
 	/* set trace callback for compressor */
-	if(!rohc_comp_set_traces_cb(comp, print_rohc_traces))
+	if(!rohc_comp_set_traces_cb2(comp, print_rohc_traces, NULL))
 	{
 		fprintf(stderr, "cannot set trace callback for the compressor\n");
 		goto destroy_comp;
 	}
 
-	rohc_activate_profile(comp, ROHC_PROFILE_UNCOMPRESSED);
-	rohc_activate_profile(comp, ROHC_PROFILE_UDP);
-	rohc_activate_profile(comp, ROHC_PROFILE_IP);
-	rohc_activate_profile(comp, ROHC_PROFILE_UDPLITE);
-	rohc_activate_profile(comp, ROHC_PROFILE_RTP);
-	rohc_activate_profile(comp, ROHC_PROFILE_ESP);
-
-	/* initialize the random generator */
-	seed = time(NULL);
-	srand(seed);
-
-	/* set the callback for random numbers */
-	if(!rohc_comp_set_random_cb(comp, gen_random_num, NULL))
+	/* enable the compression profiles
+	 * (the IP/TCP profile is not ready enough to be enabled) */
+	if(!rohc_comp_enable_profiles(comp, ROHC_PROFILE_UNCOMPRESSED,
+	                              ROHC_PROFILE_RTP, ROHC_PROFILE_UDP,
+	                              ROHC_PROFILE_IP, ROHC_PROFILE_UDPLITE,
+	                              ROHC_PROFILE_ESP, -1))
 	{
-		fprintf(stderr, "failed to set the callback for random numbers\n");
+		fprintf(stderr, "failed to enable the compression profiles\n");
 		goto destroy_comp;
 	}
 
 	/* create the decompressor (associate it with the compressor) */
-	decomp = rohc_alloc_decompressor(is_umode ? NULL : comp);
+	decomp = rohc_decomp_new2(ROHC_SMALL_CID, ROHC_SMALL_CID_MAX, mode);
 	if(decomp == NULL)
 	{
 		fprintf(stderr, "cannot create the ROHC decompressor\n");
@@ -763,14 +800,14 @@ int main(int argc, char *argv[])
 	}
 
 	/* set trace callback for decompressor */
-	if(!rohc_decomp_set_traces_cb(decomp, print_rohc_traces))
+	if(!rohc_decomp_set_traces_cb2(decomp, print_rohc_traces, NULL))
 	{
 		fprintf(stderr, "cannot set trace callback for the decompressor\n");
 		goto destroy_decomp;
 	}
 
 
-	/* 
+	/*
 	 * Main program:
 	 */
 
@@ -793,7 +830,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* init the tunnel sequence number */
-	seq = 0;
+	tunnel_seq = 0;
 
 	/* catch signals to properly shutdown the bridge */
 	alive = 1;
@@ -852,7 +889,8 @@ int main(int argc, char *argv[])
 #endif
 			   FD_ISSET(wan, &readfds))
 			{
-				failure = wan2tun(decomp, wan, tun, tunnel.type);
+				failure = wan2tun(&tunnel, decomp, wan, tun,
+				                  mode == ROHC_U_MODE ? NULL : comp);
 #if STOP_ON_FAILURE
 				if(failure)
 					alive = 0;
@@ -864,7 +902,7 @@ int main(int argc, char *argv[])
 		gettimeofday(&now, NULL);
 		if(now.tv_sec > last.tv_sec + 1)
 		{
-			failure = flush_feedback(comp, wan, &tunnel);
+			failure = flush_feedback(wan, &tunnel);
 			last = now;
 #if STOP_ON_FAILURE
 			if(failure)
@@ -883,9 +921,9 @@ int main(int argc, char *argv[])
 close_stats_comp:
 	fclose(stats_comp);
 destroy_decomp:
-	rohc_free_decompressor(decomp);
+	rohc_decomp_free(decomp);
 destroy_comp:
-	rohc_free_compressor(comp);
+	rohc_comp_free(comp);
 close_wan:
 	close(wan);
 close_tun:
@@ -960,19 +998,22 @@ int tun_create(char *name)
  * @param length  OUT: the length of the data
  * @return        0 in case of success, a non-null value otherwise
  */
-int read_from_tun(int fd, unsigned char *packet, unsigned int *length)
+int read_from_tun(const int fd, struct rohc_buf *const packet)
 {
 	int ret;
 
-	ret = read(fd, packet, *length);
-
-	if(ret < 0 || ret > *length)
+	ret = read(fd, rohc_buf_data(*packet), rohc_buf_avail_len(*packet));
+	if(ret < 0 || ((unsigned int) ret) > rohc_buf_avail_len(*packet))
 	{
 		fprintf(stderr, "read failed: %s (%d)\n", strerror(errno), errno);
 		goto error;
 	}
-
-	*length = ret;
+	else if(ret < 4)
+	{
+		fprintf(stderr, "read failed: packet is smaller than the TUN header\n");
+		goto error;
+	}
+	packet->len += ret;
 
 #if DEBUG
 	fprintf(stderr, "read %u bytes on fd %d\n", ret, fd);
@@ -981,7 +1022,6 @@ int read_from_tun(int fd, unsigned char *packet, unsigned int *length)
 	return 0;
 
 error:
-	*length = 0;
 	return 1;
 }
 
@@ -994,14 +1034,13 @@ error:
  *
  * @param fd      The TUN file descriptor to write data to
  * @param packet  The packet to write to the TUN interface (header included)
- * @param length  The length of the packet (header included)
  * @return        0 in case of success, a non-null value otherwise
  */
-int write_to_tun(int fd, unsigned char *packet, unsigned int length)
+int write_to_tun(int fd, struct rohc_buf packet)
 {
 	int ret;
 
-	ret = write(fd, packet, length);
+	ret = write(fd, rohc_buf_data(packet), packet.len);
 	if(ret < 0)
 	{
 		fprintf(stderr, "write failed: %s (%d)\n", strerror(errno), errno);
@@ -1009,7 +1048,7 @@ int write_to_tun(int fd, unsigned char *packet, unsigned int length)
 	}
 
 #if DEBUG
-	fprintf(stderr, "%u bytes written on fd %d\n", length, fd);
+	fprintf(stderr, "%zu bytes written on fd %d\n", packet.len, fd);
 #endif
 
 	return 0;
@@ -1071,7 +1110,7 @@ int udp_create(struct in_addr laddr, int port)
 		        strerror(errno), errno);
 		goto close;
 	}
-	
+
 	return sock;
 
 close:
@@ -1085,11 +1124,10 @@ quit:
  * @brief Read data from the UDP socket
  *
  * @param sock    The UDP socket descriptor to read data from
- * @param buffer  The buffer where to store the data
- * @param length  OUT: the length of the data
+ * @param packet  The packet to read
  * @return        0 in case of success, a non-null value otherwise
  */
-int read_from_udp(int sock, unsigned char *buffer, unsigned int *length)
+int read_from_udp(int sock, struct rohc_buf *const packet)
 {
 	struct sockaddr_in addr;
 	socklen_t addr_len;
@@ -1099,30 +1137,29 @@ int read_from_udp(int sock, unsigned char *buffer, unsigned int *length)
 	memset(&addr, 0, addr_len);
 
 	/* read data from the UDP socket */
-	ret = recvfrom(sock, buffer, *length, 0, (struct sockaddr *) &addr,
-	               &addr_len);
+	ret = recvfrom(sock, rohc_buf_data(*packet), rohc_buf_avail_len(*packet),
+	               0, (struct sockaddr *) &addr, &addr_len);
 
-	if(ret < 0 || ret > *length)
+	if(ret < 0 || ((unsigned int) ret) > rohc_buf_avail_len(*packet))
 	{
 		fprintf(stderr, "recvfrom failed: %s (%d)\n", strerror(errno), errno);
 		goto error;
 	}
-
-	if(ret == 0)
-		goto quit;
-
-	*length = ret;
+	else if(ret < 2)
+	{
+		fprintf(stderr, "recvfrom failed: packet too small for UDP header\n");
+		goto error;
+	}
+	packet->len += ret;
 
 #if DEBUG
-	fprintf(stderr, "read one %u-byte ROHC packet on UDP socket %d\n",
-	        *length - 2, sock);
+	fprintf(stderr, "read one %zu-byte ROHC packet on UDP socket %d\n",
+	        packet->len - 2, sock);
 #endif
 
-quit:
 	return 0;
 
 error:
-	*length = 0;
 	return 1;
 }
 
@@ -1140,12 +1177,13 @@ error:
  * @param raddr   The remote address of the tunnel (ie. the address where to
  *                send the UDP datagrams)
  * @param port    The remote UDP port where to send the UDP data
- * @param buffer  The packet to write to the UDP socket
- * @param length  The length of the packet
+ * @param packet  The packet to write to the UDP socket
  * @return        0 in case of success, a non-null value otherwise
  */
-int write_to_udp(int sock, struct in_addr raddr, int port,
-                 unsigned char *packet, unsigned int length)
+int write_to_udp(int sock,
+                 struct in_addr raddr,
+                 int port,
+                 struct rohc_buf packet)
 {
 	struct sockaddr_in addr;
 	int ret;
@@ -1156,12 +1194,13 @@ int write_to_udp(int sock, struct in_addr raddr, int port,
 	addr.sin_port = htons(port);
 
 	/* write the tunnel sequence number at the beginning of packet */
-	packet[0] = (htons(seq) >> 8) & 0xff;
-	packet[1] = htons(seq) & 0xff;
+	rohc_buf_pull(&packet, 2);
+	rohc_buf_byte_at(packet, 0) = (htons(tunnel_seq) >> 8) & 0xff;
+	rohc_buf_byte_at(packet, 1) = htons(tunnel_seq) & 0xff;
 
 	/* send the data on the UDP socket */
-	ret = sendto(sock, packet, length, 0, (struct sockaddr *) &addr,
-	             sizeof(struct sockaddr_in));
+	ret = sendto(sock, rohc_buf_data(packet), packet.len, 0,
+	             (struct sockaddr *) &addr, sizeof(struct sockaddr_in));
 	if(ret < 0)
 	{
 		fprintf(stderr, "sendto failed: %s (%d)\n", strerror(errno), errno);
@@ -1169,7 +1208,7 @@ int write_to_udp(int sock, struct in_addr raddr, int port,
 	}
 
 #if DEBUG
-	fprintf(stderr, "%u bytes written on socket %d\n", length, sock);
+	fprintf(stderr, "%zu bytes written on socket %d\n", packet.len, sock);
 #endif
 
 	return 0;
@@ -1234,13 +1273,10 @@ quit:
  * @brief Read data from the RAW socket
  *
  * @param sock    The RAW socket descriptor to read data from
- * @param buffer  The buffer where to store the data
- * @param length  OUT: the length of the data
+ * @param packet  The packet to read
  * @return        0 in case of success, a non-null value otherwise
  */
-static int read_from_raw(const int sock,
-                         unsigned char *const buffer,
-                         unsigned int *const length)
+static int read_from_raw(const int sock, struct rohc_buf *const packet)
 {
 	struct sockaddr_ll addr;
 	socklen_t addr_len;
@@ -1250,29 +1286,28 @@ static int read_from_raw(const int sock,
 	memset(&addr, 0, addr_len);
 
 	/* read data from the UDP socket */
-	ret = recvfrom(sock, buffer, *length, 0, (struct sockaddr *) &addr,
-	               &addr_len);
-	if(ret < 0 || ret > *length)
+	ret = recvfrom(sock, rohc_buf_data(*packet), rohc_buf_avail_len(*packet),
+	               0, (struct sockaddr *) &addr, &addr_len);
+	if(ret < 0 || ((unsigned int) ret) > rohc_buf_avail_len(*packet))
 	{
 		fprintf(stderr, "recvfrom failed: %s (%d)\n", strerror(errno), errno);
 		goto error;
 	}
-
-	if(ret == 0)
-		goto quit;
-
-	*length = ret;
+	else if(ret < 3)
+	{
+		fprintf(stderr, "recvfrom failed: packet too small for RAW header\n");
+		goto error;
+	}
+	packet->len += ret;
 
 #if DEBUG
-	fprintf(stderr, "read one %u-byte ROHC packet on RAW socket %d\n",
-	        *length - 2, sock);
+	fprintf(stderr, "read one %zu-byte ROHC packet on RAW socket %d\n",
+	        packet->len - 3, sock);
 #endif
 
-quit:
 	return 0;
 
 error:
-	*length = 0;
 	return 1;
 }
 
@@ -1294,24 +1329,16 @@ error:
  * @param raddr      The remote address of the tunnel (ie. the address where
  *                   to send the Ethernet datagrams)
  * @param itf_index  The index of the local interface on which to write
- * @param buffer     The packet to write to the RAW socket
- * @param length     The length of the packet
+ * @param packet     The packet to write to the RAW socket
  * @return           0 in case of success, a non-null value otherwise
  */
 static int write_to_raw(const int sock,
                         const uint8_t raddr[ETH_ALEN],
                         const unsigned int itf_index,
-                        unsigned char *const packet,
-                        const unsigned int length)
+                        struct rohc_buf packet)
 {
 	struct sockaddr_ll addr;
 	int ret;
-
-	if(length <= 3 || length > 255)
-	{
-		fprintf(stderr, "write_to_raw: bad length %u\n", length);
-		goto error;
-	}
 
 	memset(&addr, 0, sizeof(addr));
 	addr.sll_family = AF_PACKET;
@@ -1321,18 +1348,24 @@ static int write_to_raw(const int sock,
 	memcpy(addr.sll_addr, raddr, ETH_ALEN);
 
 	/* write the tunnel sequence number at the beginning of packet */
-	packet[0] = (htons(seq) >> 8) & 0xff;
-	packet[1] = htons(seq) & 0xff;
+	rohc_buf_pull(&packet, 3);
+	if(packet.len <= 3 || packet.len > 255)
+	{
+		fprintf(stderr, "write_to_raw: bad length %zu\n", packet.len);
+		goto error;
+	}
+	rohc_buf_byte_at(packet, 0) = (htons(tunnel_seq) >> 8) & 0xff;
+	rohc_buf_byte_at(packet, 1) = htons(tunnel_seq) & 0xff;
 
 	/* Current ROHC packet length. Since for Ethernet min payload is 46 and
-	 * any excess bytes after payload are  padded. It is very much possible
+	 * any excess bytes after payload are padded. It is very much possible
 	 * that current ROHC packet length is less than 46 bytes, so the length is
 	 * conveyed in the third byte */
-	packet[2] = length - 3;
+	rohc_buf_byte_at(packet, 2) = packet.len - 3;
 
 	/* send the data on the UDP socket */
-	ret = sendto(sock, packet, length, 0, (struct sockaddr *) &addr,
-	             sizeof(struct sockaddr_ll));
+	ret = sendto(sock, rohc_buf_data(packet), packet.len, 0,
+	             (struct sockaddr *) &addr, sizeof(struct sockaddr_ll));
 	if(ret < 0)
 	{
 		fprintf(stderr, "sendto failed: %s (%d)\n", strerror(errno), errno);
@@ -1340,7 +1373,7 @@ static int write_to_raw(const int sock,
 	}
 
 #if DEBUG
-	fprintf(stderr, "%u bytes written on socket %d\n", length, sock);
+	fprintf(stderr, "%zu bytes written on socket %d\n", packet.len, sock);
 #endif
 
 	return 0;
@@ -1381,13 +1414,18 @@ int tun2wan(struct rohc_comp *comp,
             const struct rohc_tunnel *const tunnel,
             int error, double ber, double pe2, double p2)
 {
-	static unsigned char buffer[TUNTAP_BUFSIZE];
-	static unsigned char rohc_packet[3 + MAX_ROHC_SIZE];
-	unsigned int buffer_len = TUNTAP_BUFSIZE;
-	unsigned char *packet;
-	size_t packet_len;
+	/* the buffer that will contain the uncompressed packet */
+	static unsigned char uncomp_buffer[TUNTAP_BUFSIZE];
+	struct rohc_buf uncomp_packet =
+		rohc_buf_init_empty(uncomp_buffer, TUNTAP_BUFSIZE);
+
+	/* the buffer that will contain the compressed ROHC packet */
+	static unsigned char rohc_buffer[3 + MAX_ROHC_SIZE];
+	struct rohc_buf rohc_packet =
+		rohc_buf_init_empty(rohc_buffer, 3 + MAX_ROHC_SIZE);
+
 	bool is_segment = false;
-	size_t rohc_size;
+	rohc_status_t status;
 	int ret;
 
 	/* error emulation */
@@ -1406,8 +1444,6 @@ int tun2wan(struct rohc_comp *comp,
 
 	/* statistics output */
 	rohc_comp_last_packet_info2_t last_packet_info;
-	const char *modes[] = { "error", "U-mode", "O-mode", "R-mode" };
-	const char *states[] = { "error", "IR", "FO", "SO" };
 
 	/* init the error model variables */
 	if(error > 0)
@@ -1436,52 +1472,51 @@ int tun2wan(struct rohc_comp *comp,
 #endif
 
 	/* read the IP packet from the virtual interface */
-	ret = read_from_tun(from, buffer, &buffer_len);
+	ret = read_from_tun(from, &uncomp_packet);
 	if(ret != 0)
 	{
 		fprintf(stderr, "read_from_tun failed\n");
 		goto error;
 	}
 
-	if(buffer_len == 0)
-		goto quit;
+	/* skip the TUN header */
+	rohc_buf_pull(&uncomp_packet, 4);
 
-	packet = &buffer[4];
-	packet_len = buffer_len - 4;
+	/* skip the tunnel header */
+	rohc_packet.len += 3;
+	rohc_buf_pull(&rohc_packet, 3);
 
 	/* increment the tunnel sequence number */
-	seq++;
+	tunnel_seq++;
 
 	/* compress the IP packet */
 #if DEBUG
-	fprintf(stderr, "compress packet #%u (%zd bytes)\n", seq, packet_len);
+	fprintf(stderr, "compress packet #%u (%zd bytes)\n", tunnel_seq, packet_len);
 #endif
-	ret = rohc_compress2(comp, packet, packet_len,
-	                     rohc_packet + 3, MAX_ROHC_SIZE,
-	                     &rohc_size);
-	if(ret == ROHC_NEED_SEGMENT)
+	status = rohc_compress4(comp, uncomp_packet, &rohc_packet);
+	if(status == ROHC_STATUS_SEGMENT)
 	{
 		is_segment = true;
 	}
-	else if(ret != ROHC_OK)
+	else if(status != ROHC_STATUS_OK)
 	{
-		fprintf(stderr, "compression of packet #%u failed\n", seq);
-		dump_packet("IP packet", packet, packet_len);
+		fprintf(stderr, "compression of packet #%u failed\n", tunnel_seq);
+		dump_packet("IP packet", uncomp_packet);
 		goto error;
 	}
 
 	/* emulate lossy medium if asked to do so */
 	if(error == 1) /* uniform error model */
 	{
-		if(nb_bytes + rohc_size >= bytes_without_error)
+		if(nb_bytes + rohc_packet.len >= bytes_without_error)
 		{
 			to_drop = 1;
 			dropped++;
-			fprintf(stderr, "error inserted, ROHC packet #%u dropped\n", seq);
-			nb_bytes = rohc_size - (bytes_without_error - nb_bytes);
+			fprintf(stderr, "error inserted, ROHC packet #%u dropped\n", tunnel_seq);
+			nb_bytes = rohc_packet.len - (bytes_without_error - nb_bytes);
 		}
 
-		nb_bytes += rohc_size;
+		nb_bytes += rohc_packet.len;
 	}
 	else if(error == 2) /* non-uniform/burst error model */
 	{
@@ -1490,7 +1525,7 @@ int tun2wan(struct rohc_comp *comp,
 		if(is_state_drop && is_timeout(last, now, 2))
 		{
 			fprintf(stderr, "go back to normal state (too much time between "
-			        "packets #%u and #%u)\n", seq - 1, seq);
+			        "packets #%u and #%u)\n", tunnel_seq - 1, tunnel_seq);
 			is_state_drop = 0;
 		}
 		last = now;
@@ -1506,7 +1541,7 @@ int tun2wan(struct rohc_comp *comp,
 		{
 			to_drop = 1;
 			dropped++;
-			fprintf(stderr, "error inserted, ROHC packet #%u dropped\n", seq);
+			fprintf(stderr, "error inserted, ROHC packet #%u dropped\n", tunnel_seq);
 		}
 	}
 
@@ -1516,21 +1551,19 @@ int tun2wan(struct rohc_comp *comp,
 		if(is_segment)
 		{
 			/* retrieve and transmit all remaining ROHC segments */
-			while((ret = rohc_comp_get_segment(comp, rohc_packet + 3, MAX_ROHC_SIZE,
-			                                   &rohc_size)) != ROHC_NEED_SEGMENT)
+			while((status = rohc_comp_get_segment2(comp, &rohc_packet)) != ROHC_STATUS_SEGMENT)
 			{
 				/* write the ROHC segment in the tunnel */
 				if(tunnel->type == ROHC_TUNNEL_UDP)
 				{
 					ret = write_to_udp(to, tunnel->params.udp.raddr,
-					                   tunnel->params.udp.port,
-					                   rohc_packet + 1, 2 + rohc_size);
+					                   tunnel->params.udp.port, rohc_packet);
 				}
 				else /* ROHC_TUNNEL_ETHERNET */
 				{
 					ret = write_to_raw(to, tunnel->params.ethernet.raddr,
 					                   tunnel->params.ethernet.itf_index,
-					                   rohc_packet, 3 + rohc_size);
+					                   rohc_packet);
 				}
 				if(ret != 0)
 				{
@@ -1545,14 +1578,13 @@ int tun2wan(struct rohc_comp *comp,
 			if(tunnel->type == ROHC_TUNNEL_UDP)
 			{
 				ret = write_to_udp(to, tunnel->params.udp.raddr,
-				                   tunnel->params.udp.port,
-				                   rohc_packet + 1, 2 + rohc_size);
+				                   tunnel->params.udp.port, rohc_packet);
 			}
 			else /* ROHC_TUNNEL_ETHERNET */
 			{
 				ret = write_to_raw(to, tunnel->params.ethernet.raddr,
 				                   tunnel->params.ethernet.itf_index,
-				                   rohc_packet, 3 + rohc_size);
+				                   rohc_packet);
 			}
 			if(ret != 0)
 			{
@@ -1571,9 +1603,9 @@ int tun2wan(struct rohc_comp *comp,
 		goto error;
 	}
 	fprintf(stats_comp, "%d\t%s\t%s\t%lu\t%lu\t%lu\t%lu\t%u\n",
-	        seq,
-	        modes[last_packet_info.context_mode],
-	        states[last_packet_info.context_state],
+	        tunnel_seq,
+	        rohc_get_mode_descr(last_packet_info.context_mode),
+	        rohc_comp_get_state_descr(last_packet_info.context_state),
 	        last_packet_info.total_last_uncomp_size,
 	        last_packet_info.header_last_uncomp_size,
 	        last_packet_info.total_last_comp_size,
@@ -1581,7 +1613,6 @@ int tun2wan(struct rohc_comp *comp,
 	        dropped);
 	fflush(stats_comp);
 
-quit:
 	return 0;
 
 error:
@@ -1612,24 +1643,35 @@ void print_decomp_stats(unsigned int seq,
  * The function decompresses the ROHC packets thanks to the ROHC library before
  * sending them on the TUN interface.
  *
+ * @param tunnel       The tunnel context
  * @param decomp       The ROHC decompressor
  * @param from         The WAN socket descriptor to read from
  * @param to           The TUN file descriptor to write to
- * @param tunnel_type  The tunnel of the tunnel
+ * @param comp         The same-site associated ROHC compressor if any,
+ *                     NULL if running in unidirectional mode
  * @return             0 in case of success, a non-null value otherwise
  */
-int wan2tun(struct rohc_decomp *const decomp,
+int wan2tun(struct rohc_tunnel *const tunnel,
+            struct rohc_decomp *const decomp,
             const int from,
             const int to,
-            const rohc_tunnel_t tunnel_type)
+            struct rohc_comp *const comp)
 {
-	static unsigned char packet[3 + MAX_ROHC_SIZE];
-	static unsigned char decomp_packet[MAX_ROHC_SIZE + 4];
-	unsigned int packet_len = TUNTAP_BUFSIZE;
-	unsigned char *rohc_packet;
-	unsigned int rohc_pkt_len;
-	int decomp_size;
+	static unsigned char buffer[3 + TUNTAP_BUFSIZE];
+	struct rohc_buf packet = rohc_buf_init_empty(buffer, 3 + TUNTAP_BUFSIZE);
+
+	static unsigned char decomp_buffer[TUNTAP_BUFSIZE + 4];
+	struct rohc_buf decomp_packet =
+		rohc_buf_init_empty(decomp_buffer, TUNTAP_BUFSIZE + 4);
+
+	const size_t feedback_rcvd_max_len = 500;
+	uint8_t feedback_rcvd_buf[feedback_rcvd_max_len];
+	struct rohc_buf feedback_rcvd =
+		rohc_buf_init_empty(feedback_rcvd_buf, feedback_rcvd_max_len);
+
+	rohc_status_t status;
 	int ret;
+
 	static unsigned int max_seq = 0;
 	unsigned int new_seq;
 	static unsigned long lost_packets = 0;
@@ -1640,13 +1682,13 @@ int wan2tun(struct rohc_decomp *const decomp,
 #endif
 
 	/* read the sequence number + ROHC packet from the tunnel */
-	if(tunnel_type == ROHC_TUNNEL_UDP)
+	if(tunnel->type == ROHC_TUNNEL_UDP)
 	{
-		ret = read_from_udp(from, packet, &packet_len);
+		ret = read_from_udp(from, &packet);
 	}
 	else /* ROHC_TUNNEL_ETHERNET */
 	{
-		ret = read_from_raw(from, packet, &packet_len);
+		ret = read_from_raw(from, &packet);
 	}
 	if(ret != 0)
 	{
@@ -1654,8 +1696,8 @@ int wan2tun(struct rohc_decomp *const decomp,
 		goto error;
 	}
 
-	if((tunnel_type == ROHC_TUNNEL_UDP && packet_len <= 2) ||
-	   (tunnel_type == ROHC_TUNNEL_ETHERNET && packet_len <= 3))
+	if((tunnel->type == ROHC_TUNNEL_UDP && packet.len <= 2) ||
+	   (tunnel->type == ROHC_TUNNEL_ETHERNET && packet.len <= 3))
 	{
 		fprintf(stderr, "packet received from WAN is too short\n");
 		goto quit;
@@ -1663,7 +1705,8 @@ int wan2tun(struct rohc_decomp *const decomp,
 
 	/* find out if some ROHC packets were lost between compressor and
 	 * decompressor (use the tunnel sequence number) */
-	new_seq = ntohs((packet[0] << 8) + packet[1]);
+	new_seq = ntohs((rohc_buf_byte(packet) << 8) +
+	                rohc_buf_byte_at(packet, 1));
 	if(new_seq < max_seq)
 	{
 		/* some packets were reordered, the packet was wrongly
@@ -1694,69 +1737,77 @@ int wan2tun(struct rohc_decomp *const decomp,
 	/* current ROHC packet length. Since for Ethernet min payload is 46 bytes
 	 * and it is possible that current ROHC packet length is not that much, so
 	 * the current length is extracted from the third byte */
-	if(tunnel_type == ROHC_TUNNEL_UDP)
+	if(tunnel->type == ROHC_TUNNEL_UDP)
 	{
-		rohc_pkt_len = packet_len - 2;
-		rohc_packet = packet + 2;
+		rohc_buf_pull(&packet, 2);
 	}
 	else /* ROHC_TUNNEL_ETHERNET */
 	{
-		rohc_pkt_len = packet[2];
-		if(rohc_pkt_len > (packet_len - 3))
+		uint8_t rohc_pkt_len = rohc_buf_byte_at(packet, 2);
+		if(rohc_pkt_len > (packet.len - 3))
 		{
 			fprintf(stderr, "malformed Ethernet frame: length at byte #3 is "
 			        "greater thant the full Ethernet frame\n");
 			goto error;
 		}
-		rohc_packet = packet + 3;
+		rohc_buf_pull(&packet, 3);
+		packet.len = rohc_pkt_len;
 	}
+
+	/* skip the TUN header */
+	decomp_packet.len += 4;
+	rohc_buf_pull(&decomp_packet, 4);
 
 	/* decompress the ROHC packet */
 #if DEBUG
 	fprintf(stderr, "decompress ROHC packet #%u (%u bytes)\n",
-	        new_seq, rohc_pkt_len);
+	        new_seq, packet.len);
 #endif
-	decomp_size = rohc_decompress(decomp, rohc_packet, rohc_pkt_len,
-	                              &decomp_packet[4], MAX_ROHC_SIZE);
-	if(decomp_size <= 0)
+	status = rohc_decompress3(decomp, packet, &decomp_packet,
+	                          &feedback_rcvd, &(tunnel->feedback_send));
+	if(status != ROHC_STATUS_OK)
 	{
-		if(decomp_size == ROHC_FEEDBACK_ONLY)
+		fprintf(stderr, "decompression of packet #%u failed\n", new_seq);
+		dump_packet("ROHC packet", packet);
+		failed_decomp++;
+		goto drop;
+	}
+
+	/* give received feedback to the same-side associated compressor */
+	if(feedback_rcvd.len > 0 && comp != NULL)
+	{
+		if(!rohc_comp_deliver_feedback2(comp, feedback_rcvd))
 		{
-			/* no stats for feedback-only packets */
-			goto quit;
-		}
-		else
-		{
-			fprintf(stderr, "decompression of packet #%u failed\n", new_seq);
-			dump_packet("ROHC packet", rohc_packet, rohc_pkt_len);
-			failed_decomp++;
-			goto drop;
+			fprintf(stderr, "failed to deliver the received feedback to the "
+			        "same-site associated ROHC compressor\n");
 		}
 	}
 
 	/* build the TUN header */
-	decomp_packet[0] = 0;
-	decomp_packet[1] = 0;
-	switch((decomp_packet[4] >> 4) & 0x0f)
+	rohc_buf_push(&decomp_packet, 4);
+	rohc_buf_byte_at(decomp_packet, 0) = 0;
+	rohc_buf_byte_at(decomp_packet, 1) = 0;
+	switch((rohc_buf_byte_at(decomp_packet, 4) >> 4) & 0x0f)
 	{
 		case 4: /* IPv4 */
-			decomp_packet[2] = 0x08;
-			decomp_packet[3] = 0x00;
+			rohc_buf_byte_at(decomp_packet, 2) = 0x08;
+			rohc_buf_byte_at(decomp_packet, 3) = 0x00;
 			break;
 		case 6: /* IPv6 */
-			decomp_packet[2] = 0x86;
-			decomp_packet[3] = 0xdd;
+			rohc_buf_byte_at(decomp_packet, 2) = 0x86;
+			rohc_buf_byte_at(decomp_packet, 3) = 0xdd;
 			break;
 		default:
 			fprintf(stderr, "bad IP version (%d)\n",
-			        (decomp_packet[4] >> 4) & 0x0f);
-			dump_packet("ROHC packet", packet, packet_len);
-			dump_packet("Decompressed packet", &decomp_packet[4], decomp_size);
+			        (rohc_buf_byte_at(decomp_packet, 4) >> 4) & 0x0f);
+			dump_packet("ROHC packet", packet);
+			rohc_buf_pull(&decomp_packet, 4);
+			dump_packet("Decompressed packet", decomp_packet);
 			goto drop;
 	}
 
 	/* write the IP packet on the virtual interface */
-	ret = write_to_tun(to, decomp_packet, decomp_size + 4);
+	ret = write_to_tun(to, decomp_packet);
 	if(ret != 0)
 	{
 		fprintf(stderr, "write_to_tun failed\n");
@@ -1791,54 +1842,41 @@ error:
  * @param tunnel The type and parameters of the tunnel
  * @return       0 in case of success, a non-null value otherwise
  */
-int flush_feedback(struct rohc_comp *comp,
-                   const int to,
-                   const struct rohc_tunnel *const tunnel)
+int flush_feedback(const int to,
+                   struct rohc_tunnel *const tunnel)
 {
-	static unsigned char rohc_packet[3 + MAX_ROHC_SIZE];
-	int rohc_size;
 	int ret;
 
 #if DEBUG
-	fprintf(stderr, "\n");
+	fprintf(stderr, "flush %zu bytes of feedback data\n",
+	        tunnel->feedback_send.len);
 #endif
-
-	/* flush feedback data as many times as necessary */
-	do
+	if(tunnel->feedback_send.len > 0)
 	{
-		/* flush feedback data */
-		rohc_size = rohc_feedback_flush(comp, rohc_packet + 3, MAX_ROHC_SIZE);
+		/* increment the tunnel sequence number */
+		tunnel_seq++;
 
-#if DEBUG
-		fprintf(stderr, "flush %d bytes of feedback data\n", rohc_size);
-#endif
-
-		if(rohc_size > 0)
+		/* write the ROHC packet in the tunnel */
+		if(tunnel->type == ROHC_TUNNEL_UDP)
 		{
-			/* increment the tunnel sequence number */
-			seq++;
-
-			/* write the ROHC packet in the tunnel */
-			if(tunnel->type == ROHC_TUNNEL_UDP)
-			{
-				ret = write_to_udp(to, tunnel->params.udp.raddr,
-				                   tunnel->params.udp.port,
-				                   rohc_packet + 1, 2 + rohc_size);
-			}
-			else
-			{
-				ret = write_to_raw(to, tunnel->params.ethernet.raddr,
-				                   tunnel->params.ethernet.itf_index,
-				                   rohc_packet, 3 + rohc_size);
-			}
-			if(ret != 0)
-			{
-				fprintf(stderr, "failed to write data on tunnel\n");
-				goto error;
-			}
+			rohc_buf_push(&(tunnel->feedback_send), 2);
+			ret = write_to_udp(to, tunnel->params.udp.raddr,
+			                   tunnel->params.udp.port,
+			                   tunnel->feedback_send);
+		}
+		else
+		{
+			rohc_buf_push(&(tunnel->feedback_send), 3);
+			ret = write_to_raw(to, tunnel->params.ethernet.raddr,
+			                   tunnel->params.ethernet.itf_index,
+			                   tunnel->feedback_send);
+		}
+		if(ret != 0)
+		{
+			fprintf(stderr, "failed to write data on tunnel\n");
+			goto error;
 		}
 	}
-	while(rohc_size > 0);
 
 	return 0;
 
@@ -1860,22 +1898,21 @@ error:
  *
  * @param descr   A string that describes the packet
  * @param packet  The packet to display
- * @param length  The length of the packet to display
  */
-void dump_packet(char *descr, unsigned char *packet, const size_t length)
+void dump_packet(const char *const descr, const struct rohc_buf packet)
 {
 	size_t i;
 
 	fprintf(stderr, "-------------------------------\n");
-	fprintf(stderr, "%s (%zd bytes):\n", descr, length);
-	for(i = 0; i < length; i++)
+	fprintf(stderr, "%s (%zd bytes):\n", descr, packet.len);
+	for(i = 0; i < packet.len; i++)
 	{
 		if(i > 0 && (i % 16) == 0)
 			fprintf(stderr, "\n");
 		else if(i > 0 && (i % 8) == 0)
 			fprintf(stderr, "\t");
 
-		fprintf(stderr, "%.2x ", packet[i]);
+		fprintf(stderr, "%.2x ", rohc_buf_byte_at(packet, i));
 	}
 	fprintf(stderr, "\n");
 	fprintf(stderr, "-------------------------------\n");
@@ -1952,40 +1989,42 @@ int is_timeout(struct timeval first,
                unsigned int max)
 {
 	unsigned int delta_sec;
-	int is_timeout;
+	int verdict;
 
 	delta_sec = second.tv_sec - first.tv_sec;
 
 	if(delta_sec > max)
-		is_timeout = 1;
+		verdict = 1;
 	else if(delta_sec == max)
 	{
 		if(second.tv_usec > first.tv_usec)
-			is_timeout = 1;
+			verdict = 1;
 		else
-			is_timeout = 0;
+			verdict = 0;
 	}
 	else
-		is_timeout = 0;
+		verdict = 0;
 
-	return is_timeout;
+	return verdict;
 }
 
 
 /**
  * @brief Print traces emitted by the ROHC library
  *
- * @param level    The priority level of the trace
- * @param entity   The entity that emitted the trace among:
- *                  \li ROHC_TRACE_COMP
- *                  \li ROHC_TRACE_DECOMP
- * @param profile  The ID of the ROHC compression/decompression profile
- *                 the trace is related to
- * @param format   The format string of the trace
+ * @param priv_ctxt  An optional private context, may be NULL
+ * @param level      The priority level of the trace
+ * @param entity     The entity that emitted the trace among:
+ *                    \li ROHC_TRACE_COMP
+ *                    \li ROHC_TRACE_DECOMP
+ * @param profile    The ID of the ROHC compression/decompression profile
+ *                   the trace is related to
+ * @param format     The format string of the trace
  */
-static void print_rohc_traces(const rohc_trace_level_t level,
-                              const rohc_trace_entity_t entity,
-                              const int profile,
+static void print_rohc_traces(void *const priv_ctxt __attribute__((unused)),
+                              const rohc_trace_level_t level __attribute__((unused)),
+                              const rohc_trace_entity_t entity __attribute__((unused)),
+                              const int profile __attribute__((unused)),
                               const char *const format,
                               ...)
 {

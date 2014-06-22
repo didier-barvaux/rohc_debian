@@ -1,17 +1,19 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2011,2012,2013 Didier Barvaux
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -20,7 +22,6 @@
  * @author Didier Barvaux <didier.barvaux@toulouse.viveris.com>
  * @author Didier Barvaux <didier@barvaux.org>
  * @author David Moreau from TAS
- * @author The hackers from ROHC for Linux
  */
 
 #include "interval.h"
@@ -42,26 +43,25 @@
  * @param k     The number of least significant bits of the value that are
  *              transmitted
  * @param p     The shift parameter (may be negative)
- * @param min   OUT: The lower limit of the interval
- * @param max   OUT: The upper limit of the interval
+ * @return      The computed interval
  */
-void rohc_f_16bits(const uint16_t v_ref,
-                   const size_t k,
-                   const rohc_lsb_shift_t p,
-                   uint16_t *const min,
-                   uint16_t *const max)
+struct rohc_interval16 rohc_f_16bits(const uint16_t v_ref,
+                                     const size_t k,
+                                     const rohc_lsb_shift_t p)
 {
-	uint32_t min32;
-	uint32_t max32;
+	struct rohc_interval32 interval32;
+	struct rohc_interval16 interval16;
 
 	/* do not accept more bits than the field may contain */
 	assert(k <= 16);
 
 	/* use the function for 32-bit fields, then ensure that nothing is greater
 	 * than 0xffff */
-	rohc_f_32bits(v_ref, k, p, &min32, &max32);
-	*min = min32 & 0xfffff;
-	*max = max32 & 0xfffff;
+	interval32 = rohc_f_32bits(v_ref, k, p);
+	interval16.min = interval32.min & 0xfffff;
+	interval16.max = interval32.max & 0xfffff;
+
+	return interval16;
 }
 
 
@@ -79,15 +79,13 @@ void rohc_f_16bits(const uint16_t v_ref,
  * @param k     The number of least significant bits of the value that are
  *              transmitted
  * @param p     The shift parameter (may be negative)
- * @param min   OUT: The lower limit of the interval
- * @param max   OUT: The upper limit of the interval
+ * @return      The computed interval
  */
-void rohc_f_32bits(const uint32_t v_ref,
-                   const size_t k,
-                   const rohc_lsb_shift_t p,
-                   uint32_t *const min,
-                   uint32_t *const max)
+struct rohc_interval32 rohc_f_32bits(const uint32_t v_ref,
+                                     const size_t k,
+                                     const rohc_lsb_shift_t p)
 {
+	struct rohc_interval32 interval32;
 	uint32_t interval_width;
 	int32_t computed_p;
 
@@ -105,40 +103,7 @@ void rohc_f_32bits(const uint32_t v_ref,
 	}
 
 	/* determine the real p value to use */
-	switch(p)
-	{
-		case ROHC_LSB_SHIFT_RTP_TS: /* special computation for RTP TS encoding */
-		{
-			if(k <= 2)
-			{
-				computed_p = 0;
-			}
-			else
-			{
-				computed_p = (1 << (k - 2)) - 1;
-			}
-		}
-		break;
-
-		/* special computation for RTP and ESP SN encoding */
-		case ROHC_LSB_SHIFT_RTP_SN: /* = ROHC_LSB_SHIFT_ESP_SN */
-		{
-			if(k <= 4)
-			{
-				computed_p = 1;
-			}
-			else
-			{
-				computed_p = (1 << (k - 5)) - 1;
-			}
-		}
-		break;
-
-		default: /* otherwise: use the p value given as parameter */
-		{
-			computed_p = p;
-		}
-	}
+	computed_p = rohc_interval_compute_p(k, p);
 
 	/* compute the minimal and maximal values of the interval:
 	 *   min = v_ref - p
@@ -146,7 +111,9 @@ void rohc_f_32bits(const uint32_t v_ref,
 	 *
 	 * Straddling the lower and upper wraparound boundaries
 	 * is handled without additional operation */
-	*min = v_ref - computed_p;
-	*max = v_ref + interval_width - computed_p;
+	interval32.min = v_ref - computed_p;
+	interval32.max = v_ref + interval_width - computed_p;
+
+	return interval32;
 }
 

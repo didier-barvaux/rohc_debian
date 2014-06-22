@@ -88,7 +88,8 @@ build_triplet = @build@
 host_triplet = @host@
 subdir = src/common
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
-	$(top_srcdir)/depcomp $(include_HEADERS) $(noinst_HEADERS)
+	$(top_srcdir)/depcomp $(include_HEADERS) $(noinst_HEADERS) \
+	$(pkginclude_HEADERS)
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -124,21 +125,19 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)"
+am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)" \
+	"$(DESTDIR)$(pkgincludedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
-librohc_common_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am__objects_1 = librohc_common_la-rohc_common.lo \
 	librohc_common_la-rohc_packets.lo \
 	librohc_common_la-rohc_traces_internal.lo \
-	librohc_common_la-rohc_utils.lo librohc_common_la-crc.lo \
-	librohc_common_la-decode.lo \
-	librohc_common_la-ip_id_offset_decode.lo \
-	librohc_common_la-interval.lo librohc_common_la-lsb_decode.lo \
-	librohc_common_la-sdvl.lo librohc_common_la-wlsb.lo \
-	librohc_common_la-ip.lo librohc_common_la-ts_sc_comp.lo \
-	librohc_common_la-ts_sc_decomp.lo \
-	librohc_common_la-comp_list.lo librohc_common_la-cid.lo
+	librohc_common_la-rohc_utils.lo librohc_common_la-rohc_buf.lo \
+	librohc_common_la-crc.lo librohc_common_la-rohc_add_cid.lo \
+	librohc_common_la-interval.lo librohc_common_la-sdvl.lo \
+	librohc_common_la-ip.lo librohc_common_la-net_pkt.lo \
+	librohc_common_la-comp_list.lo librohc_common_la-rohc_stats.lo \
+	librohc_common_la-feedback_parse.lo
 am_librohc_common_la_OBJECTS = $(am__objects_1)
 librohc_common_la_OBJECTS = $(am_librohc_common_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -198,7 +197,7 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
-HEADERS = $(include_HEADERS) $(noinst_HEADERS)
+HEADERS = $(include_HEADERS) $(noinst_HEADERS) $(pkginclude_HEADERS)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 am__recursive_targets = \
@@ -265,6 +264,8 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CMOCKA_CFLAGS = @CMOCKA_CFLAGS@
+CMOCKA_LIBS = @CMOCKA_LIBS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CYGPATH_W = @CYGPATH_W@
@@ -311,6 +312,9 @@ PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 RANLIB = @RANLIB@
 ROHC_API_AGE = @ROHC_API_AGE@
 ROHC_API_CURRENT = @ROHC_API_CURRENT@
@@ -358,8 +362,10 @@ includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
 is_dot_found = @is_dot_found@
+is_doxy2man_found = @is_doxy2man_found@
 is_doxygen_found = @is_doxygen_found@
 is_gnuplot_found = @is_gnuplot_found@
+is_help2man_found = @is_help2man_found@
 is_latex_found = @is_latex_found@
 is_qemu_found = @is_qemu_found@
 is_sort_found = @is_sort_found@
@@ -384,7 +390,6 @@ prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
 sbindir = @sbindir@
-sched_lib = @sched_lib@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
@@ -392,54 +397,64 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = protocols . test
+SUBDIRS = protocols .
 lib_LTLIBRARIES = librohc_common.la
 sources = \
 	rohc_common.c \
 	rohc_packets.c \
 	rohc_traces_internal.c \
 	rohc_utils.c \
+	rohc_buf.c \
 	crc.c \
-	decode.c \
-	ip_id_offset_decode.c \
+	rohc_add_cid.c \
 	interval.c \
-	lsb_decode.c \
 	sdvl.c \
-	wlsb.c \
 	ip.c \
-	ts_sc_comp.c \
-	ts_sc_decomp.c \
+	net_pkt.c \
 	comp_list.c \
-	cid.c
+	rohc_stats.c \
+	feedback_parse.c
 
 public_headers = \
 	rohc.h \
 	rohc_packets.h \
-	rohc_traces.h
+	rohc_traces.h \
+	rohc_time.h \
+	rohc_buf.h
+
+
+# fake public headers installed in $includedir to point
+# to the real public headers in $includedir/$packagename
+public_compat_headers = \
+	compat_headers/rohc.h \
+	compat_headers/rohc_packets.h \
+	compat_headers/rohc_traces.h
 
 private_headers = \
+	rohc_internal.h \
 	rohc_bit_ops.h \
 	rohc_debug.h \
 	rohc_traces_internal.h \
-	rohc_time.h \
+	rohc_time_internal.h \
 	rohc_utils.h \
 	crc.h \
-	decode.h \
-	ip_id_offset_decode.h \
+	rohc_add_cid.h \
 	interval.h \
-	lsb_decode.h \
 	sdvl.h \
-	wlsb.h \
 	ip.h \
-	ts_sc_comp.h \
-	ts_sc_decomp.h \
+	net_pkt.h \
 	comp_list.h \
-	cid.h
+	rohc_stats.h \
+	feedback_parse.h
 
 librohc_common_la_SOURCES = $(sources)
-librohc_common_la_LIBADD = $(additional_platform_libs)
+librohc_common_la_LIBADD = \
+	$(builddir)/protocols/librohc_proto.la \
+	$(additional_platform_libs)
+
 librohc_common_la_LDFLAGS = \
 	$(configure_ldflags) \
+	-export-symbols $(srcdir)/librohc_common.symbols \
 	-no-undefined \
 	-version-info $(ROHC_API_CURRENT):$(ROHC_API_REVISION):$(ROHC_API_AGE)
 
@@ -449,8 +464,19 @@ librohc_common_la_CFLAGS = \
 librohc_common_la_CPPFLAGS = \
 	-I$(top_srcdir)/src
 
-include_HEADERS = $(public_headers)
+librohc_common_la_DEPENDENCIES = \
+	$(builddir)/protocols/librohc_proto.la \
+	$(srcdir)/librohc_common.symbols
+
+include_HEADERS = $(public_compat_headers)
+pkginclude_HEADERS = $(public_headers)
 noinst_HEADERS = $(private_headers)
+
+# extra files for releases
+EXTRA_DIST = \
+	librohc_common.symbols \
+	rohc
+
 all: all-recursive
 
 .SUFFIXES:
@@ -530,22 +556,20 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-cid.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-comp_list.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-crc.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-decode.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-feedback_parse.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-interval.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-ip.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-ip_id_offset_decode.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-lsb_decode.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-net_pkt.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-rohc_add_cid.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-rohc_buf.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-rohc_common.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-rohc_packets.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-rohc_stats.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-rohc_traces_internal.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-rohc_utils.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-sdvl.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-ts_sc_comp.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-ts_sc_decomp.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-wlsb.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -596,6 +620,13 @@ librohc_common_la-rohc_utils.lo: rohc_utils.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-rohc_utils.lo `test -f 'rohc_utils.c' || echo '$(srcdir)/'`rohc_utils.c
 
+librohc_common_la-rohc_buf.lo: rohc_buf.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-rohc_buf.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-rohc_buf.Tpo -c -o librohc_common_la-rohc_buf.lo `test -f 'rohc_buf.c' || echo '$(srcdir)/'`rohc_buf.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-rohc_buf.Tpo $(DEPDIR)/librohc_common_la-rohc_buf.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rohc_buf.c' object='librohc_common_la-rohc_buf.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-rohc_buf.lo `test -f 'rohc_buf.c' || echo '$(srcdir)/'`rohc_buf.c
+
 librohc_common_la-crc.lo: crc.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-crc.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-crc.Tpo -c -o librohc_common_la-crc.lo `test -f 'crc.c' || echo '$(srcdir)/'`crc.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-crc.Tpo $(DEPDIR)/librohc_common_la-crc.Plo
@@ -603,19 +634,12 @@ librohc_common_la-crc.lo: crc.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-crc.lo `test -f 'crc.c' || echo '$(srcdir)/'`crc.c
 
-librohc_common_la-decode.lo: decode.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-decode.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-decode.Tpo -c -o librohc_common_la-decode.lo `test -f 'decode.c' || echo '$(srcdir)/'`decode.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-decode.Tpo $(DEPDIR)/librohc_common_la-decode.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='decode.c' object='librohc_common_la-decode.lo' libtool=yes @AMDEPBACKSLASH@
+librohc_common_la-rohc_add_cid.lo: rohc_add_cid.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-rohc_add_cid.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-rohc_add_cid.Tpo -c -o librohc_common_la-rohc_add_cid.lo `test -f 'rohc_add_cid.c' || echo '$(srcdir)/'`rohc_add_cid.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-rohc_add_cid.Tpo $(DEPDIR)/librohc_common_la-rohc_add_cid.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rohc_add_cid.c' object='librohc_common_la-rohc_add_cid.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-decode.lo `test -f 'decode.c' || echo '$(srcdir)/'`decode.c
-
-librohc_common_la-ip_id_offset_decode.lo: ip_id_offset_decode.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-ip_id_offset_decode.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-ip_id_offset_decode.Tpo -c -o librohc_common_la-ip_id_offset_decode.lo `test -f 'ip_id_offset_decode.c' || echo '$(srcdir)/'`ip_id_offset_decode.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-ip_id_offset_decode.Tpo $(DEPDIR)/librohc_common_la-ip_id_offset_decode.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ip_id_offset_decode.c' object='librohc_common_la-ip_id_offset_decode.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-ip_id_offset_decode.lo `test -f 'ip_id_offset_decode.c' || echo '$(srcdir)/'`ip_id_offset_decode.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-rohc_add_cid.lo `test -f 'rohc_add_cid.c' || echo '$(srcdir)/'`rohc_add_cid.c
 
 librohc_common_la-interval.lo: interval.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-interval.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-interval.Tpo -c -o librohc_common_la-interval.lo `test -f 'interval.c' || echo '$(srcdir)/'`interval.c
@@ -624,26 +648,12 @@ librohc_common_la-interval.lo: interval.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-interval.lo `test -f 'interval.c' || echo '$(srcdir)/'`interval.c
 
-librohc_common_la-lsb_decode.lo: lsb_decode.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-lsb_decode.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-lsb_decode.Tpo -c -o librohc_common_la-lsb_decode.lo `test -f 'lsb_decode.c' || echo '$(srcdir)/'`lsb_decode.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-lsb_decode.Tpo $(DEPDIR)/librohc_common_la-lsb_decode.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='lsb_decode.c' object='librohc_common_la-lsb_decode.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-lsb_decode.lo `test -f 'lsb_decode.c' || echo '$(srcdir)/'`lsb_decode.c
-
 librohc_common_la-sdvl.lo: sdvl.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-sdvl.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-sdvl.Tpo -c -o librohc_common_la-sdvl.lo `test -f 'sdvl.c' || echo '$(srcdir)/'`sdvl.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-sdvl.Tpo $(DEPDIR)/librohc_common_la-sdvl.Plo
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='sdvl.c' object='librohc_common_la-sdvl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-sdvl.lo `test -f 'sdvl.c' || echo '$(srcdir)/'`sdvl.c
-
-librohc_common_la-wlsb.lo: wlsb.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-wlsb.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-wlsb.Tpo -c -o librohc_common_la-wlsb.lo `test -f 'wlsb.c' || echo '$(srcdir)/'`wlsb.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-wlsb.Tpo $(DEPDIR)/librohc_common_la-wlsb.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='wlsb.c' object='librohc_common_la-wlsb.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-wlsb.lo `test -f 'wlsb.c' || echo '$(srcdir)/'`wlsb.c
 
 librohc_common_la-ip.lo: ip.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-ip.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-ip.Tpo -c -o librohc_common_la-ip.lo `test -f 'ip.c' || echo '$(srcdir)/'`ip.c
@@ -652,19 +662,12 @@ librohc_common_la-ip.lo: ip.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-ip.lo `test -f 'ip.c' || echo '$(srcdir)/'`ip.c
 
-librohc_common_la-ts_sc_comp.lo: ts_sc_comp.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-ts_sc_comp.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-ts_sc_comp.Tpo -c -o librohc_common_la-ts_sc_comp.lo `test -f 'ts_sc_comp.c' || echo '$(srcdir)/'`ts_sc_comp.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-ts_sc_comp.Tpo $(DEPDIR)/librohc_common_la-ts_sc_comp.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ts_sc_comp.c' object='librohc_common_la-ts_sc_comp.lo' libtool=yes @AMDEPBACKSLASH@
+librohc_common_la-net_pkt.lo: net_pkt.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-net_pkt.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-net_pkt.Tpo -c -o librohc_common_la-net_pkt.lo `test -f 'net_pkt.c' || echo '$(srcdir)/'`net_pkt.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-net_pkt.Tpo $(DEPDIR)/librohc_common_la-net_pkt.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='net_pkt.c' object='librohc_common_la-net_pkt.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-ts_sc_comp.lo `test -f 'ts_sc_comp.c' || echo '$(srcdir)/'`ts_sc_comp.c
-
-librohc_common_la-ts_sc_decomp.lo: ts_sc_decomp.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-ts_sc_decomp.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-ts_sc_decomp.Tpo -c -o librohc_common_la-ts_sc_decomp.lo `test -f 'ts_sc_decomp.c' || echo '$(srcdir)/'`ts_sc_decomp.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-ts_sc_decomp.Tpo $(DEPDIR)/librohc_common_la-ts_sc_decomp.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ts_sc_decomp.c' object='librohc_common_la-ts_sc_decomp.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-ts_sc_decomp.lo `test -f 'ts_sc_decomp.c' || echo '$(srcdir)/'`ts_sc_decomp.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-net_pkt.lo `test -f 'net_pkt.c' || echo '$(srcdir)/'`net_pkt.c
 
 librohc_common_la-comp_list.lo: comp_list.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-comp_list.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-comp_list.Tpo -c -o librohc_common_la-comp_list.lo `test -f 'comp_list.c' || echo '$(srcdir)/'`comp_list.c
@@ -673,12 +676,19 @@ librohc_common_la-comp_list.lo: comp_list.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-comp_list.lo `test -f 'comp_list.c' || echo '$(srcdir)/'`comp_list.c
 
-librohc_common_la-cid.lo: cid.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-cid.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-cid.Tpo -c -o librohc_common_la-cid.lo `test -f 'cid.c' || echo '$(srcdir)/'`cid.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-cid.Tpo $(DEPDIR)/librohc_common_la-cid.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='cid.c' object='librohc_common_la-cid.lo' libtool=yes @AMDEPBACKSLASH@
+librohc_common_la-rohc_stats.lo: rohc_stats.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-rohc_stats.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-rohc_stats.Tpo -c -o librohc_common_la-rohc_stats.lo `test -f 'rohc_stats.c' || echo '$(srcdir)/'`rohc_stats.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-rohc_stats.Tpo $(DEPDIR)/librohc_common_la-rohc_stats.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rohc_stats.c' object='librohc_common_la-rohc_stats.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-cid.lo `test -f 'cid.c' || echo '$(srcdir)/'`cid.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-rohc_stats.lo `test -f 'rohc_stats.c' || echo '$(srcdir)/'`rohc_stats.c
+
+librohc_common_la-feedback_parse.lo: feedback_parse.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-feedback_parse.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-feedback_parse.Tpo -c -o librohc_common_la-feedback_parse.lo `test -f 'feedback_parse.c' || echo '$(srcdir)/'`feedback_parse.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-feedback_parse.Tpo $(DEPDIR)/librohc_common_la-feedback_parse.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='feedback_parse.c' object='librohc_common_la-feedback_parse.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-feedback_parse.lo `test -f 'feedback_parse.c' || echo '$(srcdir)/'`feedback_parse.c
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -706,6 +716,27 @@ uninstall-includeHEADERS:
 	@list='$(include_HEADERS)'; test -n "$(includedir)" || list=; \
 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
 	dir='$(DESTDIR)$(includedir)'; $(am__uninstall_files_from_dir)
+install-pkgincludeHEADERS: $(pkginclude_HEADERS)
+	@$(NORMAL_INSTALL)
+	@list='$(pkginclude_HEADERS)'; test -n "$(pkgincludedir)" || list=; \
+	if test -n "$$list"; then \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(pkgincludedir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(pkgincludedir)" || exit 1; \
+	fi; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_HEADER) $$files '$(DESTDIR)$(pkgincludedir)'"; \
+	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(pkgincludedir)" || exit $$?; \
+	done
+
+uninstall-pkgincludeHEADERS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(pkginclude_HEADERS)'; test -n "$(pkgincludedir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	dir='$(DESTDIR)$(pkgincludedir)'; $(am__uninstall_files_from_dir)
 
 # This directory's subdirectories are mostly independent; you can cd
 # into them and run 'make' without going through this Makefile.
@@ -866,7 +897,7 @@ check: check-recursive
 all-am: Makefile $(LTLIBRARIES) $(HEADERS)
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)"; do \
+	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)" "$(DESTDIR)$(pkgincludedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-recursive
@@ -922,7 +953,7 @@ info: info-recursive
 
 info-am:
 
-install-data-am: install-includeHEADERS
+install-data-am: install-includeHEADERS install-pkgincludeHEADERS
 
 install-dvi: install-dvi-recursive
 
@@ -968,7 +999,8 @@ ps: ps-recursive
 
 ps-am:
 
-uninstall-am: uninstall-includeHEADERS uninstall-libLTLIBRARIES
+uninstall-am: uninstall-includeHEADERS uninstall-libLTLIBRARIES \
+	uninstall-pkgincludeHEADERS
 
 .MAKE: $(am__recursive_targets) install-am install-strip
 
@@ -981,12 +1013,13 @@ uninstall-am: uninstall-includeHEADERS uninstall-libLTLIBRARIES
 	install-dvi-am install-exec install-exec-am install-html \
 	install-html-am install-includeHEADERS install-info \
 	install-info-am install-libLTLIBRARIES install-man install-pdf \
-	install-pdf-am install-ps install-ps-am install-strip \
-	installcheck installcheck-am installdirs installdirs-am \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags tags-am uninstall uninstall-am \
-	uninstall-includeHEADERS uninstall-libLTLIBRARIES
+	install-pdf-am install-pkgincludeHEADERS install-ps \
+	install-ps-am install-strip installcheck installcheck-am \
+	installdirs installdirs-am maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags tags-am uninstall uninstall-am uninstall-includeHEADERS \
+	uninstall-libLTLIBRARIES uninstall-pkgincludeHEADERS
 
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.

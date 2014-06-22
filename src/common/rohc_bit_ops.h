@@ -1,24 +1,26 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2010,2012,2013 Didier Barvaux
+ * Copyright 2013 Viveris Technologies
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
  * @file    rohc_bit_ops.h
  * @brief   Bitwised operations for ROHC compression/decompression
  * @author  Didier Barvaux <didier.barvaux@toulouse.viveris.com>
- * @author  The hackers from ROHC for Linux
  * @author  Didier Barvaux <didier@barvaux.org>
  */
 
@@ -104,6 +106,79 @@
 		((((*((x) + 1)) << 8) & 0xff00) | ((*(x)) & 0x00ff))
 #endif
 
+
+/** Append new LSB bits to already extracted bits */
+#define APPEND_BITS(field_descr, ext_no, field, field_nr, bits, bits_nr, max) \
+	do \
+	{ \
+		/* ensure not to eval variables several times */ \
+		const typeof(bits) _bits = (bits); \
+		const size_t _bits_nr = (bits_nr); \
+		const size_t _max = (max); \
+		/* print a description of what we do */ \
+		rohc_decomp_debug(context, \
+		                  "%zd bits of " #field_descr " found in %s = 0x%x", \
+		                  (_bits_nr), rohc_get_ext_descr(ext_no), (_bits)); \
+		/* is there enough room for all existing and new bits? */ \
+		if(((field_nr) + (_bits_nr)) <= (_max)) \
+		{ \
+			/* enough room: make and clear room, copy LSB */ \
+			field <<= (_bits_nr); \
+			field &= ~((1 << (_bits_nr)) - 1); \
+			field |= (_bits); \
+			field_nr += (_bits_nr); \
+		} \
+		else \
+		{ \
+			/* not enough room: drop some MSB */ \
+			typeof(field) _mask; \
+			assert((_bits_nr) > 0); \
+			assert((_bits_nr) <= (_max)); \
+			/* remove extra MSB (warn if dropped MSB are non-zero) */ \
+			_mask = (1 << ((_max) - (_bits_nr))) - 1; \
+			if((field & _mask) != field) \
+			{ \
+				rohc_info((context)->decompressor, ROHC_TRACE_DECOMP, \
+				          (context)->profile->id, \
+				          "too many bits for " #field_descr ": %zu bits found " \
+				          "in %s, and %zu bits already found before for a " \
+				          "%zu-bit field", (_bits_nr), \
+				          rohc_get_ext_descr(ext_no), (field_nr), (_max)); \
+			} \
+			field &= _mask; \
+			/* make room and clear that room for new LSB */ \
+			field <<= (_bits_nr); \
+			field &= ~((1 << (_bits_nr)) - 1); \
+			/* add new LSB */ \
+			field |= (_bits); \
+			field_nr = (_max); \
+		} \
+	} \
+	while(0)
+
+/** SN: append new LSB bits to already extracted bits */
+#define APPEND_SN_BITS(ext_no, base, bits, bits_nr) \
+	APPEND_BITS(SN, ext_no, \
+	            (base)->sn, (base)->sn_nr, \
+	            (bits), (bits_nr), 32)
+
+/** Outer IP-ID: append new LSB bits to already extracted bits */
+#define APPEND_OUTER_IP_ID_BITS(ext_no, base, bits, bits_nr) \
+	APPEND_BITS(outer IP-ID, ext_no, \
+	            (base)->outer_ip.id, (base)->outer_ip.id_nr, \
+	            (bits), (bits_nr), 16)
+
+/** Inner IP-ID: append new LSB bits to already extracted bits */
+#define APPEND_INNER_IP_ID_BITS(ext_no, base, bits, bits_nr) \
+	APPEND_BITS(inner IP-ID, ext_no, \
+	            (base)->inner_ip.id, (base)->inner_ip.id_nr, \
+	            (bits), (bits_nr), 16)
+
+/** TS: append new LSB bits to already extracted bits */
+#define APPEND_TS_BITS(ext_no, base, bits, bits_nr) \
+	APPEND_BITS(TS, ext_no, \
+	            (base)->ts, (base)->ts_nr, \
+	            (bits), (bits_nr), 32)
 
 #endif
 

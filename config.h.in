@@ -6,9 +6,6 @@
 /* Define DLT_LINUX_SLL if not defined by the system */
 #undef DLT_LINUX_SLL
 
-/* Whether deprecated API is enabled or not. */
-#undef ENABLE_DEPRECATED_API
-
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #undef HAVE_ARPA_INET_H
 
@@ -57,9 +54,6 @@
 /* Define to 1 if you have the <pcap/pcap.h> header file. */
 #undef HAVE_PCAP_PCAP_H
 
-/* Define to 1 if you have the <sched.h> header file. */
-#undef HAVE_SCHED_H
-
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
 
@@ -74,9 +68,6 @@
 
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
-
-/* Define to 1 if you have the <sys/mman.h> header file. */
-#undef HAVE_SYS_MMAN_H
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
@@ -124,14 +115,11 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
+/* Whether deprecated API is enabled or not. */
+#undef ROHC_ENABLE_DEPRECATED_API
+
 /* Extra debug traces for ROHC library */
 #undef ROHC_EXTRA_DEBUG
-
-/* Whether RTP bit type is enabled or not. */
-#undef RTP_BIT_TYPE
-
-/* Define the number of arguments that sched_setscheduler takes */
-#undef SCHED_SETSCHEDULER_PARAMS
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS

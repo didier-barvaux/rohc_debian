@@ -1,17 +1,21 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2010,2011,2012,2013,2014 Didier Barvaux
+ * Copyright 2007,2008 Thales Alenia Space
+ * Copyright 2007,2009,2010,2012,2013,2014 Viveris Technologies
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -19,7 +23,6 @@
  * @brief ROHC compression context for the UDP profile.
  * @author Didier Barvaux <didier.barvaux@toulouse.viveris.com>
  * @author Didier Barvaux <didier@barvaux.org>
- * @author The hackers from ROHC for Linux
  */
 
 #include "c_udp.h"
@@ -81,25 +84,27 @@ struct sc_udp_context
  * Private function prototypes.
  */
 
-static int c_udp_create(struct c_context *const context,
-                        const struct ip_packet *ip);
+static bool c_udp_create(struct rohc_comp_ctxt *const context,
+                         const struct net_pkt *const packet)
+	__attribute__((warn_unused_result, nonnull(1, 2)));
 
-static void udp_decide_state(struct c_context *const context);
+static void udp_decide_state(struct rohc_comp_ctxt *const context);
 
-static int c_udp_encode(struct c_context *const context,
-                        const struct ip_packet *ip,
-                        const size_t packet_size,
-                        unsigned char *const dest,
-                        const size_t dest_size,
+static int c_udp_encode(struct rohc_comp_ctxt *const context,
+                        const struct net_pkt *const uncomp_pkt,
+                        unsigned char *const rohc_pkt,
+                        const size_t rohc_pkt_max_len,
                         rohc_packet_t *const packet_type,
-                        int *const payload_offset);
+                        size_t *const payload_offset)
+	__attribute__((warn_unused_result, nonnull(1, 2, 3, 5, 6)));
 
-static int udp_code_dynamic_udp_part(const struct c_context *context,
-                                     const unsigned char *next_header,
-                                     unsigned char *const dest,
-                                     int counter);
+static size_t udp_code_dynamic_udp_part(const struct rohc_comp_ctxt *const context,
+                                        const unsigned char *const next_header,
+                                        unsigned char *const dest,
+                                        const size_t counter)
+	__attribute__((warn_unused_result, nonnull(1, 2, 3)));
 
-static int udp_changed_udp_dynamic(const struct c_context *context,
+static int udp_changed_udp_dynamic(const struct rohc_comp_ctxt *context,
                                    const struct udphdr *udp);
 
 
@@ -110,79 +115,46 @@ static int udp_changed_udp_dynamic(const struct c_context *context,
  * This function is one of the functions that must exist in one profile for the
  * framework to work.
  *
- * @param context The compression context
- * @param ip      The IP/UDP packet given to initialize the new context
- * @return        1 if successful, 0 otherwise
+ * @param context  The compression context
+ * @param packet   The IP/UDP packet given to initialize the new context
+ * @return         true if successful, false otherwise
  */
-static int c_udp_create(struct c_context *const context,
-                        const struct ip_packet *ip)
+static bool c_udp_create(struct rohc_comp_ctxt *const context,
+                         const struct net_pkt *const packet)
 {
 	const struct rohc_comp *const comp = context->compressor;
 	struct c_generic_context *g_context;
 	struct sc_udp_context *udp_context;
-	struct ip_packet ip2;
-	const struct ip_packet *last_ip_header;
 	const struct udphdr *udp;
-	unsigned int ip_proto;
 
 	assert(context != NULL);
 	assert(context->profile != NULL);
-	assert(ip != NULL);
+	assert(packet != NULL);
 
 	/* create and initialize the generic part of the profile context */
-	if(!c_generic_create(context, ROHC_LSB_SHIFT_SN, ip))
+	if(!c_generic_create(context, ROHC_LSB_SHIFT_SN, packet))
 	{
-		rohc_warning(context->compressor, ROHC_TRACE_COMP, context->profile->id,
-		             "generic context creation failed\n");
+		rohc_comp_warn(context, "generic context creation failed");
 		goto quit;
 	}
 	g_context = (struct c_generic_context *) context->specific;
 
 	/* initialize SN to a random value (RFC 3095, 5.11.1) */
 	g_context->sn = comp->random_cb(comp, comp->random_cb_ctxt) & 0xffff;
-	rohc_comp_debug(context, "initialize context(SN) = random() = %u\n",
+	rohc_comp_debug(context, "initialize context(SN) = random() = %u",
 	                g_context->sn);
 
-	/* check if packet is IP/UDP or IP/IP/UDP */
-	ip_proto = ip_get_protocol(ip);
-	if(ip_proto == ROHC_IPPROTO_IPIP || ip_proto == ROHC_IPPROTO_IPV6)
-	{
-		/* get the last IP header */
-		if(!ip_get_inner_packet(ip, &ip2))
-		{
-			rohc_warning(context->compressor, ROHC_TRACE_COMP, context->profile->id,
-			             "cannot create the inner IP header\n");
-			goto clean;
-		}
-
-		/* two IP headers, the last IP header is the second one */
-		last_ip_header = &ip2;
-
-		/* get the transport protocol */
-		ip_proto = ip_get_protocol(last_ip_header);
-	}
-	else
-	{
-		/* only one single IP header, the last IP header is the first one */
-		last_ip_header = ip;
-	}
-
-	if(ip_proto != ROHC_IPPROTO_UDP)
-	{
-		rohc_warning(context->compressor, ROHC_TRACE_COMP, context->profile->id,
-		             "next header is not UDP (%d), cannot use this profile\n",
-		             ip_proto);
-		goto clean;
-	}
-
-	udp = (struct udphdr *) ip_get_next_layer(last_ip_header);
+	/* check that transport protocol is UDP */
+	assert(packet->transport->proto == ROHC_IPPROTO_UDP);
+	assert(packet->transport->data != NULL);
+	udp = (struct udphdr *) packet->transport->data;
 
 	/* create the UDP part of the profile context */
 	udp_context = malloc(sizeof(struct sc_udp_context));
 	if(udp_context == NULL)
 	{
-		rohc_warning(context->compressor, ROHC_TRACE_COMP, context->profile->id,
-		             "no memory for the UDP part of the profile context\n");
+		rohc_error(context->compressor, ROHC_TRACE_COMP, context->profile->id,
+		           "no memory for the UDP part of the profile context");
 		goto clean;
 	}
 	g_context->specific = udp_context;
@@ -195,7 +167,6 @@ static int c_udp_create(struct c_context *const context,
 	udp_context->tmp.send_udp_dynamic = -1;
 
 	/* init the UDP-specific variables and functions */
-	g_context->next_header_proto = ROHC_IPPROTO_UDP;
 	g_context->next_header_len = sizeof(struct udphdr);
 	g_context->decide_state = udp_decide_state;
 	g_context->decide_FO_packet = c_ip_decide_FO_packet;
@@ -211,12 +182,12 @@ static int c_udp_create(struct c_context *const context,
 	g_context->compute_crc_static = udp_compute_crc_static;
 	g_context->compute_crc_dynamic = udp_compute_crc_dynamic;
 
-	return 1;
+	return true;
 
 clean:
 	c_generic_destroy(context);
 quit:
-	return 0;
+	return false;
 }
 
 
@@ -239,79 +210,49 @@ quit:
  * This function is one of the functions that must exist in one profile for the
  * framework to work.
  *
- * @param comp      The ROHC compressor
- * @param outer_ip  The outer IP header of the IP packet to check
- * @param inner_ip  \li The inner IP header of the IP packet to check if the IP
- *                      packet contains at least 2 IP headers,
- *                  \li NULL if the IP packet to check contains only one IP header
- * @param protocol  The transport protocol carried by the IP packet:
- *                    \li the protocol carried by the outer IP header if there
- *                        is only one IP header,
- *                    \li the protocol carried by the inner IP header if there
- *                        are at least two IP headers.
- * @param ctxt_key  The key to help finding the context associated with packet
- * @return          Whether the IP packet corresponds to the profile:
- *                    \li true if the IP packet corresponds to the profile,
- *                    \li false if the IP packet does not correspond to
- *                        the profile
+ * @param comp    The ROHC compressor
+ * @param packet  The packet to check
+ * @return        Whether the IP packet corresponds to the profile:
+ *                  \li true if the IP packet corresponds to the profile,
+ *                  \li false if the IP packet does not correspond to
+ *                      the profile
  */
 bool c_udp_check_profile(const struct rohc_comp *const comp,
-                         const struct ip_packet *const outer_ip,
-                         const struct ip_packet *const inner_ip,
-                         const uint8_t protocol,
-                         rohc_ctxt_key_t *const ctxt_key)
+                         const struct net_pkt *const packet)
 {
-	const struct ip_packet *last_ip_header;
 	const struct udphdr *udp_header;
-	unsigned int ip_payload_size;
 	bool ip_check;
 
 	assert(comp != NULL);
-	assert(outer_ip != NULL);
-	assert(ctxt_key != NULL);
-
-	/* check that the transport protocol is UDP */
-	if(protocol != ROHC_IPPROTO_UDP)
-	{
-		goto bad_profile;
-	}
+	assert(packet != NULL);
 
 	/* check that the the versions of outer and inner IP headers are 4 or 6
 	   and that outer and inner IP headers are not IP fragments */
-	ip_check = c_generic_check_profile(comp, outer_ip, inner_ip, protocol,
-	                                   ctxt_key);
+	ip_check = c_generic_check_profile(comp, packet);
 	if(!ip_check)
 	{
 		goto bad_profile;
 	}
 
-	/* determine the last IP header */
-	if(inner_ip != NULL)
+	/* IP payload shall be large enough for UDP header */
+	if(packet->transport->len < sizeof(struct udphdr))
 	{
-		/* two IP headers, the last IP header is the inner IP header */
-		last_ip_header = inner_ip;
-	}
-	else
-	{
-		/* only one IP header, last IP header is the outer IP header */
-		last_ip_header = outer_ip;
+		goto bad_profile;
 	}
 
-	/* IP payload shall be large enough for UDP header */
-	ip_payload_size = ip_get_plen(last_ip_header);
-	if(ip_payload_size < sizeof(struct udphdr))
+	/* check that the transport protocol is UDP */
+	if(packet->transport->data == NULL ||
+	   packet->transport->proto != ROHC_IPPROTO_UDP)
 	{
 		goto bad_profile;
 	}
 
 	/* retrieve the UDP header */
-	udp_header = (const struct udphdr *) ip_get_next_layer(last_ip_header);
-	if(ip_payload_size != rohc_ntoh16(udp_header->len))
+	udp_header = (const struct udphdr *) packet->transport->data;
+	if(packet->transport->len != rohc_ntoh16(udp_header->len))
 	{
 		goto bad_profile;
 	}
-	*ctxt_key ^= udp_header->source;
-	*ctxt_key ^= udp_header->dest;
 
 	return true;
 
@@ -338,145 +279,37 @@ bad_profile:
  * This function is one of the functions that must exist in one profile for the
  * framework to work.
  *
- * @param context The compression context
- * @param ip      The IP/UDP packet to check
- * @return        true if the IP/UDP packet belongs to the context
- *                false if it does not belong to the context
+ * @param context  The compression context
+ * @param packet   The IP/UDP packet to check
+ * @return         true if the IP/UDP packet belongs to the context
+ *                 false if it does not belong to the context
  */
-bool c_udp_check_context(const struct c_context *context,
-                         const struct ip_packet *ip)
+bool c_udp_check_context(const struct rohc_comp_ctxt *const context,
+                         const struct net_pkt *const packet)
 {
 	struct c_generic_context *g_context;
 	struct sc_udp_context *udp_context;
-	struct ip_header_info *ip_flags;
-	struct ip_header_info *ip2_flags;
-	struct ip_packet ip2;
-	const struct ip_packet *last_ip_header;
 	const struct udphdr *udp;
-	ip_version version;
-	unsigned int ip_proto;
-	bool is_ip_same;
-	bool is_ip2_same;
-	bool is_udp_same;
 
 	g_context = (struct c_generic_context *) context->specific;
 	udp_context = (struct sc_udp_context *) g_context->specific;
-	ip_flags = &g_context->ip_flags;
-	ip2_flags = &g_context->ip2_flags;
 
-	/* check the IP version of the first header */
-	version = ip_get_version(ip);
-	if(version != ip_flags->version)
+	/* first, check the same parameters as for the IP-only profile */
+	if(!c_ip_check_context(context, packet))
 	{
 		goto bad_context;
 	}
 
-	/* compare the addresses of the first header */
-	if(version == IPV4)
-	{
-		is_ip_same = ip_flags->info.v4.old_ip.saddr == ipv4_get_saddr(ip) &&
-		             ip_flags->info.v4.old_ip.daddr == ipv4_get_daddr(ip);
-	}
-	else /* IPV6 */
-	{
-		is_ip_same =
-			IPV6_ADDR_CMP(&ip_flags->info.v6.old_ip.ip6_src, ipv6_get_saddr(ip)) &&
-			IPV6_ADDR_CMP(&ip_flags->info.v6.old_ip.ip6_dst, ipv6_get_daddr(ip));
-	}
-
-	if(!is_ip_same)
+	/* in addition, check UDP ports */
+	assert(packet->transport->data != NULL);
+	udp = (struct udphdr *) packet->transport->data;
+	if(udp_context->old_udp.source != udp->source ||
+	   udp_context->old_udp.dest != udp->dest)
 	{
 		goto bad_context;
 	}
 
-	/* compare the Flow Label of the first header if IPv6 */
-	if(version == IPV6 && ipv6_get_flow_label(ip) !=
-	   IPV6_GET_FLOW_LABEL(ip_flags->info.v6.old_ip))
-	{
-		goto bad_context;
-	}
-
-	/* check the second IP header */
-	ip_proto = ip_get_protocol(ip);
-	if(ip_proto == ROHC_IPPROTO_IPIP || ip_proto == ROHC_IPPROTO_IPV6)
-	{
-		/* check if the context used to have a second IP header */
-		if(!g_context->is_ip2_initialized)
-		{
-			goto bad_context;
-		}
-
-		/* get the second IP header */
-		if(!ip_get_inner_packet(ip, &ip2))
-		{
-			rohc_warning(context->compressor, ROHC_TRACE_COMP, context->profile->id,
-			             "cannot create the inner IP header\n");
-			goto bad_context;
-		}
-
-		/* check the IP version of the second header */
-		version = ip_get_version(&ip2);
-		if(version != ip2_flags->version)
-		{
-			goto bad_context;
-		}
-
-		/* compare the addresses of the second header */
-		if(version == IPV4)
-		{
-			is_ip2_same = ip2_flags->info.v4.old_ip.saddr == ipv4_get_saddr(&ip2) &&
-			              ip2_flags->info.v4.old_ip.daddr == ipv4_get_daddr(&ip2);
-		}
-		else /* IPV6 */
-		{
-			is_ip2_same = IPV6_ADDR_CMP(&ip2_flags->info.v6.old_ip.ip6_src,
-			                            ipv6_get_saddr(&ip2)) &&
-			              IPV6_ADDR_CMP(&ip2_flags->info.v6.old_ip.ip6_dst,
-			                            ipv6_get_daddr(&ip2));
-		}
-
-		if(!is_ip2_same)
-		{
-			goto bad_context;
-		}
-
-		/* compare the Flow Label of the second header if IPv6 */
-		if(version == IPV6 && ipv6_get_flow_label(&ip2) !=
-		   IPV6_GET_FLOW_LABEL(ip2_flags->info.v6.old_ip))
-		{
-			goto bad_context;
-		}
-
-		/* get the last IP header */
-		last_ip_header = &ip2;
-
-		/* get the transport protocol */
-		ip_proto = ip_get_protocol(&ip2);
-	}
-	else /* no second IP header */
-	{
-		/* check if the context used not to have a second header */
-		if(g_context->is_ip2_initialized)
-		{
-			goto bad_context;
-		}
-
-		/* only one single IP header, the last IP header is the first one */
-		last_ip_header = ip;
-	}
-
-	/* check the transport protocol */
-	if(ip_proto != ROHC_IPPROTO_UDP)
-	{
-		goto bad_context;
-	}
-
-	/* check UDP ports */
-	udp = (struct udphdr *) ip_get_next_layer(last_ip_header);
-	is_udp_same = udp_context->old_udp.source == udp->source &&
-	              udp_context->old_udp.dest == udp->dest;
-
-	return is_udp_same;
+	return true;
 
 bad_context:
 	return false;
@@ -487,31 +320,25 @@ bad_context:
  * @brief Encode an IP/UDP packet according to a pattern decided by several
  *        different factors.
  *
- * @param context        The compression context
- * @param ip             The IP packet to encode
- * @param packet_size    The length of the IP packet to encode
- * @param dest           The rohc-packet-under-build buffer
- * @param dest_size      The length of the rohc-packet-under-build buffer
- * @param packet_type    OUT: The type of ROHC packet that is created
- * @param payload_offset The offset for the payload in the IP packet
- * @return               The length of the created ROHC packet
- *                       or -1 in case of failure
+ * @param context           The compression context
+ * @param uncomp_pkt        The uncompressed packet to encode
+ * @param rohc_pkt          OUT: The ROHC packet
+ * @param rohc_pkt_max_len  The maximum length of the ROHC packet
+ * @param packet_type       OUT: The type of ROHC packet that is created
+ * @param payload_offset    OUT: The offset for the payload in the IP packet
+ * @return                  The length of the ROHC packet if successful,
+ *                          -1 otherwise
  */
-static int c_udp_encode(struct c_context *const context,
-                        const struct ip_packet *ip,
-                        const size_t packet_size,
-                        unsigned char *const dest,
-                        const size_t dest_size,
+static int c_udp_encode(struct rohc_comp_ctxt *const context,
+                        const struct net_pkt *const uncomp_pkt,
+                        unsigned char *const rohc_pkt,
+                        const size_t rohc_pkt_max_len,
                         rohc_packet_t *const packet_type,
-                        int *const payload_offset)
+                        size_t *const payload_offset)
 {
 	struct c_generic_context *g_context;
 	struct sc_udp_context *udp_context;
-	struct ip_packet ip2;
-	const struct ip_packet *last_ip_header;
 	const struct udphdr *udp;
-	unsigned int ip_proto;
-	size_t ip_hdrs_len;
 	int size;
 
 	assert(context != NULL);
@@ -520,45 +347,18 @@ static int c_udp_encode(struct c_context *const context,
 	assert(g_context->specific != NULL);
 	udp_context = (struct sc_udp_context *) g_context->specific;
 
-	ip_proto = ip_get_protocol(ip);
-	if(ip_proto == ROHC_IPPROTO_IPIP || ip_proto == ROHC_IPPROTO_IPV6)
-	{
-		/* get the last IP header */
-		if(!ip_get_inner_packet(ip, &ip2))
-		{
-			rohc_warning(context->compressor, ROHC_TRACE_COMP, context->profile->id,
-			             "cannot create the inner IP header\n");
-			return -1;
-		}
-		last_ip_header = &ip2;
-
-		/* get the transport protocol */
-		ip_proto = ip_get_protocol(last_ip_header);
-	}
-	else
-	{
-		/* only one single IP header, the last IP header is the first one */
-		last_ip_header = ip;
-	}
-
-	if(ip_proto != ROHC_IPPROTO_UDP)
-	{
-		rohc_warning(context->compressor, ROHC_TRACE_COMP, context->profile->id,
-		             "packet is not an UDP packet\n");
-		return -1;
-	}
-	udp = (struct udphdr *) ip_get_next_layer(last_ip_header);
+	/* retrieve the UDP header */
+	assert(uncomp_pkt->transport->data != NULL);
+	udp = (struct udphdr *) uncomp_pkt->transport->data;
 
 	/* check that UDP length is correct (we have to discard all packets with
 	 * wrong UDP length fields, otherwise the ROHC decompressor will compute
 	 * a different UDP length on its side) */
-	ip_hdrs_len = ((unsigned char *) udp) - ip->data;
-	if(rohc_ntoh16(udp->len) != (packet_size - ip_hdrs_len))
+	if(rohc_ntoh16(udp->len) != uncomp_pkt->transport->len)
 	{
-		rohc_warning(context->compressor, ROHC_TRACE_COMP, context->profile->id,
-		             "wrong UDP Length field in UDP header: %u found while "
-		             "%zd expected\n", rohc_ntoh16(udp->len),
-		             packet_size - ip_hdrs_len);
+		rohc_comp_warn(context, "wrong UDP Length field in UDP header: %u "
+		               "found while %zu expected", rohc_ntoh16(udp->len),
+		               uncomp_pkt->transport->len);
 		return -1;
 	}
 
@@ -566,7 +366,7 @@ static int c_udp_encode(struct c_context *const context,
 	udp_context->tmp.send_udp_dynamic = udp_changed_udp_dynamic(context, udp);
 
 	/* encode the IP packet */
-	size = c_generic_encode(context, ip, packet_size, dest, dest_size,
+	size = c_generic_encode(context, uncomp_pkt, rohc_pkt, rohc_pkt_max_len,
 	                        packet_type, payload_offset);
 	if(size < 0)
 	{
@@ -574,8 +374,8 @@ static int c_udp_encode(struct c_context *const context,
 	}
 
 	/* update the context with the new UDP header */
-	if(g_context->tmp.packet_type == PACKET_IR ||
-	   g_context->tmp.packet_type == PACKET_IR_DYN)
+	if(g_context->tmp.packet_type == ROHC_PACKET_IR ||
+	   g_context->tmp.packet_type == ROHC_PACKET_IR_DYN)
 	{
 		memcpy(&udp_context->old_udp, udp, sizeof(struct udphdr));
 	}
@@ -596,7 +396,7 @@ quit:
  *
  * @param context The compression context
  */
-static void udp_decide_state(struct c_context *const context)
+static void udp_decide_state(struct rohc_comp_ctxt *const context)
 {
 	struct c_generic_context *g_context;
 	struct sc_udp_context *udp_context;
@@ -607,8 +407,8 @@ static void udp_decide_state(struct c_context *const context)
 	if(udp_context->tmp.send_udp_dynamic)
 	{
 		rohc_comp_debug(context, "go back to IR state because UDP checksum "
-		                "behaviour changed in the last few packets\n");
-		change_state(context, IR);
+		                "behaviour changed in the last few packets");
+		change_state(context, ROHC_COMP_STATE_IR);
 	}
 	else
 	{
@@ -637,22 +437,23 @@ static void udp_decide_state(struct c_context *const context)
  * @param counter     The current position in the rohc-packet-under-build buffer
  * @return            The new position in the rohc-packet-under-build buffer
  */
-int udp_code_uo_remainder(const struct c_context *context,
-                          const unsigned char *next_header,
-                          unsigned char *const dest,
-                          int counter)
+size_t udp_code_uo_remainder(const struct rohc_comp_ctxt *const context,
+                             const unsigned char *const next_header,
+                             unsigned char *const dest,
+                             const size_t counter)
 {
-	const struct udphdr *udp = (struct udphdr *) next_header;
+	const struct udphdr *const udp = (struct udphdr *) next_header;
+	size_t nr_written = 0;
 
 	/* part 13 */
 	if(udp->check != 0)
 	{
-		rohc_comp_debug(context, "UDP checksum = 0x%x\n", udp->check);
+		rohc_comp_debug(context, "UDP checksum = 0x%x", udp->check);
 		memcpy(&dest[counter], &udp->check, 2);
-		counter += 2;
+		nr_written += 2;
 	}
 
-	return counter;
+	return counter + nr_written;
 }
 
 
@@ -677,24 +478,25 @@ int udp_code_uo_remainder(const struct c_context *context,
  * @param counter     The current position in the rohc-packet-under-build buffer
  * @return            The new position in the rohc-packet-under-build buffer
  */
-int udp_code_static_udp_part(const struct c_context *context,
-                             const unsigned char *next_header,
-                             unsigned char *const dest,
-                             int counter)
+size_t udp_code_static_udp_part(const struct rohc_comp_ctxt *const context,
+                                const unsigned char *const next_header,
+                                unsigned char *const dest,
+                                const size_t counter)
 {
-	const struct udphdr *udp = (struct udphdr *) next_header;
+	const struct udphdr *const udp = (struct udphdr *) next_header;
+	size_t nr_written = 0;
 
 	/* part 1 */
-	rohc_comp_debug(context, "UDP source port = 0x%x\n", udp->source);
-	memcpy(&dest[counter], &udp->source, 2);
-	counter += 2;
+	rohc_comp_debug(context, "UDP source port = 0x%x", udp->source);
+	memcpy(&dest[counter + nr_written], &udp->source, 2);
+	nr_written += 2;
 
 	/* part 2 */
-	rohc_comp_debug(context, "UDP dest port = 0x%x\n", udp->dest);
-	memcpy(&dest[counter], &udp->dest, 2);
-	counter += 2;
+	rohc_comp_debug(context, "UDP dest port = 0x%x", udp->dest);
+	memcpy(&dest[counter + nr_written], &udp->dest, 2);
+	nr_written += 2;
 
-	return counter;
+	return counter + nr_written;
 }
 
 
@@ -717,14 +519,15 @@ int udp_code_static_udp_part(const struct c_context *context,
  * @param counter     The current position in the rohc-packet-under-build buffer
  * @return            The new position in the rohc-packet-under-build buffer
  */
-static int udp_code_dynamic_udp_part(const struct c_context *context,
-                                     const unsigned char *next_header,
-                                     unsigned char *const dest,
-                                     int counter)
+static size_t udp_code_dynamic_udp_part(const struct rohc_comp_ctxt *const context,
+                                        const unsigned char *const next_header,
+                                        unsigned char *const dest,
+                                        const size_t counter)
 {
 	struct c_generic_context *g_context;
 	struct sc_udp_context *udp_context;
 	const struct udphdr *udp;
+	size_t nr_written = 0;
 
 	g_context = (struct c_generic_context *) context->specific;
 	udp_context = (struct sc_udp_context *) g_context->specific;
@@ -732,12 +535,12 @@ static int udp_code_dynamic_udp_part(const struct c_context *context,
 	udp = (struct udphdr *) next_header;
 
 	/* part 1 */
-	rohc_comp_debug(context, "UDP checksum = 0x%x\n", udp->check);
-	memcpy(&dest[counter], &udp->check, 2);
-	counter += 2;
+	rohc_comp_debug(context, "UDP checksum = 0x%x", udp->check);
+	memcpy(&dest[counter + nr_written], &udp->check, 2);
+	nr_written += 2;
 	udp_context->udp_checksum_change_count++;
 
-	return counter;
+	return counter + nr_written;
 }
 
 
@@ -748,7 +551,7 @@ static int udp_code_dynamic_udp_part(const struct c_context *context,
  * @param udp     The UDP header
  * @return        The number of UDP fields that changed
  */
-static int udp_changed_udp_dynamic(const struct c_context *context,
+static int udp_changed_udp_dynamic(const struct rohc_comp_ctxt *context,
                                    const struct udphdr *udp)
 {
 	const struct c_generic_context *g_context;
@@ -779,18 +582,17 @@ static int udp_changed_udp_dynamic(const struct c_context *context,
  * @brief Define the compression part of the UDP profile as described
  *        in the RFC 3095.
  */
-struct c_profile c_udp_profile =
+const struct rohc_comp_profile c_udp_profile =
 {
-	ROHC_IPPROTO_UDP,    /* IP protocol */
-	ROHC_PROFILE_UDP,    /* profile ID (see 8 in RFC 3095) */
-	"UDP / Compressor",  /* profile description */
-	c_udp_create,        /* profile handlers */
-	c_generic_destroy,
-	c_udp_check_profile,
-	c_udp_check_context,
-	c_udp_encode,
-	c_generic_reinit_context,
-	c_generic_feedback,
-	c_generic_use_udp_port,
+	.id             = ROHC_PROFILE_UDP, /* profile ID (see 8 in RFC 3095) */
+	.protocol       = ROHC_IPPROTO_UDP, /* IP protocol */
+	.create         = c_udp_create,     /* profile handlers */
+	.destroy        = c_generic_destroy,
+	.check_profile  = c_udp_check_profile,
+	.check_context  = c_udp_check_context,
+	.encode         = c_udp_encode,
+	.reinit_context = c_generic_reinit_context,
+	.feedback       = c_generic_feedback,
+	.use_udp_port   = c_generic_use_udp_port,
 };
 

@@ -15,7 +15,8 @@ TESTS = \
 	test_damaged_packet_8_uo1id.sh \
 	test_damaged_packet_8_uor2ts_without-ext3.sh \
 	test_damaged_packet_8_uor2ts_with-ext3-and-ts-stride.sh \
-	test_damaged_packet_8_uor2_with-ext3-but-not-ts-stride.sh
+	test_damaged_packet_8_uor2_with-ext3-but-not-ts-stride.sh \
+	test_damaged_packet_273_uo0_repair.sh
 
 
 check_PROGRAMS = \
@@ -23,7 +24,9 @@ check_PROGRAMS = \
 
 
 test_damaged_packet_CFLAGS = \
-	$(configure_cflags)
+	$(configure_cflags) \
+	-Wno-unused-parameter \
+	-Wno-sign-compare
 
 test_damaged_packet_CPPFLAGS = \
 	-I$(top_srcdir)/test \
@@ -50,6 +53,8 @@ test_damaged_packet_LDADD = \
 
 EXTRA_DIST = \
 	test_damaged_packet.sh \
+	test_damaged_packet_repair.sh \
+	test_damaged_packet_norepair.sh \
 	$(TESTS) \
 	inputs
 

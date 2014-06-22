@@ -16,12 +16,6 @@ else
 LINUX_MODULE_DIR =
 endif
 
-if ROHC_STATS
-STATS_DIR = statistics
-else
-STATS_DIR = 
-endif
-
 if BUILD_DOC
 DOC_DIR = doc
 else
@@ -38,7 +32,6 @@ SUBDIRS = \
 	src \
 	$(TESTS_DIR) \
 	$(LINUX_MODULE_DIR) \
-	$(STATS_DIR) \
 	app \
 	$(DOC_DIR) \
 	$(EXAMPLES_DIR) \
@@ -80,15 +73,23 @@ dist-hook:
 	find $(distdir)/test/non_regression/inputs \
 		-type f -and \
 		-not -name source.pcap -and \
-		-not -name rohc_wlsb4_smallcid.pcap -and \
-		-not -name rohc_wlsb4_largecid.pcap -and \
-		-not -name rohc_wlsb64_smallcid.pcap -and \
-		-not -name rohc_wlsb64_largecid.pcap -and \
+		-not -name rohc_maxcontexts0_wlsb4_smallcid.pcap -and \
+		-not -name rohc_maxcontexts0_wlsb4_largecid.pcap -and \
+		-not -name rohc_maxcontexts0_wlsb64_smallcid.pcap -and \
+		-not -name rohc_maxcontexts0_wlsb64_largecid.pcap -and \
+		-not -name rohc_maxcontexts1_wlsb4_smallcid.pcap -and \
+		-not -name rohc_maxcontexts1_wlsb4_largecid.pcap -and \
+		-not -name rohc_maxcontexts1_wlsb64_smallcid.pcap -and \
+		-not -name rohc_maxcontexts1_wlsb64_largecid.pcap -and \
 		-not -name description -and \
-		-not -name rohc_sizes_wlsb4_smallcid -and \
-		-not -name rohc_sizes_wlsb4_largecid -and \
-		-not -name rohc_sizes_wlsb64_smallcid -and \
-		-not -name rohc_sizes_wlsb64_largecid -and \
+		-not -name rohc_maxcontexts0_wlsb4_smallcid.sizes -and \
+		-not -name rohc_maxcontexts0_wlsb4_largecid.sizes -and \
+		-not -name rohc_maxcontexts0_wlsb64_smallcid.sizes -and \
+		-not -name rohc_maxcontexts0_wlsb64_largecid.sizes -and \
+		-not -name rohc_maxcontexts1_wlsb4_smallcid.sizes -and \
+		-not -name rohc_maxcontexts1_wlsb4_largecid.sizes -and \
+		-not -name rohc_maxcontexts1_wlsb64_smallcid.sizes -and \
+		-not -name rohc_maxcontexts1_wlsb64_largecid.sizes -and \
 		-not -name README \
 		-exec $(RM) \{\} \;
 
@@ -97,4 +98,8 @@ if CODE_COVERAGE
 TESTS_CODE_COVERAGE = test/report_code_coverage.sh
 endif
 TESTS = $(TESTS_CODE_COVERAGE)
+
+distclean-local:
+	$(RM) output.zcov
+	$(RM) -r coverage-report/
 

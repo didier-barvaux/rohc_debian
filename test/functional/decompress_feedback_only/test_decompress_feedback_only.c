@@ -1,25 +1,28 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2011,2012,2013,2014 Didier Barvaux
+ * Copyright 2012 Viveris Technologies
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
  * @file   test_decompress_feedback_only.c
- * @brief  Check that FEEDBACK-2 packets are generated as expected
+ * @brief  Check that decompression of ROHC feedback-only packets is fine
  * @author Didier Barvaux <didier@barvaux.org>
  *
- * The application decompresses ROHC feedback-only packets successfully.
+ * The application shall decompress ROHC feedback-only packets successfully.
  */
 
 #include "test.h"
@@ -31,7 +34,6 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
-#include <time.h> /* for time(2) */
 #include <stdarg.h>
 
 /* ROHC includes */
@@ -41,17 +43,15 @@
 
 /* prototypes of private functions */
 static void usage(void);
-static int test_decomp(const unsigned char *const rohc_feedback,
-                       const size_t rohc_feedback_len);
-static void print_rohc_traces(const rohc_trace_level_t level,
+static int test_decomp(const struct rohc_buf rohc_feedback)
+	__attribute__((warn_unused_result));
+static void print_rohc_traces(void *const priv_ctxt,
+                              const rohc_trace_level_t level,
                               const rohc_trace_entity_t entity,
                               const int profile,
                               const char *const format,
                               ...)
-	__attribute__((format(printf, 4, 5), nonnull(4)));
-static int gen_random_num(const struct rohc_comp *const comp,
-                          void *const user_context)
-	__attribute__((nonnull(1)));
+	__attribute__((format(printf, 5, 6), nonnull(5)));
 
 
 /**
@@ -66,39 +66,24 @@ static int gen_random_num(const struct rohc_comp *const comp,
  */
 int main(int argc, char *argv[])
 {
-	int args_read = 1;
-
 	/* a ROHC feedback-only packet */
-	const unsigned char rohc_feedback[] = { 0xf4, 0x20, 0x00, 0x11, 0xe9 };
+	const struct rohc_ts arrival_time = { .sec = 0, .nsec = 0 };
+	uint8_t rohc_feedback_data[] = { 0xf4, 0x20, 0x00, 0x11, 0xe9 };
 	const size_t rohc_feedback_len = 5;
+	const struct rohc_buf rohc_feedback =
+		rohc_buf_init_full(rohc_feedback_data, rohc_feedback_len, arrival_time);
 
 	int status = 1;
 
 	/* parse program arguments, print the help message in case of failure */
-	if(argc <= 0)
+	if(argc != 1)
 	{
 		usage();
 		goto error;
 	}
 
-	for(argc--, argv++; argc > 0; argc -= args_read, argv += args_read)
-	{
-		if(!strcmp(*argv, "-h"))
-		{
-			/* print help */
-			usage();
-			goto error;
-		}
-		else
-		{
-			/* do not accept more than two arguments without option name */
-			usage();
-			goto error;
-		}
-	}
-
 	/* test ROHC feedback-only decompression */
-	status = test_decomp(rohc_feedback, rohc_feedback_len);
+	status = test_decomp(rohc_feedback);
 
 error:
 	return status;
@@ -123,94 +108,54 @@ static void usage(void)
 /**
  * @brief Test the ROHC library with the given ROHC feedback packet
  *
- * @param rohc_feedback      The ROHC feedback data
- * @param rohc_feedback_len  The length (in bytes) of the ROHC feedback
- * @return                   0 in case of success,
- *                           1 in case of failure
+ * @param rohc_feedback  The ROHC feedback data
+ * @return               0 in case of success,
+ *                       1 in case of failure
  */
-static int test_decomp(const unsigned char *const rohc_feedback,
-                       const size_t rohc_feedback_len)
+static int test_decomp(const struct rohc_buf rohc_feedback)
 {
-	struct rohc_comp *comp;
 	struct rohc_decomp *decomp;
 
-	unsigned char ip_packet[MAX_ROHC_SIZE];
-	int ip_size;
+	uint8_t ip_buffer[MAX_ROHC_SIZE];
+	struct rohc_buf ip_packet = rohc_buf_init_empty(ip_buffer, MAX_ROHC_SIZE);
 
-#define NB_RTP_PORTS 5
-	const unsigned int rtp_ports[NB_RTP_PORTS] =
-		{ 1234, 36780, 33238, 5020, 5002 };
+	uint8_t feedback_buffer[MAX_ROHC_SIZE];
+	struct rohc_buf feedback_packet =
+		rohc_buf_init_empty(feedback_buffer, MAX_ROHC_SIZE);
 
-	unsigned int i;
 	int is_failure = 1;
-
-	/* create the ROHC compressor with small CID */
-	comp = rohc_alloc_compressor(ROHC_SMALL_CID_MAX, 0, 0, 0);
-	if(comp == NULL)
-	{
-		fprintf(stderr, "failed to create the ROHC compressor\n");
-		goto error;
-	}
-
-	/* set the callback for traces on compressor */
-	if(!rohc_comp_set_traces_cb(comp, print_rohc_traces))
-	{
-		fprintf(stderr, "failed to set the callback for traces on "
-		        "compressor\n");
-		goto destroy_comp;
-	}
-
-	/* initialize the random generator */
-	srand(time(NULL));
-
-	/* set the callback for random numbers */
-	if(!rohc_comp_set_random_cb(comp, gen_random_num, NULL))
-	{
-		fprintf(stderr, "failed to set the callback for random numbers\n");
-		goto destroy_comp;
-	}
-
-	/* reset list of RTP ports for compressor */
-	if(!rohc_comp_reset_rtp_ports(comp))
-	{
-		fprintf(stderr, "failed to reset list of RTP ports\n");
-		goto destroy_comp;
-	}
-
-	/* add some ports to the list of RTP ports */
-	for(i = 0; i < NB_RTP_PORTS; i++)
-	{
-		if(!rohc_comp_add_rtp_port(comp, rtp_ports[i]))
-		{
-			fprintf(stderr, "failed to enable RTP port %u\n", rtp_ports[i]);
-			goto destroy_comp;
-		}
-	}
+	rohc_status_t status;
 
 	/* create the ROHC decompressor in bi-directional mode */
-	decomp = rohc_alloc_decompressor(comp);
+	decomp = rohc_decomp_new2(ROHC_SMALL_CID, ROHC_SMALL_CID_MAX, ROHC_O_MODE);
 	if(decomp == NULL)
 	{
 		fprintf(stderr, "failed to create the ROHC decompressor\n");
-		goto destroy_comp;
+		goto error;
 	}
 
 	/* set the callback for traces on decompressor */
-	if(!rohc_decomp_set_traces_cb(decomp, print_rohc_traces))
+	if(!rohc_decomp_set_traces_cb2(decomp, print_rohc_traces, NULL))
 	{
 		fprintf(stderr, "cannot set trace callback for decompressor\n");
 		goto destroy_decomp;
 	}
 
 	/* decompress the ROHC feedback with the ROHC decompressor */
-	ip_size = rohc_decompress(decomp,
-	                          (unsigned char *) rohc_feedback,
-	                          rohc_feedback_len,
-	                          ip_packet, MAX_ROHC_SIZE);
-	if(ip_size != ROHC_FEEDBACK_ONLY)
+	status = rohc_decompress3(decomp, rohc_feedback, &ip_packet,
+	                          &feedback_packet, NULL);
+	if(status != ROHC_STATUS_OK)
 	{
 		fprintf(stderr, "failed to decompress ROHC feedback\n");
 		goto destroy_decomp;
+	}
+	if(!rohc_buf_is_empty(ip_packet))
+	{
+		fprintf(stderr, "ROHC packet was not a feedback-only packet\n");
+	}
+	if(rohc_buf_is_empty(feedback_packet))
+	{
+		fprintf(stderr, "ROHC packet contained no feedback data\n");
 	}
 	fprintf(stderr, "decompression is successful\n");
 
@@ -218,9 +163,7 @@ static int test_decomp(const unsigned char *const rohc_feedback,
 	is_failure = 0;
 
 destroy_decomp:
-	rohc_free_decompressor(decomp);
-destroy_comp:
-	rohc_free_compressor(comp);
+	rohc_decomp_free(decomp);
 error:
 	return is_failure;
 }
@@ -229,15 +172,17 @@ error:
 /**
  * @brief Callback to print traces of the ROHC library
  *
- * @param level    The priority level of the trace
- * @param entity   The entity that emitted the trace among:
- *                  \li ROHC_TRACE_COMP
- *                  \li ROHC_TRACE_DECOMP
- * @param profile  The ID of the ROHC compression/decompression profile
- *                 the trace is related to
- * @param format   The format string of the trace
+ * @param priv_ctxt  An optional private context, may be NULL
+ * @param level      The priority level of the trace
+ * @param entity     The entity that emitted the trace among:
+ *                    \li ROHC_TRACE_COMP
+ *                    \li ROHC_TRACE_DECOMP
+ * @param profile    The ID of the ROHC compression/decompression profile
+ *                   the trace is related to
+ * @param format     The format string of the trace
  */
-static void print_rohc_traces(const rohc_trace_level_t level,
+static void print_rohc_traces(void *const priv_ctxt __attribute__((unused)),
+                              const rohc_trace_level_t level,
                               const rohc_trace_entity_t entity,
                               const int profile,
                               const char *const format,
@@ -248,21 +193,5 @@ static void print_rohc_traces(const rohc_trace_level_t level,
 	va_start(args, format);
 	vfprintf(stdout, format, args);
 	va_end(args);
-}
-
-
-/**
- * @brief Generate a random number
- *
- * @param comp          The ROHC compressor
- * @param user_context  Should always be NULL
- * @return              A random number
- */
-static int gen_random_num(const struct rohc_comp *const comp,
-                          void *const user_context)
-{
-	assert(comp != NULL);
-	assert(user_context == NULL);
-	return rand();
 }
 

@@ -8,13 +8,16 @@
 
 TESTS = \
 	test_lost_packet_7-7_7_non_sequential_rtp_ts.sh \
-	test_lost_packet_102-105_125_rtp_with_sn_wrapround.sh
+	test_lost_packet_102-105_125_rtp_with_sn_wrapround.sh \
+	test_lost_packet_274-287_289_nominal_rtp.sh
 
 check_PROGRAMS = \
 	test_lost_packet
 
 test_lost_packet_CFLAGS = \
-	$(configure_cflags)
+	$(configure_cflags) \
+	-Wno-unused-parameter \
+	-Wno-sign-compare
 
 test_lost_packet_CPPFLAGS = \
 	-I$(top_srcdir)/test \
@@ -41,6 +44,8 @@ test_lost_packet_LDADD = \
 
 EXTRA_DIST = \
 	test_lost_packet.sh \
+	test_lost_packet_repair.sh \
+	test_lost_packet_norepair.sh \
 	$(TESTS) \
 	inputs
 

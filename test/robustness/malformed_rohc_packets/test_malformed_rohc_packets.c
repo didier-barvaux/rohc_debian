@@ -1,17 +1,19 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2012,2013,2014 Didier Barvaux
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -160,7 +162,7 @@ static int test_decomp(const char *const filename,
 	unsigned char *packet;
 	struct rohc_decomp *decomp;
 	unsigned int counter;
-	int status = 1;
+	int is_failure = 1;
 
 	/* open the source dump file */
 	handle = pcap_open_offline(filename, errbuf);
@@ -196,24 +198,20 @@ static int test_decomp(const char *const filename,
 	}
 
 	/* create the decompressor */
-	decomp = rohc_alloc_decompressor(NULL);
+	decomp = rohc_decomp_new2(ROHC_SMALL_CID, ROHC_SMALL_CID_MAX, ROHC_U_MODE);
 	if(decomp == NULL)
 	{
 		fprintf(stderr, "cannot create the decompressor\n");
 		goto close_input;
 	}
 
-	/* set CID type and MAX_CID for decompressor 1 */
-	if(!rohc_decomp_set_cid_type(decomp, ROHC_SMALL_CID))
+	/* enable decompression profiles */
+	if(!rohc_decomp_enable_profiles(decomp, ROHC_PROFILE_UNCOMPRESSED,
+	                                ROHC_PROFILE_UDP, ROHC_PROFILE_IP,
+	                                ROHC_PROFILE_UDPLITE, ROHC_PROFILE_RTP,
+	                                ROHC_PROFILE_ESP, -1))
 	{
-		fprintf(stderr, "failed to set CID type to small CIDs for "
-		        "decompressor\n");
-		goto destroy_decomp;
-	}
-	if(!rohc_decomp_set_max_cid(decomp, ROHC_SMALL_CID_MAX))
-	{
-		fprintf(stderr, "failed to set MAX_CID to %d for "
-		        "decompressor\n", ROHC_SMALL_CID_MAX);
+		fprintf(stderr, "failed to enable the decompression profiles\n");
 		goto destroy_decomp;
 	}
 
@@ -221,10 +219,13 @@ static int test_decomp(const char *const filename,
 	counter = 0;
 	while((packet = (unsigned char *) pcap_next(handle, &header)) != NULL)
 	{
-		unsigned char *rohc_packet;
-		int rohc_size;
-		static unsigned char ip_packet[MAX_ROHC_SIZE];
-		int ip_size;
+		const struct rohc_ts arrival_time = { .sec = 0, .nsec = 0 };
+		struct rohc_buf rohc_packet =
+			rohc_buf_init_full(packet, header.caplen, arrival_time);
+		uint8_t ip_buffer[MAX_ROHC_SIZE];
+		struct rohc_buf ip_packet =
+			rohc_buf_init_empty(ip_buffer, MAX_ROHC_SIZE);
+		rohc_status_t status;
 
 		counter++;
 
@@ -236,16 +237,15 @@ static int test_decomp(const char *const filename,
 			goto destroy_decomp;
 		}
 
-		rohc_packet = packet + link_len;
-		rohc_size = header.len - link_len;
+		/* skip the link layer header */
+		rohc_buf_pull(&rohc_packet, link_len);
 
 		fprintf(stderr, "decompress malformed packet #%u:\n", counter);
 
 		/* decompress the ROHC packet */
-		ip_size = rohc_decompress(decomp,
-		                          rohc_packet, rohc_size,
-		                          ip_packet, MAX_ROHC_SIZE);
-		if(ip_size > 0)
+		status = rohc_decompress3(decomp, rohc_packet, &ip_packet, NULL, NULL);
+		fprintf(stderr, "\tdecompression status: %s\n", rohc_strerror(status));
+		if(status == ROHC_STATUS_OK)
 		{
 			if(counter >= failure_start)
 			{
@@ -271,13 +271,13 @@ static int test_decomp(const char *const filename,
 		}
 	}
 
-	status = 0;
+	is_failure = 0;
 
 destroy_decomp:
-	rohc_free_decompressor(decomp);
+	rohc_decomp_free(decomp);
 close_input:
 	pcap_close(handle);
 error:
-	return status;
+	return is_failure;
 }
 

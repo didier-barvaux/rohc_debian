@@ -1,17 +1,21 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2013,2014 Didier Barvaux
+ * Copyright 2009,2010 Thales Communications
+ * Copyright 2013 Viveris Technologies
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -103,17 +107,33 @@ static int couples_initialized = 0;
 
 
 /**
+ * @brief Generate a false random number for testing the ROHC library
+ *
+ * @param comp          The ROHC compressor
+ * @param user_context  Should always be NULL
+ * @return              Always 0
+ */
+static int gen_false_random_num(const struct rohc_comp *const comp,
+                                void *const user_context)
+{
+	return 0;
+}
+
+
+/**
  * @brief Print traces emitted by the ROHC library
  *
- * @param level    The priority level of the trace
- * @param entity   The entity that emitted the trace among:
- *                  \li ROHC_TRACE_COMP
- *                  \li ROHC_TRACE_DECOMP
- * @param profile  The ID of the ROHC compression/decompression profile
- *                 the trace is related to
- * @param format   The format string of the trace
+ * @param priv_ctxt  An optional private context, may be NULL
+ * @param level      The priority level of the trace
+ * @param entity     The entity that emitted the trace among:
+ *                    \li ROHC_TRACE_COMP
+ *                    \li ROHC_TRACE_DECOMP
+ * @param profile    The ID of the ROHC compression/decompression profile
+ *                   the trace is related to
+ * @param format     The format string of the trace
  */
-static void rohc_print_traces(const rohc_trace_level_t level,
+static void rohc_print_traces(void *const priv_ctxt __attribute__((unused)),
+                              const rohc_trace_level_t level,
                               const rohc_trace_entity_t entity,
                               const int profile,
                               const char *const format,
@@ -128,6 +148,50 @@ static void rohc_print_traces(const rohc_trace_level_t level,
 
 
 /**
+ * @brief The RTP detection callback
+ *
+ * @param ip           The innermost IP packet
+ * @param udp          The UDP header of the packet
+ * @param payload      The UDP payload of the packet
+ * @param payload_size The size of the UDP payload (in bytes)
+ * @return             true if the packet is an RTP packet, false otherwise
+ */
+bool rohc_comp_rtp_cb(const unsigned char *const ip __attribute__((unused)),
+                      const unsigned char *const udp,
+                      const unsigned char *const payload __attribute__((unused)),
+                      const unsigned int payload_size __attribute__((unused)),
+                      void *const rtp_private __attribute__((unused)))
+{
+	const size_t default_rtp_ports_nr = 5;
+	unsigned int default_rtp_ports[] = { 1234, 36780, 33238, 5020, 5002 };
+	uint16_t udp_dport;
+	bool is_rtp = false;
+	size_t i;
+
+	if(udp == NULL)
+	{
+		return false;
+	}
+
+	/* get the UDP destination port */
+	memcpy(&udp_dport, udp + 2, sizeof(uint16_t));
+
+	/* is the UDP destination port in the list of ports reserved for RTP
+	 * traffic by default (for compatibility reasons) */
+	for(i = 0; i < default_rtp_ports_nr; i++)
+	{
+		if(ntohs(udp_dport) == default_rtp_ports[i])
+		{
+			is_rtp = true;
+			break;
+		}
+	}
+
+	return is_rtp;
+}
+
+
+/**
  * @brief Init a ROHC couple (part 1)
  *
  * In part 1, only the compressor is initialized.
@@ -138,11 +202,7 @@ static void rohc_print_traces(const rohc_trace_level_t level,
  */
 int rohc_couple_init_phase1(struct rohc_couple *couple, int index)
 {
-#define NB_RTP_PORTS 5
-	unsigned int rtp_ports[NB_RTP_PORTS] =
-		{ 1234, 36780, 33238, 5020, 5002 };
 	bool is_ok;
-	int i;
 
 	pr_info("[%s] init ROHC couple #%d (phase 1)\n",
 	        THIS_MODULE->name, index + 1);
@@ -150,7 +210,8 @@ int rohc_couple_init_phase1(struct rohc_couple *couple, int index)
 	memset(couple, 0, sizeof(struct rohc_couple));
 
 	/* create the compressor */
-	couple->comp = rohc_alloc_compressor(ROHC_SMALL_CID_MAX, 0, 0, 0);
+	couple->comp = rohc_comp_new2(ROHC_SMALL_CID, ROHC_SMALL_CID_MAX,
+	                              gen_false_random_num, NULL);
 	if(couple->comp == NULL)
 	{
 		pr_err("[%s] \t cannot create the ROHC compressor\n",
@@ -161,7 +222,7 @@ int rohc_couple_init_phase1(struct rohc_couple *couple, int index)
 	        THIS_MODULE->name);
 
 	/* link the compressor to the appropriate log function */
-	is_ok = rohc_comp_set_traces_cb(couple->comp, rohc_print_traces);
+	is_ok = rohc_comp_set_traces_cb2(couple->comp, rohc_print_traces, NULL);
 	if(!is_ok)
 	{
 		pr_err("[%s] \t cannot set trace callback for compressor\n",
@@ -172,33 +233,24 @@ int rohc_couple_init_phase1(struct rohc_couple *couple, int index)
 	        THIS_MODULE->name);
 
 	/* activate all the compression profiles */
-	rohc_activate_profile(couple->comp, ROHC_PROFILE_UNCOMPRESSED);
-	rohc_activate_profile(couple->comp, ROHC_PROFILE_RTP);
-	rohc_activate_profile(couple->comp, ROHC_PROFILE_UDP);
-	rohc_activate_profile(couple->comp, ROHC_PROFILE_ESP);
-	rohc_activate_profile(couple->comp, ROHC_PROFILE_IP);
-	rohc_activate_profile(couple->comp, ROHC_PROFILE_UDPLITE);
-	pr_info("[%s] \t Uncompressed, RTP, UDP, ESP, IP and UDP-Lite profiles enabled "
-	        "for ROHC compressor successfully set\n", THIS_MODULE->name);
-
-	/* reset list of RTP ports */
-	is_ok = rohc_comp_reset_rtp_ports(couple->comp);
+	is_ok = rohc_comp_enable_profiles(couple->comp, ROHC_PROFILE_UNCOMPRESSED,
+	                                  ROHC_PROFILE_RTP, ROHC_PROFILE_UDP,
+	                                  ROHC_PROFILE_ESP, ROHC_PROFILE_IP,
+	                                  ROHC_PROFILE_UDPLITE, -1);
 	if(!is_ok)
 	{
-		pr_err("[%s] \t failed to reset list of RTP ports\n", THIS_MODULE->name);
+		pr_err("[%s] \t failed to enabled all compression profiles\n",
+		       THIS_MODULE->name);
 		goto free_compressor;
 	}
+	pr_info("[%s] \t Uncompressed, RTP, UDP, ESP, IP and UDP-Lite profiles "
+	        "enabled for ROHC compressor successfully set\n",
+	        THIS_MODULE->name);
 
-	/* add some ports to the list of RTP ports */
-	for(i = 0; i < NB_RTP_PORTS; i++)
+	/* set UDP ports dedicated to RTP traffic */
+	if(!rohc_comp_set_rtp_detection_cb(couple->comp, rohc_comp_rtp_cb, NULL))
 	{
-		is_ok = rohc_comp_add_rtp_port(couple->comp, rtp_ports[i]);
-		if(!is_ok)
-		{
-			pr_err("[%s] \t failed to enable RTP port %u\n",
-			       THIS_MODULE->name, rtp_ports[i]);
-			goto free_compressor;
-		}
+		goto free_compressor;
 	}
 	pr_info("[%s] \t RTP ports successfully configured for ROHC compressor\n",
 	        THIS_MODULE->name);
@@ -209,7 +261,7 @@ int rohc_couple_init_phase1(struct rohc_couple *couple, int index)
 	return 0;
 
 free_compressor:
-	rohc_free_compressor(couple->comp);
+	rohc_comp_free(couple->comp);
 error:
 	return 1;
 }
@@ -220,15 +272,12 @@ error:
  *
  * In part 2, the decompressor and the buffers are initialized.
  *
- * @param couple           The couple of ROHC compressor/decompressor to
- *                         initialize
- * @param index            The index of the couple: 0 or 1
- * @param associated_comp  The compressor to associate with the decompressor
- * @return                 0 in case of success, non-zero otherwise
+ * @param couple  The couple of ROHC compressor/decompressor to initialize
+ * @param index   The index of the couple: 0 or 1
+ * @return        0 in case of success, non-zero otherwise
  */
 int rohc_couple_init_phase2(struct rohc_couple *couple,
-                            int index,
-                            struct rohc_comp *associated_comp)
+                            int index)
 {
 	bool is_ok;
 
@@ -237,7 +286,8 @@ int rohc_couple_init_phase2(struct rohc_couple *couple,
 
 	/* create the decompressor and associate it with the compressor
 	   of the other ROHC couple */
-	couple->decomp = rohc_alloc_decompressor(associated_comp);
+	couple->decomp = rohc_decomp_new2(ROHC_SMALL_CID, ROHC_SMALL_CID_MAX,
+	                                  ROHC_O_MODE);
 	if(couple->decomp == NULL)
 	{
 		pr_err("[%s] \t cannot create the ROHC decompressor\n",
@@ -248,7 +298,7 @@ int rohc_couple_init_phase2(struct rohc_couple *couple,
 	        THIS_MODULE->name);
 
 	/* link the decompressor to the appropriate log function */
-	is_ok = rohc_decomp_set_traces_cb(couple->decomp, rohc_print_traces);
+	is_ok = rohc_decomp_set_traces_cb2(couple->decomp, rohc_print_traces, NULL);
 	if(!is_ok)
 	{
 		pr_err("[%s] \t cannot set trace callback for decompressor\n",
@@ -296,9 +346,9 @@ int rohc_couple_init_phase2(struct rohc_couple *couple,
 free_rohc_packet:
 	kfree(couple->rohc_packet_out);
 free_decompressor:
-	rohc_free_decompressor(couple->decomp);
+	rohc_decomp_free(couple->decomp);
 free_compressor:
-	rohc_free_compressor(couple->comp);
+	rohc_comp_free(couple->comp);
 	return 1;
 }
 
@@ -345,9 +395,9 @@ void rohc_couple_release(struct rohc_couple *couple, int index)
 
 	/* free (de)compressor */
 	if(couple->comp != NULL)
-		rohc_free_compressor(couple->comp);
+		rohc_comp_free(couple->comp);
 	if(couple->decomp != NULL)
-		rohc_free_decompressor(couple->decomp);
+		rohc_decomp_free(couple->decomp);
 
 	pr_info("[%s] ROHC couple #%d successfully released\n",
 	        THIS_MODULE->name, index + 1);
@@ -397,7 +447,7 @@ static int rohc_proc_open(struct inode *inode, struct file *file)
 		}
 
 		/* phase 2: initialize the rest of the 1st ROHC couple */
-		ret = rohc_couple_init_phase2(&couples[0], 0, couples[1].comp);
+		ret = rohc_couple_init_phase2(&couples[0], 0);
 		if(ret != 0)
 		{
 			pr_err("[%s] failed to init ROHC couple #1 (phase 2)\n", THIS_MODULE->name);
@@ -405,7 +455,7 @@ static int rohc_proc_open(struct inode *inode, struct file *file)
 		}
 
 		/* phase 2: initialize the rest of the 2nd ROHC couple */
-		ret = rohc_couple_init_phase2(&couples[1], 1, couples[0].comp);
+		ret = rohc_couple_init_phase2(&couples[1], 1);
 		if(ret != 0)
 		{
 			pr_err("[%s] failed to init ROHC couple #2 (phase 2)\n", THIS_MODULE->name);
@@ -457,7 +507,7 @@ ssize_t rohc_proc_comp_write(struct file *file,
 {
 	struct rohc_couple *couple = file->private_data;
 	size_t ip_chunk_size;
-	int ret;
+	rohc_status_t status;
 	int err = -ENOMEM;
 
 	/* do we receive data of a new packet or
@@ -512,18 +562,23 @@ ssize_t rohc_proc_comp_write(struct file *file,
 	/* compress the IP packet if it is complete */
 	if(couple->ip_size_current_in == couple->ip_size_total_in)
 	{
+		const struct rohc_ts arrival_time = { .sec = 0, .nsec = 0 };
+		struct rohc_buf ip_packet =
+			rohc_buf_init_full(couple->ip_packet_in, couple->ip_size_total_in,
+			                   arrival_time);
+		struct rohc_buf rohc_packet =
+			rohc_buf_init_empty(couple->rohc_packet_out, MAX_ROHC_SIZE);
+
 		pr_info("[%s] IP packet is complete, compress it now\n",
 		        THIS_MODULE->name);
 
-		ret = rohc_compress2(couple->comp,
-									couple->ip_packet_in, couple->ip_size_total_in,
-									couple->rohc_packet_out, MAX_ROHC_SIZE,
-									&(couple->rohc_size_out));
-		if(ret != ROHC_OK)
+		status = rohc_compress4(couple->comp, ip_packet, &rohc_packet);
+		if(status != ROHC_STATUS_OK)
 		{
 			pr_err("[%s] failed to compress the IP packet\n", THIS_MODULE->name);
 			goto error;
 		}
+		couple->rohc_size_out = rohc_packet.len;
 
 		pr_info("[%s] IP packet successfully compressed\n", THIS_MODULE->name);
 
@@ -573,7 +628,7 @@ ssize_t rohc_proc_decomp_write(struct file *file,
 {
 	struct rohc_couple *couple = file->private_data;
 	size_t rohc_chunk_size;
-	int ret;
+	int status;
 	int err = -ENOMEM;
 
 	/* do we receive data of a new packet or
@@ -629,20 +684,26 @@ ssize_t rohc_proc_decomp_write(struct file *file,
 	/* decompress the ROHC packet if it is complete */
 	if(couple->rohc_size_current_in == couple->rohc_size_total_in)
 	{
+		const struct rohc_ts arrival_time = { .sec = 0, .nsec = 0 };
+		struct rohc_buf rohc_packet =
+			rohc_buf_init_full(couple->rohc_packet_in,
+			                   couple->rohc_size_total_in, arrival_time);
+		struct rohc_buf ip_packet =
+			rohc_buf_init_empty(couple->ip_packet_out, MAX_ROHC_SIZE);
+
 		pr_info("[%s] ROHC packet is complete, decompress it now\n", THIS_MODULE->name);
 
-		ret = rohc_decompress(couple->decomp,
-		                      couple->rohc_packet_in, couple->rohc_size_total_in,
-		                      couple->ip_packet_out, MAX_ROHC_SIZE);
-		if(ret <= 0)
+		status = rohc_decompress3(couple->decomp, rohc_packet, &ip_packet,
+		                          NULL, NULL);
+		if(status != ROHC_STATUS_OK)
 		{
 			pr_err("[%s] failed to decompress the ROHC packet\n", THIS_MODULE->name);
 			goto error;
 		}
+		couple->ip_size_out = ip_packet.len;
 
 		pr_info("[%s] ROHC packet successfully decompressed\n", THIS_MODULE->name);
 
-		couple->ip_size_out = ret;
 		kfree(couple->rohc_packet_in);
 		couple->rohc_packet_in = NULL;
 		couple->rohc_size_total_in = 0;
@@ -997,7 +1058,7 @@ void __exit rohc_test_exit(void)
 
 MODULE_VERSION("0.0.1");
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Thales Communications, Viveris Technologies");
+MODULE_AUTHOR("Didier Barvaux, Thales Communications, Viveris Technologies");
 MODULE_DESCRIPTION("Module for testing " PACKAGE_NAME " " PACKAGE_VERSION " (" PACKAGE_URL ")");
 
 module_init(rohc_test_init);

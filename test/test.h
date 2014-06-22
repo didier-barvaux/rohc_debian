@@ -1,17 +1,20 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2012,2013,2014 Didier Barvaux
+ * Copyright 2007,2009,2010 Viveris Technologies
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -21,28 +24,28 @@
  * @author Didier Barvaux <didier@barvaux.org>
  */
 
-#ifndef TEST__H
-#define TEST__H
+#ifndef ROHC_TEST__H
+#define ROHC_TEST__H
 
 #include <stdint.h>
 
 /// The maximal size for the ROHC packets
-#define MAX_ROHC_SIZE  (5 * 1024)
+#define MAX_ROHC_SIZE  0xffffU
 
 /// The length of the Linux Cooked Sockets header
-#define LINUX_COOKED_HDR_LEN  16
+#define LINUX_COOKED_HDR_LEN  16U
 
 /// The length of the BSD loopback encapsulation
-#define BSD_LOOPBACK_HDR_LEN  4
+#define BSD_LOOPBACK_HDR_LEN  4U
 
 /// The minimum Ethernet length (in bytes)
-#define ETHER_FRAME_MIN_LEN  60
+#define ETHER_FRAME_MIN_LEN  60U
 
 /** The length (in bytes) of the Ethernet address */
-#define ETH_ALEN  6
+#define ETH_ALEN  6U
 
 /** The length (in bytes) of the Ethernet header */
-#define ETHER_HDR_LEN  14
+#define ETHER_HDR_LEN  14U
 
 /** The 10Mb/s ethernet header */
 struct ether_header

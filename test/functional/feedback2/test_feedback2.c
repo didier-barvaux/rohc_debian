@@ -1,17 +1,20 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2011,2012,2013,2014 Didier Barvaux
+ * Copyright 2012 Viveris Technologies
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -53,26 +56,33 @@ for ./configure ? If yes, check configure output and config.log"
 #include <rohc_comp.h>
 #include <rohc_decomp.h>
 #include <rohc_packets.h>
-#include <rohc_comp_internals.h> /* to gain access to feedbacks in struct rohc_comp */
 #include <sdvl.h> /* to gain access to d_sdvalue_size() */
+#include <rohc_utils.h>
 
 
 /* prototypes of private functions */
 static void usage(void);
 static int test_comp_and_decomp(const char *filename,
-                                const int is_large_cid,
+                                const rohc_cid_type_t cid_type,
                                 const char *expected_type,
                                 char **expected_options,
                                 const unsigned short expected_options_nr);
-static void print_rohc_traces(const rohc_trace_level_t level,
+static void print_rohc_traces(void *const priv_ctxt,
+                              const rohc_trace_level_t level,
                               const rohc_trace_entity_t entity,
                               const int profile,
                               const char *const format,
                               ...)
-	__attribute__((format(printf, 4, 5), nonnull(4)));
+	__attribute__((format(printf, 5, 6), nonnull(5)));
 static int gen_random_num(const struct rohc_comp *const comp,
                           void *const user_context)
 	__attribute__((nonnull(1)));
+static bool rohc_comp_rtp_cb(const unsigned char *const ip,
+                             const unsigned char *const udp,
+                             const unsigned char *const payload,
+                             const unsigned int payload_size,
+                             void *const rtp_private)
+	__attribute__((warn_unused_result));
 
 
 /**
@@ -89,11 +99,11 @@ static int gen_random_num(const struct rohc_comp *const comp,
 int main(int argc, char *argv[])
 {
 	char *filename = NULL;
-	char *cid_type = NULL;
+	char *cid_type_name = NULL;
 	char *ack_type = NULL;
 	char **ack_options = NULL;
 	unsigned short ack_options_nr = 0;
-	int is_large_cid;
+	rohc_cid_type_t cid_type;
 	int args_read;
 	int status = 1;
 
@@ -118,10 +128,10 @@ int main(int argc, char *argv[])
 			filename = argv[0];
 			args_read = 1;
 		}
-		else if(cid_type == NULL)
+		else if(cid_type_name == NULL)
 		{
 			/* get the CID type to use to decompress ROHC packets */
-			cid_type = argv[0];
+			cid_type_name = argv[0];
 			args_read = 1;
 		}
 		else if(ack_type == NULL)
@@ -145,30 +155,30 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	/* the source filename and the ACK type are mandatory */
-	if(filename == NULL || ack_type == NULL)
+	/* the source filename, the CID type and the ACK type are mandatory */
+	if(filename == NULL || cid_type_name == NULL || ack_type == NULL)
 	{
 		usage();
 		goto error;
 	}
 
 	/* determine if we use small or large CIDs */
-	if(strcmp(cid_type, "smallcid") == 0)
+	if(strcmp(cid_type_name, "smallcid") == 0)
 	{
-		is_large_cid = 0;
+		cid_type = ROHC_SMALL_CID;
 	}
-	else if(strcmp(cid_type, "largecid") == 0)
+	else if(strcmp(cid_type_name, "largecid") == 0)
 	{
-		is_large_cid = 1;
+		cid_type = ROHC_LARGE_CID;
 	}
 	else
 	{
-		fprintf(stderr, "unknown CID type '%s'\n", cid_type);
+		fprintf(stderr, "unknown CID type '%s'\n", cid_type_name);
 		goto error;
 	}
 
 	/* test ROHC decompression with the packets from the file */
-	status = test_comp_and_decomp(filename, is_large_cid, ack_type,
+	status = test_comp_and_decomp(filename, cid_type, ack_type,
 	                              ack_options, ack_options_nr);
 
 error:
@@ -206,7 +216,7 @@ static void usage(void)
  *
  * @param filename             The name of the PCAP file that contains the
  *                             ROHC packets
- * @param is_large_cid         Whether we use large CID or not
+ * @param cid_type             The type of CID to use
  * @param expected_type        The type of acknowledgement that shall be
  *                             generated during the decompression of every
  *                             packet of the source capture
@@ -218,11 +228,13 @@ static void usage(void)
  *                             1 in case of failure
  */
 static int test_comp_and_decomp(const char *filename,
-                                const int is_large_cid,
+                                const rohc_cid_type_t cid_type,
                                 const char *expected_type,
                                 char **expected_options,
                                 const unsigned short expected_options_nr)
 {
+	const rohc_cid_t max_cid =
+		(cid_type == ROHC_SMALL_CID ? ROHC_SMALL_CID_MAX : ROHC_LARGE_CID_MAX);
 	char errbuf[PCAP_ERRBUF_SIZE];
 	pcap_t *handle;
 	int link_layer_type;
@@ -235,13 +247,7 @@ static int test_comp_and_decomp(const char *filename,
 	unsigned char *packet;
 	unsigned int counter;
 
-#define NB_RTP_PORTS 5
-	const unsigned int rtp_ports[NB_RTP_PORTS] =
-		{ 1234, 36780, 33238, 5020, 5002 };
-
 	int is_failure = 1;
-	unsigned int i;
-	int ret;
 
 	/* open the source dump file */
 	handle = pcap_open_offline(filename, errbuf);
@@ -281,7 +287,7 @@ static int test_comp_and_decomp(const char *filename,
 	srand(time(NULL));
 
 	/* create the ROHC compressor with small CID */
-	comp = rohc_alloc_compressor(ROHC_SMALL_CID_MAX, 0, 0, 0);
+	comp = rohc_comp_new2(cid_type, max_cid, gen_random_num, NULL);
 	if(comp == NULL)
 	{
 		fprintf(stderr, "failed to create the ROHC compressor\n");
@@ -289,7 +295,7 @@ static int test_comp_and_decomp(const char *filename,
 	}
 
 	/* set the callback for traces on compressor */
-	if(!rohc_comp_set_traces_cb(comp, print_rohc_traces))
+	if(!rohc_comp_set_traces_cb2(comp, print_rohc_traces, NULL))
 	{
 		fprintf(stderr, "failed to set the callback for traces on "
 		        "compressor\n");
@@ -297,51 +303,25 @@ static int test_comp_and_decomp(const char *filename,
 	}
 
 	/* enable profiles */
-	rohc_activate_profile(comp, ROHC_PROFILE_UNCOMPRESSED);
-	rohc_activate_profile(comp, ROHC_PROFILE_UDP);
-	rohc_activate_profile(comp, ROHC_PROFILE_IP);
-	rohc_activate_profile(comp, ROHC_PROFILE_UDPLITE);
-	rohc_activate_profile(comp, ROHC_PROFILE_RTP);
-	rohc_activate_profile(comp, ROHC_PROFILE_ESP);
-
-	/* configure compressor for small or large CIDs */
-	if(is_large_cid)
+	if(!rohc_comp_enable_profiles(comp, ROHC_PROFILE_UNCOMPRESSED,
+	                              ROHC_PROFILE_UDP, ROHC_PROFILE_IP,
+	                              ROHC_PROFILE_UDPLITE, ROHC_PROFILE_RTP,
+	                              ROHC_PROFILE_ESP, ROHC_PROFILE_TCP, -1))
 	{
-		rohc_c_set_large_cid(comp, 1);
-		rohc_c_set_max_cid(comp, ROHC_LARGE_CID_MAX);
-	}
-	else
-	{
-		rohc_c_set_large_cid(comp, 0);
-	}
-
-	/* set the callback for random numbers */
-	if(!rohc_comp_set_random_cb(comp, gen_random_num, NULL))
-	{
-		fprintf(stderr, "failed to set the callback for random numbers\n");
+		fprintf(stderr, "failed to enable the compression profiles\n");
 		goto destroy_comp;
 	}
 
-	/* reset list of RTP ports for compressor */
-	if(!rohc_comp_reset_rtp_ports(comp))
+	/* set UDP ports dedicated to RTP traffic */
+	if(!rohc_comp_set_rtp_detection_cb(comp, rohc_comp_rtp_cb, NULL))
 	{
-		fprintf(stderr, "failed to reset list of RTP ports\n");
+		fprintf(stderr, "failed to set the callback RTP detection\n");
 		goto destroy_comp;
-	}
-
-	/* add some ports to the list of RTP ports */
-	for(i = 0; i < NB_RTP_PORTS; i++)
-	{
-		if(!rohc_comp_add_rtp_port(comp, rtp_ports[i]))
-		{
-			fprintf(stderr, "failed to enable RTP port %u\n", rtp_ports[i]);
-			goto destroy_comp;
-		}
 	}
 
 
 	/* create the ROHC decompressor in bi-directional mode */
-	decomp = rohc_alloc_decompressor(comp);
+	decomp = rohc_decomp_new2(cid_type, max_cid, ROHC_O_MODE);
 	if(decomp == NULL)
 	{
 		fprintf(stderr, "failed to create the ROHC decompressor\n");
@@ -349,61 +329,48 @@ static int test_comp_and_decomp(const char *filename,
 	}
 
 	/* set the callback for traces on decompressor */
-	if(!rohc_decomp_set_traces_cb(decomp, print_rohc_traces))
+	if(!rohc_decomp_set_traces_cb2(decomp, print_rohc_traces, NULL))
 	{
 		fprintf(stderr, "cannot set trace callback for decompressor\n");
 		goto destroy_decomp;
 	}
 
-	/* set CID type and MAX_CID for decompressor */
-	if(is_large_cid)
+	/* enable decompression profiles */
+	if(!rohc_decomp_enable_profiles(decomp, ROHC_PROFILE_UNCOMPRESSED,
+	                                ROHC_PROFILE_UDP, ROHC_PROFILE_IP,
+	                                ROHC_PROFILE_UDPLITE, ROHC_PROFILE_RTP,
+	                                ROHC_PROFILE_ESP, ROHC_PROFILE_TCP, -1))
 	{
-		if(!rohc_decomp_set_cid_type(decomp, ROHC_LARGE_CID))
-		{
-			fprintf(stderr, "failed to set CID type to large CIDs for "
-			        "decompressor\n");
-			goto destroy_decomp;
-		}
-		if(!rohc_decomp_set_max_cid(decomp, ROHC_LARGE_CID_MAX))
-		{
-			fprintf(stderr, "failed to set MAX_CID to %d for "
-			        "decompressor\n", ROHC_LARGE_CID_MAX);
-			goto destroy_decomp;
-		}
-	}
-	else
-	{
-		if(!rohc_decomp_set_cid_type(decomp, ROHC_SMALL_CID))
-		{
-			fprintf(stderr, "failed to set CID type to small CIDs for "
-			        "decompressor\n");
-			goto destroy_decomp;
-		}
-		if(!rohc_decomp_set_max_cid(decomp, ROHC_SMALL_CID_MAX))
-		{
-			fprintf(stderr, "failed to set MAX_CID to %d for "
-			        "decompressor\n", ROHC_SMALL_CID_MAX);
-			goto destroy_decomp;
-		}
+		fprintf(stderr, "failed to enable the decompression profiles\n");
+		goto destroy_decomp;
 	}
 
 	/* for each packet in the dump */
 	counter = 0;
 	while((packet = (unsigned char *) pcap_next(handle, &header)) != NULL)
 	{
-		unsigned char *rohc_packet;
-		int rohc_size;
-		static unsigned char ip_packet[MAX_ROHC_SIZE];
-		int ip_size;
+		const struct rohc_ts arrival_time = { .sec = 0, .nsec = 0 };
+		struct rohc_buf rohc_packet =
+			rohc_buf_init_full(packet, header.caplen, arrival_time);
 
-		unsigned char *feedback_data;
-		size_t feedback_size;
-		unsigned int feedback_type;
-		unsigned int feedback_data_pos = 0;
+		uint8_t ip_buffer[MAX_ROHC_SIZE];
+		struct rohc_buf ip_packet =
+			rohc_buf_init_empty(ip_buffer, MAX_ROHC_SIZE);
+
+		uint8_t feedback_buf[MAX_ROHC_SIZE];
+		struct rohc_buf feedback_send =
+			rohc_buf_init_empty(feedback_buf, MAX_ROHC_SIZE);
+
+		uint8_t feedback_code;
+		uint8_t feedback_full_len;
+		uint8_t feedback_data_len;
+		uint8_t feedback_type;
+
 		uint16_t sn;
 		unsigned int i;
 		unsigned int opt_len;
 		unsigned int expected_opt_pos;
+		rohc_status_t status;
 
 		counter++;
 
@@ -418,65 +385,98 @@ static int test_comp_and_decomp(const char *filename,
 		}
 
 		/* skip the link layer header */
-		rohc_packet = packet + link_len;
-		rohc_size = header.len - link_len;
+		rohc_buf_pull(&rohc_packet, link_len);
 
 		/* decompress the ROHC packet with the ROHC decompressor */
-		ip_size = rohc_decompress(decomp,
-		                          rohc_packet, rohc_size,
-		                          ip_packet, MAX_ROHC_SIZE);
-		if(ip_size <= 0)
+		status = rohc_decompress3(decomp, rohc_packet, &ip_packet,
+		                          NULL, &feedback_send);
+		if(status != ROHC_STATUS_OK)
 		{
 			fprintf(stderr, "\tfailed to decompress ROHC packet\n");
 			goto destroy_decomp;
 		}
 		fprintf(stderr, "\tdecompression is successful\n");
 
-		if(comp->feedbacks_first == 0 &&
-		   comp->feedbacks[comp->feedbacks_first].length == 0)
+		/* the decompressor should have generated one feedback */
+		if(rohc_buf_is_empty(feedback_send))
 		{
 			fprintf(stderr, "\tno feedback generated while one was expected\n");
 			goto destroy_decomp;
 		}
+		fprintf(stderr, "\t%zu-byte feedback generated\n", feedback_send.len);
 
-		/* retrieve feedback data */
-		feedback_data = comp->feedbacks[comp->feedbacks_first].data;
-		feedback_size = comp->feedbacks[comp->feedbacks_first].length;
-		fprintf(stderr, "\t%zd-byte feedback generated\n", feedback_size);
+		/* feedback header starts with 0b11110 */
+		if((rohc_buf_byte(feedback_send) & 0xf8) != 0xf0)
+		{
+			fprintf(stderr, "\tfeedback should start with the bits 0b11110\n");
+			goto destroy_decomp;
+		}
+		fprintf(stderr, "\tmagic number 0b11110 found\n");
 
-		/* if feedback length is one octet, the feedback is a FEEDBACK-1 */
-		if(feedback_size < 2)
+		feedback_code = rohc_buf_byte(feedback_send) & 0x07;
+		if(feedback_code > 0)
+		{
+			feedback_data_len = feedback_code;
+			feedback_full_len = 1 + feedback_data_len;
+		}
+		else
+		{
+			fprintf(stderr, "\tadditional Size octet found\n");
+			if(feedback_send.len < 2)
+			{
+				fprintf(stderr, "\tfeedback is not large enough for the Size "
+				        "octet\n");
+				goto destroy_decomp;
+			}
+			feedback_data_len = rohc_buf_byte_at(feedback_send, 1);
+			feedback_full_len = 1 + 1 + feedback_data_len;
+		}
+		if(feedback_full_len != feedback_send.len)
+		{
+			fprintf(stderr, "\tadditional data found at the end of feedback\n");
+			goto destroy_decomp;
+		}
+		rohc_buf_pull(&feedback_send, feedback_full_len - feedback_data_len);
+
+		/* if feedback length is 2 bytes (1-byte header + 1-byte feedback), the
+		 * feedback is a FEEDBACK-1 */
+		if(feedback_send.len == 2)
 		{
 			fprintf(stderr, "\tFEEDBACK-2 should be at least 2 byte long\n");
 			goto destroy_decomp;
 		}
 
 		/* is there a Add-CID octet? */
-		if(is_large_cid)
+		if(cid_type == ROHC_LARGE_CID)
 		{
+			size_t sdvl_size;
+			uint32_t cid;
+			size_t cid_bits_nr;
+
 			/* determine the size of the SDVL-encoded large CID */
-			ret = d_sdvalue_size(feedback_data);
-			if(ret <= 0 || ret > 4)
+			sdvl_size = sdvl_decode(rohc_buf_data(feedback_send),
+			                        feedback_send.len, &cid, &cid_bits_nr);
+			if(sdvl_size <= 0 || sdvl_size > 4)
 			{
 				fprintf(stderr, "\tinvalid SDVL-encoded value for large CID\n");
 				goto destroy_decomp;
 			}
 
 			fprintf(stderr, "\tlarge CID found\n");
-			feedback_data_pos += ret;
+			rohc_buf_pull(&feedback_send, sdvl_size);
 		}
 		else
 		{
-			if(((feedback_data[0] & 0xc0) >> 6) == 3)
+			if(((rohc_buf_byte(feedback_send) & 0xc0) >> 6) == 3)
 			{
 				/* skip Add-CID */
 				fprintf(stderr, "\tAdd-CID found\n");
-				feedback_data_pos++;
+				rohc_buf_pull(&feedback_send, 1);
 			}
 		}
 
 		/* check feedback type */
-		feedback_type = (feedback_data[feedback_data_pos] & 0xc0) >> 6;
+		feedback_type = (rohc_buf_byte(feedback_send) & 0xc0) >> 6;
 		switch(feedback_type)
 		{
 			case 0:
@@ -514,13 +514,14 @@ static int test_comp_and_decomp(const char *filename,
 		fprintf(stderr, "\tFEEDBACK-2 is a %s feedback as expected\n",
 		        expected_type);
 
-		sn = ((feedback_data[feedback_data_pos] & 0x0f) << 8) +
-		     (feedback_data[feedback_data_pos + 1] & 0xff);
+		sn = ((rohc_buf_byte(feedback_send) & 0x0f) << 8) +
+		     (rohc_buf_byte_at(feedback_send, 1) & 0xff);
 		fprintf(stderr, "\tSN (or a part of it) = 0x%04x\n", sn);
+		rohc_buf_pull(&feedback_send, 2);
 
 		/* parse every feedback options found in the packet */
 		expected_opt_pos = 0;
-		for(i = feedback_data_pos + 2; i < feedback_size; i += opt_len)
+		for(i = 0; i < feedback_send.len; i += opt_len)
 		{
 			/* is another feedback option expected? */
 			if(expected_opt_pos >= expected_options_nr)
@@ -530,10 +531,10 @@ static int test_comp_and_decomp(const char *filename,
 			}
 
 			/* get option length (1 byte of header + variable data) */
-			opt_len = 1 + (feedback_data[i] & 0x0f);
+			opt_len = 1 + (rohc_buf_byte_at(feedback_send, i) & 0x0f);
 
 			/* check option type */
-			switch((feedback_data[i] & 0xf0) >> 4)
+			switch((rohc_buf_byte_at(feedback_send, i) & 0xf0) >> 4)
 			{
 				case 1:
 					/* CRC */
@@ -615,26 +616,22 @@ static int test_comp_and_decomp(const char *filename,
 				default:
 					/* unknown option: RFC 3095 says to ignore unknown options */
 					fprintf(stderr, "\tIgnore unknown %u-byte option of type %u\n",
-					        opt_len, (feedback_data[i] & 0xf0) >> 4);
+					        opt_len, (rohc_buf_byte_at(feedback_send, i) & 0xf0) >> 4);
 					break;
 			}
 		}
 
-		free(comp->feedbacks[comp->feedbacks_first].data);
-		comp->feedbacks[comp->feedbacks_first].length = 0;
-		comp->feedbacks[comp->feedbacks_first].is_locked = false;
-		comp->feedbacks_first = 0;
-		comp->feedbacks_first_unlocked = 0;
-		comp->feedbacks_next = 0;
+		feedback_send.data -= feedback_send.offset;
+		feedback_send.len = 0;
 	}
 
 	/* everything went fine */
 	is_failure = 0;
 
 destroy_decomp:
-	rohc_free_decompressor(decomp);
+	rohc_decomp_free(decomp);
 destroy_comp:
-	rohc_free_compressor(comp);
+	rohc_comp_free(comp);
 close_input:
 	pcap_close(handle);
 error:
@@ -645,15 +642,17 @@ error:
 /**
  * @brief Callback to print traces of the ROHC library
  *
- * @param level    The priority level of the trace
- * @param entity   The entity that emitted the trace among:
- *                  \li ROHC_TRACE_COMP
- *                  \li ROHC_TRACE_DECOMP
- * @param profile  The ID of the ROHC compression/decompression profile
- *                 the trace is related to
- * @param format   The format string of the trace
+ * @param priv_ctxt  An optional private context, may be NULL
+ * @param level      The priority level of the trace
+ * @param entity     The entity that emitted the trace among:
+ *                    \li ROHC_TRACE_COMP
+ *                    \li ROHC_TRACE_DECOMP
+ * @param profile    The ID of the ROHC compression/decompression profile
+ *                   the trace is related to
+ * @param format     The format string of the trace
  */
-static void print_rohc_traces(const rohc_trace_level_t level,
+static void print_rohc_traces(void *const priv_ctxt __attribute__((unused)),
+                              const rohc_trace_level_t level,
                               const rohc_trace_entity_t entity,
                               const int profile,
                               const char *const format,
@@ -680,5 +679,50 @@ static int gen_random_num(const struct rohc_comp *const comp,
 	assert(comp != NULL);
 	assert(user_context == NULL);
 	return rand();
+}
+
+
+/**
+ * @brief The RTP detection callback
+ *
+ * @param ip           The innermost IP packet
+ * @param udp          The UDP header of the packet
+ * @param payload      The UDP payload of the packet
+ * @param payload_size The size of the UDP payload (in bytes)
+ * @param rtp_private  An optional private context
+ * @return             true if the packet is an RTP packet, false otherwise
+ */
+static bool rohc_comp_rtp_cb(const unsigned char *const ip __attribute__((unused)),
+                             const unsigned char *const udp,
+                             const unsigned char *const payload __attribute__((unused)),
+                             const unsigned int payload_size __attribute__((unused)),
+                             void *const rtp_private __attribute__((unused)))
+{
+	const size_t default_rtp_ports_nr = 5;
+	unsigned int default_rtp_ports[] = { 1234, 36780, 33238, 5020, 5002 };
+	uint16_t udp_dport;
+	bool is_rtp = false;
+	size_t i;
+
+	if(udp == NULL)
+	{
+		return false;
+	}
+
+	/* get the UDP destination port */
+	memcpy(&udp_dport, udp + 2, sizeof(uint16_t));
+
+	/* is the UDP destination port in the list of ports reserved for RTP
+	 * traffic by default (for compatibility reasons) */
+	for(i = 0; i < default_rtp_ports_nr; i++)
+	{
+		if(rohc_ntoh16(udp_dport) == default_rtp_ports[i])
+		{
+			is_rtp = true;
+			break;
+		}
+	}
+
+	return is_rtp;
 }
 

@@ -17,7 +17,7 @@
 ################################################################################
 #	Name       : Makefile
 #	Author     : Didier Barvaux <didier@barvaux.org>
-#	Description: create the test tools that check behaviour of the common library
+#	Description: create the test tools that check behaviour of the comp library
 ################################################################################
 VPATH = @srcdir@
 am__is_gnu_make = test -n '$(MAKEFILE_LIST)' && test -n '$(MAKELEVEL)'
@@ -384,6 +384,8 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CMOCKA_CFLAGS = @CMOCKA_CFLAGS@
+CMOCKA_LIBS = @CMOCKA_LIBS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CYGPATH_W = @CYGPATH_W@
@@ -430,6 +432,9 @@ PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 RANLIB = @RANLIB@
 ROHC_API_AGE = @ROHC_API_AGE@
 ROHC_API_CURRENT = @ROHC_API_CURRENT@
@@ -477,8 +482,10 @@ includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
 is_dot_found = @is_dot_found@
+is_doxy2man_found = @is_doxy2man_found@
 is_doxygen_found = @is_doxygen_found@
 is_gnuplot_found = @is_gnuplot_found@
+is_help2man_found = @is_help2man_found@
 is_latex_found = @is_latex_found@
 is_qemu_found = @is_qemu_found@
 is_sort_found = @is_sort_found@
@@ -503,7 +510,6 @@ prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
 sbindir = @sbindir@
-sched_lib = @sched_lib@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
@@ -516,15 +522,13 @@ TESTS = \
 
 test_api_robustness_SOURCES = test_api_robustness.c
 test_api_robustness_LDADD = \
-	-lrohc_decomp \
 	-lrohc_comp \
 	-lrohc_common
 
 test_api_robustness_LDFLAGS = \
 	$(configure_ldflags) \
 	-L$(top_builddir)/src/common/.libs \
-	-L$(top_builddir)/src/comp/.libs \
-	-L$(top_builddir)/src/decomp/.libs
+	-L$(top_builddir)/src/comp/.libs
 
 test_api_robustness_CFLAGS = \
 	$(configure_cflags)
@@ -532,8 +536,7 @@ test_api_robustness_CFLAGS = \
 test_api_robustness_CPPFLAGS = \
 	-I$(top_srcdir)/src \
 	-I$(top_srcdir)/src/common \
-	-I$(top_srcdir)/src/comp \
-	-I$(top_srcdir)/src/decomp
+	-I$(top_srcdir)/src/comp
 
 EXTRA_DIST = \
 	test_api_robustness.sh

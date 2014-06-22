@@ -1,17 +1,20 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2013,2014 Didier Barvaux
+ * Copyright 2013 Friedrich
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -21,7 +24,6 @@
  */
 
 #include "rohc_comp.h"
-#include "rohc_decomp.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -44,6 +46,11 @@
 		fflush(stdout); \
 		assert(condition); \
 	} while(0)
+
+
+static int random_cb(const struct rohc_comp *const comp,
+                     void *const user_context)
+	__attribute__((warn_unused_result));
 
 
 /**
@@ -78,43 +85,104 @@ int main(int argc, char *argv[])
 		goto error;
 	}
 
-	/* rohc_alloc_compressor() */
-	CHECK(rohc_alloc_compressor(-1, 0, 0, 0) == NULL);
-	CHECK(rohc_alloc_compressor(ROHC_SMALL_CID_MAX + 1, 0, 0, 0) == NULL);
-	CHECK(rohc_alloc_compressor(ROHC_LARGE_CID_MAX, 0, 0, 0) == NULL);
-	CHECK(rohc_alloc_compressor(ROHC_SMALL_CID_MAX, 1, 0, 0) == NULL);
-	CHECK(rohc_alloc_compressor(ROHC_SMALL_CID_MAX, 0, 1, 0) == NULL);
-	CHECK(rohc_alloc_compressor(ROHC_SMALL_CID_MAX, 0, 1, 1) == NULL);
-	comp = rohc_alloc_compressor(ROHC_SMALL_CID_MAX, 0, 0, 0);
+	/* rohc_comp_new2() */
+	CHECK(rohc_comp_new2(-1, ROHC_SMALL_CID_MAX, random_cb, NULL) == NULL);
+	CHECK(rohc_comp_new2(ROHC_SMALL_CID + 1, ROHC_SMALL_CID_MAX,
+	                     random_cb, NULL) == NULL);
+	comp = rohc_comp_new2(ROHC_SMALL_CID, 0, random_cb, NULL);
+	CHECK(comp != NULL);
+	rohc_comp_free(comp);
+	comp = rohc_comp_new2(ROHC_SMALL_CID, ROHC_SMALL_CID_MAX,
+	                      random_cb, NULL);
+	CHECK(comp != NULL);
+	rohc_comp_free(comp);
+	CHECK(rohc_comp_new2(ROHC_SMALL_CID, ROHC_SMALL_CID_MAX + 1,
+	                     random_cb, NULL) == NULL);
+	comp = rohc_comp_new2(ROHC_LARGE_CID, 0, random_cb, NULL);
+	CHECK(comp != NULL);
+	rohc_comp_free(comp);
+	comp = rohc_comp_new2(ROHC_LARGE_CID, ROHC_LARGE_CID_MAX,
+	                      random_cb, NULL);
+	CHECK(comp != NULL);
+	rohc_comp_free(comp);
+	CHECK(rohc_comp_new2(ROHC_LARGE_CID, ROHC_LARGE_CID_MAX + 1,
+	                     random_cb, NULL) == NULL);
+	CHECK(rohc_comp_new2(ROHC_LARGE_CID, ROHC_LARGE_CID_MAX,
+	                     NULL, NULL) == NULL);
+	comp = rohc_comp_new2(ROHC_SMALL_CID, ROHC_SMALL_CID_MAX,
+	                      random_cb, NULL);
 	CHECK(comp != NULL);
 
-	/* rohc_comp_set_traces_cb() */
+	/* rohc_comp_set_traces_cb2() */
 	{
-		rohc_trace_callback_t fct = (rohc_trace_callback_t) NULL;
-		CHECK(rohc_comp_set_traces_cb(NULL, fct) == false);
-		CHECK(rohc_comp_set_traces_cb(comp, fct) == true);
+		rohc_trace_callback2_t fct = (rohc_trace_callback2_t) NULL;
+		CHECK(rohc_comp_set_traces_cb2(NULL, fct, NULL) == false);
+		CHECK(rohc_comp_set_traces_cb2(comp, fct, NULL) == true);
+		CHECK(rohc_comp_set_traces_cb2(comp, fct, comp) == true);
 	}
 
-	/* rohc_comp_set_random_cb() */
-	{
-		rohc_comp_random_cb_t fct = (rohc_comp_random_cb_t) NULL;
-		CHECK(rohc_comp_set_random_cb(NULL, fct, NULL) == false);
-		CHECK(rohc_comp_set_random_cb(comp, fct, NULL) == false);
-	}
+	/* rohc_comp_profile_enabled() */
+	CHECK(rohc_comp_profile_enabled(NULL, ROHC_PROFILE_IP) == false);
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_GENERAL) == false);
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_UNCOMPRESSED) == false);
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_RTP) == false);
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_UDP) == false);
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_ESP) == false);
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_IP) == false);
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_TCP) == false);
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_UDPLITE) == false);
 
-	/* rohc_activate_profile() */
-	rohc_activate_profile(NULL, ROHC_PROFILE_IP);
-	rohc_activate_profile(comp, ROHC_PROFILE_GENERAL);
-	rohc_activate_profile(comp, ROHC_PROFILE_IP);
+	/* rohc_comp_enable_profile() */
+	CHECK(rohc_comp_enable_profile(NULL, ROHC_PROFILE_IP) == false);
+	CHECK(rohc_comp_enable_profile(comp, ROHC_PROFILE_GENERAL) == false);
+	CHECK(rohc_comp_enable_profile(comp, ROHC_PROFILE_IP) == true);
 
-	/* rohc_comp_get_segment() */
+	/* rohc_comp_disable_profile() */
+	CHECK(rohc_comp_disable_profile(NULL, ROHC_PROFILE_IP) == false);
+	CHECK(rohc_comp_disable_profile(comp, ROHC_PROFILE_GENERAL) == false);
+	CHECK(rohc_comp_disable_profile(comp, ROHC_PROFILE_IP) == true);
+
+	/* rohc_comp_enable_profiles() */
+	CHECK(rohc_comp_enable_profiles(NULL, ROHC_PROFILE_IP, -1) == false);
+	CHECK(rohc_comp_enable_profiles(comp, ROHC_PROFILE_GENERAL, -1) == false);
+	CHECK(rohc_comp_enable_profiles(comp, ROHC_PROFILE_IP, -1) == true);
+	CHECK(rohc_comp_enable_profiles(comp, ROHC_PROFILE_IP, ROHC_PROFILE_UDP,
+	                                ROHC_PROFILE_RTP, -1) == true);
+
+	/* rohc_comp_disable_profiles() */
+	CHECK(rohc_comp_disable_profiles(NULL, ROHC_PROFILE_IP, -1) == false);
+	CHECK(rohc_comp_disable_profiles(comp, ROHC_PROFILE_GENERAL, -1) == false);
+	CHECK(rohc_comp_disable_profiles(comp, ROHC_PROFILE_UDP, -1) == true);
+	CHECK(rohc_comp_disable_profiles(comp, ROHC_PROFILE_UDP,
+	                                 ROHC_PROFILE_RTP, -1) == true);
+
+	/* rohc_comp_profile_enabled() */
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_UNCOMPRESSED) == false);
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_RTP) == false);
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_UDP) == false);
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_ESP) == false);
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_IP) == true);
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_TCP) == false);
+	CHECK(rohc_comp_profile_enabled(comp, ROHC_PROFILE_UDPLITE) == false);
+
+	/* rohc_comp_get_segment2() */
 	{
 		unsigned char buf1[1];
-		size_t len;
-		CHECK(rohc_comp_get_segment(NULL, buf1, 1, &len) == ROHC_ERROR);
-		CHECK(rohc_comp_get_segment(comp, NULL, 1, &len) == ROHC_ERROR);
-		CHECK(rohc_comp_get_segment(comp, buf1, 0, &len) == ROHC_ERROR);
-		CHECK(rohc_comp_get_segment(comp, buf1, 1, NULL) == ROHC_ERROR);
+		struct rohc_buf pkt1 = rohc_buf_init_empty(buf1, 1);
+		CHECK(rohc_comp_get_segment2(NULL, &pkt1) == ROHC_STATUS_ERROR);
+		CHECK(rohc_comp_get_segment2(comp, NULL) == ROHC_STATUS_ERROR);
+		pkt1.max_len = 0;
+		pkt1.offset = 0;
+		pkt1.len = 0;
+		CHECK(rohc_comp_get_segment2(comp, &pkt1) == ROHC_STATUS_ERROR);
+		pkt1.max_len = 1;
+		pkt1.offset = 0;
+		pkt1.len = 0;
+		CHECK(rohc_comp_get_segment2(comp, &pkt1) == ROHC_STATUS_ERROR);
+		pkt1.max_len = 2;
+		pkt1.offset = 0;
+		pkt1.len = 0;
+		CHECK(rohc_comp_get_segment2(comp, &pkt1) == ROHC_STATUS_ERROR);
 	}
 
 	/* rohc_comp_force_contexts_reinit() */
@@ -134,6 +202,12 @@ int main(int argc, char *argv[])
 	CHECK(rohc_comp_set_periodic_refreshes(comp, 5, 10) == false);
 	CHECK(rohc_comp_set_periodic_refreshes(comp, 5, 10) == false);
 
+	/* rohc_comp_set_list_trans_nr() */
+	CHECK(rohc_comp_set_list_trans_nr(NULL, 5) == false);
+	CHECK(rohc_comp_set_list_trans_nr(comp, 0) == false);
+	CHECK(rohc_comp_set_list_trans_nr(comp, 1) == true);
+	CHECK(rohc_comp_set_list_trans_nr(comp, 5) == true);
+
 	/* rohc_comp_set_rtp_detection_cb() */
 	{
 		rohc_rtp_detection_callback_t fct =
@@ -141,10 +215,6 @@ int main(int argc, char *argv[])
 		CHECK(rohc_comp_set_rtp_detection_cb(NULL, fct, NULL) == false);
 		CHECK(rohc_comp_set_rtp_detection_cb(comp, fct, NULL) == true);
 	}
-
-	/* rohc_c_using_small_cid() */
-	CHECK(rohc_c_using_small_cid(NULL) == 0);
-	CHECK(rohc_c_using_small_cid(comp) == 1);
 
 	/* rohc_comp_set_mrru() */
 	CHECK(rohc_comp_set_mrru(NULL, 10) == false);
@@ -158,12 +228,10 @@ int main(int argc, char *argv[])
 		CHECK(rohc_comp_get_mrru(NULL, &mrru) == false);
 		CHECK(rohc_comp_get_mrru(comp, NULL) == false);
 		CHECK(rohc_comp_get_mrru(comp, &mrru) == true);
+		CHECK(mrru == 65535);
 	}
-
-	/* rohc_c_set_max_cid() */
-	rohc_c_set_max_cid(NULL, ROHC_SMALL_CID_MAX);
-	rohc_c_set_max_cid(comp, -1);
-	rohc_c_set_max_cid(comp, 0xffff);
+	/* disable MRRU for next tests */
+	CHECK(rohc_comp_set_mrru(comp, 0) == true);
 
 	/* rohc_comp_get_max_cid() */
 	{
@@ -171,13 +239,8 @@ int main(int argc, char *argv[])
 		CHECK(rohc_comp_get_max_cid(NULL, &max_cid) == false);
 		CHECK(rohc_comp_get_max_cid(comp, NULL) == false);
 		CHECK(rohc_comp_get_max_cid(comp, &max_cid) == true);
+		CHECK(max_cid == ROHC_SMALL_CID_MAX);
 	}
-
-	/* rohc_c_set_large_cid() */
-	rohc_c_set_large_cid(NULL, 1);
-	rohc_c_set_large_cid(comp, -1);
-	rohc_c_set_large_cid(comp, 0);
-	rohc_c_set_large_cid(comp, 1);
 
 	/* rohc_comp_get_cid_type() */
 	{
@@ -185,79 +248,16 @@ int main(int argc, char *argv[])
 		CHECK(rohc_comp_get_cid_type(NULL, &cid_type) == false);
 		CHECK(rohc_comp_get_cid_type(comp, NULL) == false);
 		CHECK(rohc_comp_get_cid_type(comp, &cid_type) == true);
+		CHECK(cid_type == ROHC_SMALL_CID);
 	}
 
-	/* rohc_comp_add_rtp_port() */
-	CHECK(rohc_comp_add_rtp_port(NULL, 1) == false);
-	CHECK(rohc_comp_add_rtp_port(comp, 0) == false);
-	CHECK(rohc_comp_add_rtp_port(comp, 0xffff + 1) == false);
-	CHECK(rohc_comp_add_rtp_port(comp, 1) == true);
-	CHECK(rohc_comp_add_rtp_port(comp, 1) == false); /* not twice in list */
-	for(int i = 2; i <= 15; i++)
+	/* rohc_compress4() */
 	{
-		CHECK(rohc_comp_add_rtp_port(comp, i) == true);
-	}
-	CHECK(rohc_comp_add_rtp_port(comp, 16) == false);
-
-	/* rohc_comp_remove_rtp_port() */
-	CHECK(rohc_comp_remove_rtp_port(NULL, 1) == false);
-	CHECK(rohc_comp_remove_rtp_port(comp, 0) == false);
-	CHECK(rohc_comp_remove_rtp_port(comp, 0xffff + 1) == false);
-	CHECK(rohc_comp_remove_rtp_port(comp, 16) == false); /* not in list */
-	CHECK(rohc_comp_remove_rtp_port(comp, 15) == true); /* remove last */
-	CHECK(rohc_comp_remove_rtp_port(comp, 16) == false); /* not in list (2) */
-	for(int i = 1; i < 15; i++)
-	{
-		CHECK(rohc_comp_remove_rtp_port(comp, i) == true);
-	}
-	CHECK(rohc_comp_remove_rtp_port(comp, 16) == false); /* empty list */
-
-	/* rohc_comp_reset_rtp_ports() */
-	CHECK(rohc_comp_reset_rtp_ports(NULL) == false);
-	CHECK(rohc_comp_reset_rtp_ports(comp) == true);
-
-	/* rohc_c_set_enable() */
-	rohc_c_set_enable(NULL, 1);
-	rohc_c_set_enable(comp, -1);
-	rohc_c_set_enable(comp, 2);
-	rohc_c_set_enable(comp, 0);
-	rohc_c_set_enable(comp, 1);
-
-	/* rohc_c_is_enabled() */
-	CHECK(rohc_c_is_enabled(NULL) == 0);
-	CHECK(rohc_c_is_enabled(comp) == 1);
-
-	/* rohc_comp_piggyback_feedback() */
-	{
-		unsigned char buf[1];
-		CHECK(rohc_comp_piggyback_feedback(NULL, buf, 1) == false);
-		CHECK(rohc_comp_piggyback_feedback(comp, NULL, 1) == false);
-		CHECK(rohc_comp_piggyback_feedback(comp, buf, 0) == false);
-		for(int i = 0; i < 1000; i++)
-		{
-			CHECK(rohc_comp_piggyback_feedback(comp, buf, 1) == true);
-		}
-		CHECK(rohc_comp_piggyback_feedback(comp, buf, 1) == false); /* full */
-	}
-
-	/* rohc_feedback_flush() */
-	{
-		const size_t buflen = 2;
-		unsigned char buf[buflen];
-		CHECK(rohc_feedback_flush(NULL, buf, buflen) == 0);
-		CHECK(rohc_feedback_flush(comp, NULL, buflen) == 0);
-		CHECK(rohc_feedback_flush(comp, buf, 0) == 0);
-		for(int i = 0; i < 1000; i++)
-		{
-			CHECK(rohc_feedback_flush(comp, buf, buflen) > 0);
-		}
-		CHECK(rohc_feedback_flush(comp, buf, buflen) == 0); /* empty */
-	}
-
-	/* rohc_compress2() */
-	{
-		unsigned char buf1[1];
+		const struct rohc_ts ts = { .sec = 0, .nsec = 0 };
+		unsigned char buf1[1] = { 0x00 };
+		struct rohc_buf pkt1 = rohc_buf_init_full(buf1, 1, ts);
 		unsigned char buf2[100];
+		struct rohc_buf pkt2 = rohc_buf_init_empty(buf2, 100);
 		unsigned char buf[] =
 		{
 			0x45, 0x00, 0x00, 0x54,  0x00, 0x00, 0x40, 0x00,
@@ -272,14 +272,27 @@ int main(int argc, char *argv[])
 			0x2c, 0x2d, 0x2e, 0x2f,  0x30, 0x31, 0x32, 0x33,
 			0x34, 0x35, 0x36, 0x37
 		};
-		size_t len;
-		CHECK(rohc_compress2(NULL, buf1, 1, buf2, 1, &len) == ROHC_ERROR);
-		CHECK(rohc_compress2(comp, NULL, 1, buf2, 1, &len) == ROHC_ERROR);
-		CHECK(rohc_compress2(comp, buf1, 0, buf2, 1, &len) == ROHC_ERROR);
-		CHECK(rohc_compress2(comp, buf1, 1, NULL, 1, &len) == ROHC_ERROR);
-		CHECK(rohc_compress2(comp, buf1, 1, buf2, 0, &len) == ROHC_ERROR);
-		CHECK(rohc_compress2(comp, buf1, 1, buf2, 1, NULL) == ROHC_ERROR);
-		CHECK(rohc_compress2(comp, buf, sizeof(buf), buf2, sizeof(buf2), &len) == ROHC_OK);
+		struct rohc_buf pkt = rohc_buf_init_full(buf, sizeof(buf), ts);
+		CHECK(rohc_compress4(NULL, pkt1, &pkt2) == ROHC_STATUS_ERROR);
+		pkt1.len = 0;
+		CHECK(rohc_compress4(comp, pkt1, &pkt2) == ROHC_STATUS_ERROR);
+		pkt1.len = 1;
+		CHECK(rohc_compress4(comp, pkt1, NULL) == ROHC_STATUS_ERROR);
+		pkt2.max_len = 0;
+		pkt2.offset = 0;
+		pkt2.len = 0;
+		CHECK(rohc_compress4(comp, pkt1, &pkt2) == ROHC_STATUS_ERROR);
+		for(size_t i = 0; i <= pkt.len; i++)
+		{
+			pkt2.max_len = i;
+			pkt2.offset = 0;
+			pkt2.len = 0;
+			CHECK(rohc_compress4(comp, pkt, &pkt2) == ROHC_STATUS_ERROR);
+		}
+		pkt2.max_len = pkt.len + 1;
+		pkt2.offset = 0;
+		pkt2.len = 0;
+		CHECK(rohc_compress4(comp, pkt, &pkt2) == ROHC_STATUS_OK);
 	}
 
 	/* rohc_comp_get_last_packet_info2() */
@@ -313,23 +326,31 @@ int main(int argc, char *argv[])
 	}
 
 	/* rohc_comp_get_state_descr() */
-	CHECK(strcmp(rohc_comp_get_state_descr(IR), "IR") == 0);
-	CHECK(strcmp(rohc_comp_get_state_descr(FO), "FO") == 0);
-	CHECK(strcmp(rohc_comp_get_state_descr(SO), "SO") == 0);
-	CHECK(strcmp(rohc_comp_get_state_descr(0xffff), "no description") == 0);
+	CHECK(strcmp(rohc_comp_get_state_descr(ROHC_COMP_STATE_IR), "IR") == 0);
+	CHECK(strcmp(rohc_comp_get_state_descr(ROHC_COMP_STATE_FO), "FO") == 0);
+	CHECK(strcmp(rohc_comp_get_state_descr(ROHC_COMP_STATE_SO), "SO") == 0);
 
 	/* rohc_comp_force_contexts_reinit() with some contexts init'ed */
 	CHECK(rohc_comp_force_contexts_reinit(comp) == true);
 
-	/* rohc_feedback_remove_locked() */
-	CHECK(rohc_feedback_remove_locked(NULL) == false);
+	/* rohc_comp_deliver_feedback2() */
+	{
+		const struct rohc_ts ts = { .sec = 0, .nsec = 0 };
+		uint8_t buf[] = { 0xf4, 0x20, 0x01, 0x11, 0x39 };
+		struct rohc_buf pkt = rohc_buf_init_full(buf, 5, ts);
 
-	/* rohc_feedback_unlock() */
-	CHECK(rohc_feedback_unlock(NULL) == false);
+		CHECK(rohc_comp_deliver_feedback2(NULL, pkt) == false);
+		pkt.len = 0; CHECK(rohc_comp_deliver_feedback2(comp, pkt) == true);
+		pkt.len = 1; CHECK(rohc_comp_deliver_feedback2(comp, pkt) == false);
+		pkt.len = 2; CHECK(rohc_comp_deliver_feedback2(comp, pkt) == false);
+		pkt.len = 3; CHECK(rohc_comp_deliver_feedback2(comp, pkt) == false);
+		pkt.len = 4; CHECK(rohc_comp_deliver_feedback2(comp, pkt) == false);
+		pkt.len = 5; CHECK(rohc_comp_deliver_feedback2(comp, pkt) == true);
+	}
 
-	/* rohc_free_compressor() */
-	rohc_free_compressor(NULL);
-	rohc_free_compressor(comp);
+	/* rohc_comp_free() */
+	rohc_comp_free(NULL);
+	rohc_comp_free(comp);
 
 	/* test succeeds */
 	trace(verbose, "all tests are successful\n");
@@ -337,5 +358,19 @@ int main(int argc, char *argv[])
 
 error:
 	return is_failure;
+}
+
+
+/**
+ * @brief Fake random callback: always send 0
+ *
+ * @param comp          The compressor
+ * @param user_context  Private data
+ * @return              Always 0
+ */
+static int random_cb(const struct rohc_comp *const comp __attribute__((unused)),
+                     void *const user_context __attribute__((unused)))
+{
+	return 0; /* fake */
 }
 

@@ -88,7 +88,8 @@ build_triplet = @build@
 host_triplet = @host@
 subdir = src/comp
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
-	$(top_srcdir)/depcomp $(include_HEADERS) $(noinst_HEADERS)
+	$(top_srcdir)/depcomp $(include_HEADERS) $(noinst_HEADERS) \
+	$(pkginclude_HEADERS)
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
@@ -124,15 +125,15 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)"
+am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)" \
+	"$(DESTDIR)$(pkgincludedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
-librohc_comp_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_librohc_comp_la_OBJECTS = librohc_comp_la-rohc_comp.lo \
 	librohc_comp_la-c_uncompressed.lo librohc_comp_la-c_generic.lo \
 	librohc_comp_la-c_ip.lo librohc_comp_la-c_udp.lo \
 	librohc_comp_la-c_udp_lite.lo librohc_comp_la-c_esp.lo \
-	librohc_comp_la-c_rtp.lo
+	librohc_comp_la-c_rtp.lo librohc_comp_la-c_tcp.lo
 librohc_comp_la_OBJECTS = $(am_librohc_comp_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -191,7 +192,7 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
-HEADERS = $(include_HEADERS) $(noinst_HEADERS)
+HEADERS = $(include_HEADERS) $(noinst_HEADERS) $(pkginclude_HEADERS)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 am__recursive_targets = \
@@ -219,7 +220,7 @@ am__define_uniq_tagged_files = \
   done | $(am__uniquify_input)`
 ETAGS = etags
 CTAGS = ctags
-DIST_SUBDIRS = $(SUBDIRS)
+DIST_SUBDIRS = schemes . test
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 am__relativize = \
   dir0=`pwd`; \
@@ -258,6 +259,8 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CMOCKA_CFLAGS = @CMOCKA_CFLAGS@
+CMOCKA_LIBS = @CMOCKA_LIBS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CYGPATH_W = @CYGPATH_W@
@@ -304,6 +307,9 @@ PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 RANLIB = @RANLIB@
 ROHC_API_AGE = @ROHC_API_AGE@
 ROHC_API_CURRENT = @ROHC_API_CURRENT@
@@ -351,8 +357,10 @@ includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
 is_dot_found = @is_dot_found@
+is_doxy2man_found = @is_doxy2man_found@
 is_doxygen_found = @is_doxygen_found@
 is_gnuplot_found = @is_gnuplot_found@
+is_help2man_found = @is_help2man_found@
 is_latex_found = @is_latex_found@
 is_qemu_found = @is_qemu_found@
 is_sort_found = @is_sort_found@
@@ -377,7 +385,6 @@ prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
 sbindir = @sbindir@
-sched_lib = @sched_lib@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
@@ -385,7 +392,9 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = . test
+@ROHC_TESTS_FALSE@COMP_TESTS_DIR = 
+@ROHC_TESTS_TRUE@COMP_TESTS_DIR = test
+SUBDIRS = schemes . $(COMP_TESTS_DIR)
 lib_LTLIBRARIES = librohc_comp.la
 librohc_comp_la_SOURCES = \
 	rohc_comp.c \
@@ -395,14 +404,17 @@ librohc_comp_la_SOURCES = \
 	c_udp.c \
 	c_udp_lite.c \
 	c_esp.c \
-	c_rtp.c
+	c_rtp.c \
+	c_tcp.c
 
 librohc_comp_la_LIBADD = \
 	-lrohc_common \
+	$(builddir)/schemes/librohc_comp_schemes.la \
 	$(additional_platform_libs)
 
 librohc_comp_la_LDFLAGS = \
 	$(configure_ldflags) \
+	-export-symbols $(srcdir)/librohc_comp.symbols \
 	-no-undefined \
 	-version-info $(ROHC_API_CURRENT):$(ROHC_API_REVISION):$(ROHC_API_AGE) \
 	-L$(top_builddir)/src/common/.libs
@@ -414,7 +426,17 @@ librohc_comp_la_CPPFLAGS = \
 	-I$(top_srcdir)/src \
 	-I$(top_srcdir)/src/common
 
+librohc_comp_la_DEPENDENCIES = \
+	$(builddir)/schemes/librohc_comp_schemes.la \
+	$(srcdir)/librohc_comp.symbols
+
+
+# fake public headers installed in $includedir to point
+# to the real public headers in $includedir/$packagename
 include_HEADERS = \
+	compat_headers/rohc_comp.h
+
+pkginclude_HEADERS = \
 	rohc_comp.h
 
 noinst_HEADERS = \
@@ -422,9 +444,13 @@ noinst_HEADERS = \
 	c_generic.h \
 	c_ip.h \
 	c_udp.h \
-	c_udp_lite.h \
-	c_esp.h \
 	c_rtp.h
+
+
+# extra files for releases
+EXTRA_DIST = \
+	librohc_comp.symbols \
+	rohc
 
 all: all-recursive
 
@@ -509,6 +535,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_comp_la-c_generic.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_comp_la-c_ip.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_comp_la-c_rtp.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_comp_la-c_tcp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_comp_la-c_udp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_comp_la-c_udp_lite.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_comp_la-c_uncompressed.Plo@am__quote@
@@ -591,6 +618,13 @@ librohc_comp_la-c_rtp.lo: c_rtp.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_comp_la_CPPFLAGS) $(CPPFLAGS) $(librohc_comp_la_CFLAGS) $(CFLAGS) -c -o librohc_comp_la-c_rtp.lo `test -f 'c_rtp.c' || echo '$(srcdir)/'`c_rtp.c
 
+librohc_comp_la-c_tcp.lo: c_tcp.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_comp_la_CPPFLAGS) $(CPPFLAGS) $(librohc_comp_la_CFLAGS) $(CFLAGS) -MT librohc_comp_la-c_tcp.lo -MD -MP -MF $(DEPDIR)/librohc_comp_la-c_tcp.Tpo -c -o librohc_comp_la-c_tcp.lo `test -f 'c_tcp.c' || echo '$(srcdir)/'`c_tcp.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_comp_la-c_tcp.Tpo $(DEPDIR)/librohc_comp_la-c_tcp.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='c_tcp.c' object='librohc_comp_la-c_tcp.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_comp_la_CPPFLAGS) $(CPPFLAGS) $(librohc_comp_la_CFLAGS) $(CFLAGS) -c -o librohc_comp_la-c_tcp.lo `test -f 'c_tcp.c' || echo '$(srcdir)/'`c_tcp.c
+
 mostlyclean-libtool:
 	-rm -f *.lo
 
@@ -617,6 +651,27 @@ uninstall-includeHEADERS:
 	@list='$(include_HEADERS)'; test -n "$(includedir)" || list=; \
 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
 	dir='$(DESTDIR)$(includedir)'; $(am__uninstall_files_from_dir)
+install-pkgincludeHEADERS: $(pkginclude_HEADERS)
+	@$(NORMAL_INSTALL)
+	@list='$(pkginclude_HEADERS)'; test -n "$(pkgincludedir)" || list=; \
+	if test -n "$$list"; then \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(pkgincludedir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(pkgincludedir)" || exit 1; \
+	fi; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_HEADER) $$files '$(DESTDIR)$(pkgincludedir)'"; \
+	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(pkgincludedir)" || exit $$?; \
+	done
+
+uninstall-pkgincludeHEADERS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(pkginclude_HEADERS)'; test -n "$(pkgincludedir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	dir='$(DESTDIR)$(pkgincludedir)'; $(am__uninstall_files_from_dir)
 
 # This directory's subdirectories are mostly independent; you can cd
 # into them and run 'make' without going through this Makefile.
@@ -777,7 +832,7 @@ check: check-recursive
 all-am: Makefile $(LTLIBRARIES) $(HEADERS)
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)"; do \
+	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)" "$(DESTDIR)$(pkgincludedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-recursive
@@ -833,7 +888,7 @@ info: info-recursive
 
 info-am:
 
-install-data-am: install-includeHEADERS
+install-data-am: install-includeHEADERS install-pkgincludeHEADERS
 
 install-dvi: install-dvi-recursive
 
@@ -879,7 +934,8 @@ ps: ps-recursive
 
 ps-am:
 
-uninstall-am: uninstall-includeHEADERS uninstall-libLTLIBRARIES
+uninstall-am: uninstall-includeHEADERS uninstall-libLTLIBRARIES \
+	uninstall-pkgincludeHEADERS
 
 .MAKE: $(am__recursive_targets) install-am install-strip
 
@@ -892,12 +948,13 @@ uninstall-am: uninstall-includeHEADERS uninstall-libLTLIBRARIES
 	install-dvi-am install-exec install-exec-am install-html \
 	install-html-am install-includeHEADERS install-info \
 	install-info-am install-libLTLIBRARIES install-man install-pdf \
-	install-pdf-am install-ps install-ps-am install-strip \
-	installcheck installcheck-am installdirs installdirs-am \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags tags-am uninstall uninstall-am \
-	uninstall-includeHEADERS uninstall-libLTLIBRARIES
+	install-pdf-am install-pkgincludeHEADERS install-ps \
+	install-ps-am install-strip installcheck installcheck-am \
+	installdirs installdirs-am maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags tags-am uninstall uninstall-am uninstall-includeHEADERS \
+	uninstall-libLTLIBRARIES uninstall-pkgincludeHEADERS
 
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
