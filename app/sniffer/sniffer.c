@@ -1,17 +1,20 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2012,2013,2014 Didier Barvaux
+ * Copyright 2012,2013 Viveris Technologies
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -41,9 +44,7 @@
  *   thus available to reproduce and fix the discovered problems.
  */
 
-#include "test.h"
-
-#include "config.h" /* for HAVE_*_H */
+#include "config.h" /* for HAVE_*_H and PACKAGE_BUGREPORT */
 
 /* system includes */
 #include <stdio.h>
@@ -51,12 +52,18 @@
 #include <strings.h>
 #include <string.h>
 #include <netinet/in.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
+#include <netinet/tcp.h>
 #include <math.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <assert.h>
 #include <unistd.h>
 #include <signal.h>
+#include <syslog.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 /* include for the PCAP library */
 #if HAVE_PCAP_PCAP_H == 1
@@ -69,9 +76,10 @@ for ./configure ? If yes, check configure output and config.log"
 #endif
 
 /* ROHC includes */
-#include <rohc.h>
-#include <rohc_comp.h>
-#include <rohc_decomp.h>
+#include <rohc/rohc.h>
+#include <rohc/rohc_comp.h>
+#include <rohc/rohc_decomp.h>
+
 
 
 /** Return the smaller value from the two */
@@ -80,20 +88,23 @@ for ./configure ? If yes, check configure output and config.log"
 #define max(x, y)  (((x) > (y)) ? (x) : (y))
 
 /** The device MTU (TODO: should not be hardcoded) */
-#define DEV_MTU 1518
+#define DEV_MTU 1518U
 
 /** The maximal size for the ROHC packets */
 #define MAX_ROHC_SIZE  (5 * 1024)
 
 /** The length of the Linux Cooked Sockets header */
-#define LINUX_COOKED_HDR_LEN  16
+#define LINUX_COOKED_HDR_LEN  16U
+
+/** The length (in bytes) of the Ethernet header */
+#define ETHER_HDR_LEN  14U
 
 /** The minimum Ethernet length (in bytes) */
-#define ETHER_FRAME_MIN_LEN  60
+#define ETHER_FRAME_MIN_LEN  60U
 
 
 /** Some statistics collected by the sniffer */
-struct sniffer_stats
+struct sniffer_stats_t
 {
 	/** The size of one unit */
 	unsigned long comp_unit_size;
@@ -111,11 +122,11 @@ struct sniffer_stats
 	/** Cumulative number of packets per ROHC profile */
 	unsigned long comp_nr_pkts_per_profile[ROHC_PROFILE_UDPLITE + 1];
 	/** Cumulative number of packets per ROHC mode */
-	unsigned long comp_nr_pkts_per_mode[R_MODE + 1];
+	unsigned long comp_nr_pkts_per_mode[ROHC_R_MODE + 1];
 	/** Cumulative number of packets per state */
-	unsigned long comp_nr_pkts_per_state[SO + 1];
+	unsigned long comp_nr_pkts_per_state[ROHC_COMP_STATE_SO + 1];
 	/** Cumulative number of packets per packet type */
-	unsigned long comp_nr_pkts_per_pkt_type[PACKET_UNKNOWN];
+	unsigned long comp_nr_pkts_per_pkt_type[ROHC_PACKET_TCP_SEQ_8 + 1];
 	/** Cumulative number of times a context is reused (first time included) */
 	unsigned long comp_nr_reused_cid;
 
@@ -143,35 +154,38 @@ struct sniffer_stats
 /* prototypes of private functions */
 
 static void usage(void);
-static void sniffer_interrupt(int signal);
-static void sniffer_print_stats(int signal);
+static void sniffer_interrupt(int signum);
+static void sniffer_print_stats(int signum);
 
-static bool sniff(const int use_large_cid,
-                  const unsigned int max_contexts,
+static bool sniff(const rohc_cid_type_t cid_type,
+                  const size_t max_contexts,
+                  const int enabled_profiles[],
                   const char *const device_name)
-	__attribute__((nonnull(3)));
+	__attribute__((warn_unused_result, nonnull(4)));
 static int compress_decompress(struct rohc_comp *comp,
                                struct rohc_decomp *decomp,
                                struct pcap_pkthdr header,
                                unsigned char *packet,
                                size_t link_len_src,
-                               bool use_large_cid,
                                pcap_t *handle,
                                pcap_dumper_t *dumpers[],
+                               struct rohc_buf *const feedback_send,
                                unsigned int *const cid,
-                               struct sniffer_stats *stats);
+                               struct sniffer_stats_t *stats);
 
-static int compare_packets(const unsigned char *const pkt1,
-                           const size_t pkt1_size,
-                           const unsigned char *const pkt2,
-                           const size_t pkt2_size);
+static int compare_packets(const struct rohc_buf pkt1,
+                           const struct rohc_buf pkt2)
+	__attribute__((warn_unused_result));
+static size_t get_tcp_opt_padding(const struct rohc_buf packet)
+	__attribute__((warn_unused_result));
 
-static void print_rohc_traces(const rohc_trace_level_t level,
+static void print_rohc_traces(void *const priv_ctxt,
+                              const rohc_trace_level_t level,
                               const rohc_trace_entity_t entity,
                               const int profile,
                               const char *const format,
                               ...)
-	__attribute__((format(printf, 4, 5), nonnull(4)));
+	__attribute__((format(printf, 5, 6), nonnull(5)));
 static int gen_false_random_num(const struct rohc_comp *const comp,
                                 void *const user_context)
 	__attribute__((nonnull(1)));
@@ -187,10 +201,16 @@ static bool rtp_detect_cb(const unsigned char *const ip,
 static bool stop_program;
 
 /** Some statistics collected by the sniffer */
-static struct sniffer_stats stats;
+static struct sniffer_stats_t sniffer_stats;
+
+/** Whether the application runs in daemon mode or not */
+static bool is_daemon;
 
 /** Whether the application runs in verbose mode or not */
 static bool is_verbose;
+
+/** The PCAP dumpers */
+static pcap_dumper_t *sniffer_dumpers[ROHC_LARGE_CID_MAX + 1] = { 0 };
 
 /** The maximum number of traces to keep */
 #define MAX_LAST_TRACES  5000
@@ -204,6 +224,21 @@ static int last_traces_first;
 /** The index of the last trace */
 static int last_traces_last;
 
+/** Whether to print traces on stderr or not */
+static bool do_print_stderr;
+
+/** Print a trace in syslog and eventually on stderr */
+#define SNIFFER_LOG(prio, format, ...) \
+	do \
+	{ \
+		if(do_print_stderr) \
+		{ \
+			fprintf(stderr, format "\n", ##__VA_ARGS__); \
+			fflush(stderr); \
+		} \
+		syslog(prio, format, ##__VA_ARGS__); \
+	} while(0)
+
 
 /**
  * @brief Main function for the ROHC sniffer application
@@ -216,22 +251,40 @@ static int last_traces_last;
  */
 int main(int argc, char *argv[])
 {
-	char *cid_type = NULL;
+	const int do_change_dir = 1;
+	const int do_close_fds = 1;
+	int enabled_profiles[ROHC_PROFILE_UDPLITE + 1];
+	char *pidfilename = NULL;
+	char *cid_type_name = NULL;
 	char *device_name = NULL;
 	int max_contexts = ROHC_SMALL_CID_MAX + 1;
-	int use_large_cid;
+	rohc_cid_type_t cid_type;
 	int args_used;
+	int ret;
 	int i;
 
 	/* by default, we don't stop */
 	stop_program = false;
 
 	/* reset stats */
-	memset(&stats, 0, sizeof(struct sniffer_stats));
-	stats.comp_unit_size = 1;
+	memset(&sniffer_stats, 0, sizeof(struct sniffer_stats_t));
+	sniffer_stats.comp_unit_size = 1;
 
 	/* set to quiet mode by default */
 	is_verbose = false;
+	/* disable daemon mode by default */
+	is_daemon = false;
+
+	/* enable all ROHC profiles by default */
+	enabled_profiles[ROHC_PROFILE_UNCOMPRESSED] = 1;
+	enabled_profiles[ROHC_PROFILE_RTP] = 1;
+	enabled_profiles[ROHC_PROFILE_UDP] = 1;
+	enabled_profiles[ROHC_PROFILE_ESP] = 1;
+	enabled_profiles[ROHC_PROFILE_IP] = 1;
+	enabled_profiles[0x0005] = -1;
+	enabled_profiles[ROHC_PROFILE_TCP] = 1;
+	enabled_profiles[0x0007] = -1;
+	enabled_profiles[ROHC_PROFILE_UDPLITE] = 1;
 
 	/* no traces at the moment */
 	for(i = 0; i < MAX_LAST_TRACES; i++)
@@ -240,6 +293,9 @@ int main(int argc, char *argv[])
 	}
 	last_traces_first = -1;
 	last_traces_last = -1;
+
+	/* traces go to syslog */
+	openlog("rohc_sniffer", LOG_PID, LOG_USER);
 
 	/* parse program arguments, print the help message in case of failure */
 	if(argc <= 1)
@@ -252,14 +308,13 @@ int main(int argc, char *argv[])
 	{
 		args_used = 1;
 
-		if(!strcmp(*argv, "-v"))
+		if(!strcmp(*argv, "-v") || !strcmp(*argv, "--version"))
 		{
 			/* print version */
-			printf("ROHC sniffer program, based on library version %s\n",
-			       rohc_version());
+			printf("rohc_sniffer version %s\n", rohc_version());
 			goto error;
 		}
-		else if(!strcmp(*argv, "-h"))
+		else if(!strcmp(*argv, "-h") || !strcmp(*argv, "--help"))
 		{
 			/* print help */
 			usage();
@@ -270,16 +325,39 @@ int main(int argc, char *argv[])
 			/* enable verbose mode */
 			is_verbose = true;
 		}
-		else if(!strcmp(*argv, "--max-contexts"))
+		else if(!strcmp(*argv, "--daemon") || !strcmp(*argv, "-d"))
+		{
+			/* enable daemon mode */
+			is_daemon = true;
+		}
+		else if(!strcmp(*argv, "-p") || !strcmp(*argv, "--pidfile"))
+		{
+			/* get the name of the pidfile */
+			pidfilename = argv[1];
+			args_used++;
+		}
+		else if(!strcmp(*argv, "-m") || !strcmp(*argv, "--max-contexts"))
 		{
 			/* get the maximum number of contexts the test should use */
 			max_contexts = atoi(argv[1]);
 			args_used++;
 		}
-		else if(cid_type == NULL)
+		else if(!strcmp(*argv, "--disable"))
+		{
+			/* disable the given ROHC profile */
+			const int rohc_profile = atoi(argv[1]);
+			if(rohc_profile >= ROHC_PROFILE_UNCOMPRESSED &&
+			   rohc_profile <= ROHC_PROFILE_UDPLITE)
+			{
+				enabled_profiles[rohc_profile] = 0;
+				SNIFFER_LOG(LOG_INFO, "disable ROHC profile 0x%04x", rohc_profile);
+			}
+			args_used++;
+		}
+		else if(cid_type_name == NULL)
 		{
 			/* get the type of CID to use within the ROHC library */
-			cid_type = argv[0];
+			cid_type_name = argv[0];
 		}
 		else if(device_name == NULL)
 		{
@@ -296,61 +374,169 @@ int main(int argc, char *argv[])
 	}
 
 	/* check CID type */
-	if(!strcmp(cid_type, "smallcid"))
+	if(!strcmp(cid_type_name, "smallcid"))
 	{
-		use_large_cid = 0;
+		cid_type = ROHC_SMALL_CID;
 
 		/* the maximum number of ROHC contexts should be valid */
 		if(max_contexts < 1 || max_contexts > (ROHC_SMALL_CID_MAX + 1))
 		{
-			fprintf(stderr, "the maximum number of ROHC contexts should be "
-			        "between 1 and %u\n\n", ROHC_SMALL_CID_MAX + 1);
+			SNIFFER_LOG(LOG_WARNING, "the maximum number of ROHC contexts "
+			            "should be between 1 and %u", ROHC_SMALL_CID_MAX + 1);
 			usage();
 			goto error;
 		}
 	}
-	else if(!strcmp(cid_type, "largecid"))
+	else if(!strcmp(cid_type_name, "largecid"))
 	{
-		use_large_cid = 1;
+		cid_type = ROHC_LARGE_CID;
 
 		/* the maximum number of ROHC contexts should be valid */
 		if(max_contexts < 1 || max_contexts > (ROHC_LARGE_CID_MAX + 1))
 		{
-			fprintf(stderr, "the maximum number of ROHC contexts should be "
-			        "between 1 and %u\n\n", ROHC_LARGE_CID_MAX + 1);
+			SNIFFER_LOG(LOG_WARNING, "the maximum number of ROHC contexts "
+			            "should be between 1 and %u", ROHC_LARGE_CID_MAX + 1);
 			usage();
 			goto error;
 		}
 	}
 	else
 	{
-		fprintf(stderr, "invalid CID type '%s', only 'smallcid' and "
-		        "'largecid' expected\n", cid_type);
+		SNIFFER_LOG(LOG_WARNING, "invalid CID type '%s', only 'smallcid' and "
+		            "'largecid' expected", cid_type_name);
 		goto error;
 	}
 
 	/* the source filename is mandatory */
 	if(device_name == NULL)
 	{
+		SNIFFER_LOG(LOG_WARNING, "device name is mandatory");
 		usage();
 		goto error;
 	}
+
+	/* --pidfile cannot be used in foreground mode */
+	if(pidfilename != NULL && !is_daemon)
+	{
+		SNIFFER_LOG(LOG_WARNING, "option --pidfile cannot be used without "
+		            "option --daemon");
+		usage();
+		goto error;
+	}
+
+	/* run in daemon mode if asked */
+	if(is_daemon)
+	{
+		const char dirname[] = "/var/tmp/rohc_sniffer/";
+
+		ret = daemon(do_change_dir, do_close_fds);
+		if(ret != 0)
+		{
+			SNIFFER_LOG(LOG_WARNING, "failed to run in background: %s (%d)",
+			            strerror(errno), errno);
+			goto error;
+		}
+
+		/* in daemon mode, do not write on stderr anymore, only syslog */
+		do_print_stderr = false;
+
+		/* create temporary directory for captures */
+		ret = mkdir(dirname, 0700);
+		if(ret != 0 && errno != EEXIST)
+		{
+			SNIFFER_LOG(LOG_WARNING, "failed to create directory '%s': %s (%d)",
+			            dirname, strerror(errno), errno);
+			goto error;
+		}
+
+		/* enter the temporary directory */
+		ret = chdir(dirname);
+		if(ret != 0)
+		{
+			SNIFFER_LOG(LOG_WARNING, "failed to enter directory '%s': %s (%d)",
+			            dirname, strerror(errno), errno);
+			goto error;
+		}
+
+		if(pidfilename != NULL)
+		{
+			FILE *pidfile;
+
+			pidfile = fopen(pidfilename, "w");
+			if(pidfile == NULL)
+			{
+				SNIFFER_LOG(LOG_WARNING, "failed to open PID file '%s': %s (%d)",
+				            pidfilename, strerror(errno), errno);
+				goto error;
+			}
+			ret = fprintf(pidfile, "%d\n", getpid());
+			if(ret <= 0)
+			{
+				SNIFFER_LOG(LOG_WARNING, "failed to write PID in file '%s': "
+				            "%s (%d)", pidfilename, strerror(errno), errno);
+				ret = fclose(pidfile);
+				if(ret != 0)
+				{
+					SNIFFER_LOG(LOG_WARNING, "failed to close PID file '%s': "
+					            "%s (%d)", pidfilename, strerror(errno), errno);
+				}
+				goto error;
+			}
+			ret = fclose(pidfile);
+			if(ret != 0)
+			{
+				SNIFFER_LOG(LOG_WARNING, "failed to close PID file '%s': %s (%d)",
+				            pidfilename, strerror(errno), errno);
+				goto error;
+			}
+		}
+	}
+
+	SNIFFER_LOG(LOG_INFO, "starting ROHC sniffer");
 
 	/* set signal handlers */
 	signal(SIGINT, sniffer_interrupt);
 	signal(SIGTERM, sniffer_interrupt);
 	signal(SIGSEGV, sniffer_interrupt);
+	signal(SIGABRT, sniffer_interrupt);
 	signal(SIGUSR1, sniffer_print_stats);
+	{
+		struct sigaction action;
+		memset(&action, 0, sizeof(struct sigaction));
+		action.sa_handler = SIG_IGN;
+		sigaction(SIGHUP, &action, NULL);
+	}
 
 	/* test ROHC compression/decompression with the packets from the file */
-	if(!sniff(use_large_cid, max_contexts, device_name))
+	if(!sniff(cid_type, max_contexts, enabled_profiles, device_name))
 	{
 		goto error;
 	}
 
+	if(pidfilename != NULL)
+	{
+		ret = unlink(pidfilename);
+		if(ret != 0)
+		{
+			SNIFFER_LOG(LOG_WARNING, "failed to remove PID file '%s': %s (%d)",
+			            pidfilename, strerror(errno), errno);
+			goto error;
+		}
+	}
+	closelog();
 	return 0;
 
 error:
+	if(pidfilename != NULL)
+	{
+		ret = unlink(pidfilename);
+		if(ret != 0)
+		{
+			SNIFFER_LOG(LOG_WARNING, "failed to remove PID file '%s': %s (%d)",
+			            pidfilename, strerror(errno), errno);
+		}
+	}
+	closelog();
 	return 1;
 }
 
@@ -360,34 +546,115 @@ error:
  */
 static void usage(void)
 {
-	printf("ROHC sniffer tool: test the ROHC library with sniffed traffic\n"
+	printf("The ROHC sniffer tests the ROHC library with sniffed traffic\n"
 	       "\n"
-	       "usage: rohc_sniffer [OPTIONS] CID_TYPE DEVICE\n"
+	       "You need to be root (or to have POSIX capability CAP_NET_ADMIN)\n"
+	       "to run the ROHC sniffer.\n"
 	       "\n"
-	       "with:\n"
-	       "  CID_TYPE            The type of CID to use among 'smallcid'\n"
-	       "                      and 'largecid'\n"
-	       "  DEVICE              The name of the network device to use\n"
+	       "Usage: rohc_sniffer [OPTIONS] CID_TYPE DEVICE\n"
 	       "\n"
-	       "options:\n"
-	       "  -v                  Print version information and exit\n"
-	       "  -h                  Print this usage and exit\n"
-	       "  --max-contexts NUM  The maximum number of ROHC contexts to\n"
-	       "                      simultaneously use during the test\n"
-	       "  --verbose           Make the test more verbose\n");
+	       "Options:\n"
+	       "  CID_TYPE                The type of CID to use among 'smallcid'\n"
+	       "                          and 'largecid'\n"
+	       "  DEVICE                  The name of the network device to use\n"
+	       "  -v, --version           Print version information and exit\n"
+	       "  -h, --help              Print this usage and exit\n"
+	       "  -d, --daemon            Run in background, trace in syslog\n"
+	       "  -p, --pidfile FILE      Write daemon PID in the given file\n"
+	       "  -m, --max-contexts NUM  The maximum number of ROHC contexts to\n"
+	       "                          simultaneously use during the test\n"
+	       "      --disable PROFILE   A ROHC profile to disable\n"
+	       "                          (may be specified several times)\n"
+	       "      --verbose           Make the test more verbose\n"
+	       "\n"
+	       "Examples:\n"
+	       "  rohc_sniffer smallcid eth0          compress traffic from eth0\n"
+	       "                                      with small CIDs\n"
+	       "  rohc_sniffer -m 450 largecid wlan0  compress traffic from\n"
+	       "                                      wlan0 with large CIDs, no\n"
+	       "                                      more than 450 streams\n"
+	       "\n"
+	       "Report bugs to <" PACKAGE_BUGREPORT ">.\n");
 }
 
 
 /**
  * @brief Handle UNIX signals that interrupt the program
  *
- * @param signal  The received signal
+ * @param signum  The received signal
  */
-static void sniffer_interrupt(int signal)
+static void sniffer_interrupt(int signum)
 {
 	/* end the program with next captured packet */
-	fprintf(stderr, "signal %d catched\n", signal);
+	SNIFFER_LOG(LOG_NOTICE, "signal %d catched", signum);
 	stop_program = true;
+
+	/* for SIGSEGV/SIGABRT, close the PCAP dumps, print the last debug traces,
+	 * then kill the program */
+	if(signum == SIGSEGV || signum == SIGABRT)
+	{
+		int i;
+
+		if(signum == SIGSEGV)
+		{
+			SNIFFER_LOG(LOG_WARNING, "a segfault occurred at packet #%lu",
+			            sniffer_stats.total_packets);
+		}
+		else
+		{
+			SNIFFER_LOG(LOG_WARNING, "an assertion failed at packet #%lu",
+			            sniffer_stats.total_packets);
+		}
+
+		/* close PCAP dumpers */
+		for(i = 0; i <= ROHC_LARGE_CID_MAX; i++)
+		{
+			if(sniffer_dumpers[i] != NULL)
+			{
+				SNIFFER_LOG(LOG_INFO, "close dump file for context with ID %u", i);
+				pcap_dump_close(sniffer_dumpers[i]);
+			}
+		}
+
+		/* print last debug traces */
+		if(last_traces_first == -1 || last_traces_last == -1)
+		{
+			SNIFFER_LOG(LOG_NOTICE, "no trace to print");
+			raise(SIGKILL);
+		}
+
+		if(last_traces_first <= last_traces_last)
+		{
+			SNIFFER_LOG(LOG_NOTICE, "print the last %d traces...",
+			            last_traces_last - last_traces_first);
+			for(i = last_traces_first; i <= last_traces_last; i++)
+			{
+				SNIFFER_LOG(LOG_WARNING, "%s", last_traces[i]);
+			}
+		}
+		else
+		{
+			SNIFFER_LOG(LOG_NOTICE, "print the last %d traces...",
+			            MAX_LAST_TRACES - last_traces_first + last_traces_last);
+			for(i = last_traces_first;
+			    i <= MAX_LAST_TRACES + last_traces_last;
+			    i++)
+			{
+				SNIFFER_LOG(LOG_WARNING, "%s", last_traces[i % MAX_LAST_TRACES]);
+			}
+		}
+		SNIFFER_LOG(LOG_NOTICE, "all last traces printed, you can analyze "
+		            "the problem, have a nice day!");
+
+		if(signum == SIGSEGV)
+		{
+			struct sigaction action;
+			memset(&action, 0, sizeof(struct sigaction));
+			action.sa_handler = SIG_DFL;
+			sigaction(SIGSEGV, &action, NULL);
+			raise(signum);
+		}
+	}
 }
 
 
@@ -398,8 +665,8 @@ static void sniffer_interrupt(int signal)
  * @param total  The total to compute percentage from
  * @return       The percentage
  */
-static unsigned long long percent(const unsigned long value,
-                                  const unsigned long total)
+static unsigned long long compute_percent(const unsigned long value,
+                                          const unsigned long total)
 {
 	unsigned long long percent;
 
@@ -421,139 +688,160 @@ static unsigned long long percent(const unsigned long value,
 /**
  * @brief Handle UNIX signals that print statistics
  *
- * @param signal  The received signal
+ * @param signum  The received signal
  */
-static void sniffer_print_stats(int signal)
+static void sniffer_print_stats(int signum __attribute__((unused)))
 {
 	unsigned long total;
 	int i;
 
+	SNIFFER_LOG(LOG_INFO, "dump ROHC sniffer statistics...");
+
 	/* general */
-	printf("general:\n");
-	printf("\ttotal packets: %lu packets\n", stats.total_packets);
-	printf("\tbad packets: %lu packets (%llu%%)\n", stats.bad_packets,
-	       percent(stats.bad_packets, stats.total_packets));
-	printf("\tloss (estim.):\n");
-	printf("\t\t%lu packets among %lu bursts (%llu%%)\n", stats.nr_lost_packets,
-	       stats.nr_loss_bursts,
-	       percent(stats.nr_lost_packets, stats.total_packets));
-	printf("\t\tpackets per burst: max %lu, avg %lu, min %lu\n",
-	       stats.max_loss_burst_len, (stats.nr_loss_bursts != 0 ?
-	       stats.nr_lost_packets / stats.nr_loss_bursts : 0),
-	       stats.min_loss_burst_len);
-	printf("\tmis-ordered packets (estim.): %lu packets (%llu%%)\n",
-	       stats.nr_misordered_packets,
-	       percent(stats.nr_misordered_packets, stats.total_packets));
-	printf("\tduplicated packets (estim.): %lu packets (%llu%%)\n",
-	       stats.nr_duplicated_packets,
-	       percent(stats.nr_duplicated_packets, stats.total_packets));
+	SNIFFER_LOG(LOG_INFO, "general:");
+	SNIFFER_LOG(LOG_INFO, "  total packets: %lu packets",
+	            sniffer_stats.total_packets);
+	SNIFFER_LOG(LOG_INFO, "  bad packets: %lu packets (%llu%%)",
+	            sniffer_stats.bad_packets,
+	            compute_percent(sniffer_stats.bad_packets, sniffer_stats.total_packets));
+	SNIFFER_LOG(LOG_INFO, "  loss (estim.):");
+	SNIFFER_LOG(LOG_INFO, "    %lu packets among %lu bursts (%llu%%)",
+	            sniffer_stats.nr_lost_packets, sniffer_stats.nr_loss_bursts,
+	            compute_percent(sniffer_stats.nr_lost_packets, sniffer_stats.total_packets));
+	SNIFFER_LOG(LOG_INFO, "    packets per burst: max %lu, avg %lu, min %lu",
+	            sniffer_stats.max_loss_burst_len, (sniffer_stats.nr_loss_bursts != 0 ?
+	            sniffer_stats.nr_lost_packets / sniffer_stats.nr_loss_bursts : 0),
+	            sniffer_stats.min_loss_burst_len);
+	SNIFFER_LOG(LOG_INFO, "  mis-ordered packets (estim.): %lu packets "
+	            "(%llu%%)", sniffer_stats.nr_misordered_packets,
+	            compute_percent(sniffer_stats.nr_misordered_packets, sniffer_stats.total_packets));
+	SNIFFER_LOG(LOG_INFO, "  duplicated packets (estim.): %lu packets "
+	            "(%llu%%)", sniffer_stats.nr_duplicated_packets,
+	            compute_percent(sniffer_stats.nr_duplicated_packets, sniffer_stats.total_packets));
 
 	/* compression gain */
-	printf("compression gain:\n");
-	if(stats.comp_unit_size == 1)
+	SNIFFER_LOG(LOG_INFO, "compression gain:");
+	if(sniffer_stats.comp_unit_size == 1)
 	{
-		printf("\tpre-compress: %lu bytes\n", stats.comp_pre_nr_bytes);
+		SNIFFER_LOG(LOG_INFO, "  pre-compress: %lu bytes",
+		            sniffer_stats.comp_pre_nr_bytes);
 	}
 	else
 	{
-		printf("\tpre-compress: %lu %s\n", stats.comp_pre_nr_units,
-		       stats.comp_unit_size == 1000 ? "KB" :
-		       (stats.comp_unit_size == 1000*1000 ? "MB" :
-		        (stats.comp_unit_size == 1000*1000*1000 ? "GB" : "?")));
+		SNIFFER_LOG(LOG_INFO, "  pre-compress: %lu %s",
+		            sniffer_stats.comp_pre_nr_units,
+		            sniffer_stats.comp_unit_size == 1000 ? "KB" :
+		            (sniffer_stats.comp_unit_size == 1000*1000 ? "MB" :
+		             (sniffer_stats.comp_unit_size == 1000*1000*1000 ? "GB" : "?")));
 	}
-	if(stats.comp_unit_size == 1)
+	if(sniffer_stats.comp_unit_size == 1)
 	{
-		printf("\tpost-compress: %lu bytes\n", stats.comp_post_nr_bytes);
+		SNIFFER_LOG(LOG_INFO, "  post-compress: %lu bytes",
+		            sniffer_stats.comp_post_nr_bytes);
 	}
 	else
 	{
-		printf("\tpost-compress: %lu %s\n", stats.comp_post_nr_units,
-		       stats.comp_unit_size == 1000 ? "KB" :
-		       (stats.comp_unit_size == 1000*1000 ? "MB" :
-		        (stats.comp_unit_size == 1000*1000*1000 ? "GB" : "?")));
+		SNIFFER_LOG(LOG_INFO, "  post-compress: %lu %s",
+		            sniffer_stats.comp_post_nr_units,
+		            sniffer_stats.comp_unit_size == 1000 ? "KB" :
+		            (sniffer_stats.comp_unit_size == 1000*1000 ? "MB" :
+		             (sniffer_stats.comp_unit_size == 1000*1000*1000 ? "GB" : "?")));
 	}
-	if(stats.comp_unit_size == 1)
+	if(sniffer_stats.comp_unit_size == 1)
 	{
-		printf("\tcompress ratio: %llu%% of total, ie. %llu%% of gain\n",
-		       percent(stats.comp_post_nr_bytes, stats.comp_pre_nr_bytes),
-		       100 - percent(stats.comp_post_nr_bytes, stats.comp_pre_nr_bytes));
+		SNIFFER_LOG(LOG_INFO, "  compress ratio: %llu%% of total, ie. %llu%% "
+		            "of gain",
+		            compute_percent(sniffer_stats.comp_post_nr_bytes, sniffer_stats.comp_pre_nr_bytes),
+		            100 - compute_percent(sniffer_stats.comp_post_nr_bytes, sniffer_stats.comp_pre_nr_bytes));
 	}
 	else
 	{
-		printf("\tcompress ratio: %llu%% of total, ie. %llu%% of gain\n",
-		       percent(stats.comp_post_nr_units, stats.comp_pre_nr_units),
-		       100 - percent(stats.comp_post_nr_units, stats.comp_pre_nr_units));
+		SNIFFER_LOG(LOG_INFO, "  compress ratio: %llu%% of total, ie. %llu%% "
+		            "of gain",
+		            compute_percent(sniffer_stats.comp_post_nr_units, sniffer_stats.comp_pre_nr_units),
+		            100 - compute_percent(sniffer_stats.comp_post_nr_units, sniffer_stats.comp_pre_nr_units));
 	}
-	printf("\tused and re-used contexts: %lu\n", stats.comp_nr_reused_cid);
+	SNIFFER_LOG(LOG_INFO, "  used and re-used contexts: %lu",
+	            sniffer_stats.comp_nr_reused_cid);
 
 	/* packets per profile */
-	total = stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UNCOMPRESSED] +
-	        stats.comp_nr_pkts_per_profile[ROHC_PROFILE_RTP] +
-	        stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UDP] +
-	        stats.comp_nr_pkts_per_profile[ROHC_PROFILE_IP] +
-	        stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UDPLITE];
-	printf("packets per profile:\n");
-	printf("\tUncompressed profile: %lu packets (%llu%%)\n",
-	       stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UNCOMPRESSED],
-	       percent(stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UNCOMPRESSED],
-	               total));
-	printf("\tIP/UDP/RTP profile: %lu packets (%llu%%)\n",
-	       stats.comp_nr_pkts_per_profile[ROHC_PROFILE_RTP],
-	       percent(stats.comp_nr_pkts_per_profile[ROHC_PROFILE_RTP], total));
-	printf("\tIP/UDP profile: %lu packets (%llu%%)\n",
-	       stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UDP],
-	       percent(stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UDP], total));
-	printf("\tIP-only profile: %lu packets (%llu%%)\n",
-	       stats.comp_nr_pkts_per_profile[ROHC_PROFILE_IP],
-	       percent(stats.comp_nr_pkts_per_profile[ROHC_PROFILE_IP], total));
-	printf("\tIP/UDP-Lite profile: %lu packets (%llu%%)\n",
-	       stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UDPLITE],
-	       percent(stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UDPLITE], total));
+	total = sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UNCOMPRESSED] +
+	        sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_RTP] +
+	        sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UDP] +
+	        sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_IP] +
+	        sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_TCP] +
+	        sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UDPLITE];
+	SNIFFER_LOG(LOG_INFO, "packets per profile:");
+	SNIFFER_LOG(LOG_INFO, "  Uncompressed profile: %lu packets (%llu%%)",
+	            sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UNCOMPRESSED],
+	            compute_percent(sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UNCOMPRESSED],
+	                    total));
+	SNIFFER_LOG(LOG_INFO, "  IP/UDP/RTP profile: %lu packets (%llu%%)",
+	            sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_RTP],
+	            compute_percent(sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_RTP], total));
+	SNIFFER_LOG(LOG_INFO, "  IP/UDP profile: %lu packets (%llu%%)",
+	            sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UDP],
+	            compute_percent(sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UDP], total));
+	SNIFFER_LOG(LOG_INFO, "  IP-only profile: %lu packets (%llu%%)",
+	            sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_IP],
+	            compute_percent(sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_IP], total));
+	SNIFFER_LOG(LOG_INFO, "  IP/TCP profile: %lu packets (%llu%%)",
+	            sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_TCP],
+	            compute_percent(sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_TCP], total));
+	SNIFFER_LOG(LOG_INFO, "  IP/UDP-Lite profile: %lu packets (%llu%%)",
+	            sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UDPLITE],
+	            compute_percent(sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UDPLITE], total));
 
 	/* packets per mode */
-	total = stats.comp_nr_pkts_per_mode[U_MODE] +
-	        stats.comp_nr_pkts_per_mode[O_MODE] +
-	        stats.comp_nr_pkts_per_mode[R_MODE];
-	printf("packets per mode:\n");
-	printf("\tU-mode: %lu packets (%llu%%)\n",
-	       stats.comp_nr_pkts_per_mode[U_MODE],
-	       percent(stats.comp_nr_pkts_per_mode[U_MODE], total));
-	printf("\tO-mode: %lu packets (%llu%%)\n",
-	       stats.comp_nr_pkts_per_mode[O_MODE],
-	       percent(stats.comp_nr_pkts_per_mode[O_MODE], total));
-	printf("\tR-mode: %lu packets (%llu%%)\n",
-	       stats.comp_nr_pkts_per_mode[R_MODE],
-	       percent(stats.comp_nr_pkts_per_mode[R_MODE], total));
+	total = sniffer_stats.comp_nr_pkts_per_mode[ROHC_U_MODE] +
+	        sniffer_stats.comp_nr_pkts_per_mode[ROHC_O_MODE] +
+	        sniffer_stats.comp_nr_pkts_per_mode[ROHC_R_MODE];
+	SNIFFER_LOG(LOG_INFO, "packets per mode:");
+	SNIFFER_LOG(LOG_INFO, "  U-mode: %lu packets (%llu%%)",
+	            sniffer_stats.comp_nr_pkts_per_mode[ROHC_U_MODE],
+	            compute_percent(sniffer_stats.comp_nr_pkts_per_mode[ROHC_U_MODE], total));
+	SNIFFER_LOG(LOG_INFO, "  O-mode: %lu packets (%llu%%)",
+	            sniffer_stats.comp_nr_pkts_per_mode[ROHC_O_MODE],
+	            compute_percent(sniffer_stats.comp_nr_pkts_per_mode[ROHC_O_MODE], total));
+	SNIFFER_LOG(LOG_INFO, "  R-mode: %lu packets (%llu%%)",
+	            sniffer_stats.comp_nr_pkts_per_mode[ROHC_R_MODE],
+	            compute_percent(sniffer_stats.comp_nr_pkts_per_mode[ROHC_R_MODE], total));
 
 	/* packets per state */
-	total = stats.comp_nr_pkts_per_state[IR] +
-	        stats.comp_nr_pkts_per_state[FO] +
-	        stats.comp_nr_pkts_per_state[SO];
-	printf("packets per state:\n");
-	printf("\tIR state: %lu packets (%llu%%)\n",
-	       stats.comp_nr_pkts_per_state[IR],
-	       percent(stats.comp_nr_pkts_per_state[IR], total));
-	printf("\tFO state: %lu packets (%llu%%)\n",
-	       stats.comp_nr_pkts_per_state[FO],
-	       percent(stats.comp_nr_pkts_per_state[FO], total));
-	printf("\tSO state: %lu packets (%llu%%)\n",
-	       stats.comp_nr_pkts_per_state[SO],
-	       percent(stats.comp_nr_pkts_per_state[SO], total));
+	total = sniffer_stats.comp_nr_pkts_per_state[ROHC_COMP_STATE_IR] +
+	        sniffer_stats.comp_nr_pkts_per_state[ROHC_COMP_STATE_FO] +
+	        sniffer_stats.comp_nr_pkts_per_state[ROHC_COMP_STATE_SO];
+	SNIFFER_LOG(LOG_INFO, "packets per state:");
+	SNIFFER_LOG(LOG_INFO, "  IR state: %lu packets (%llu%%)",
+	            sniffer_stats.comp_nr_pkts_per_state[ROHC_COMP_STATE_IR],
+	            compute_percent(sniffer_stats.comp_nr_pkts_per_state[ROHC_COMP_STATE_IR], total));
+	SNIFFER_LOG(LOG_INFO, "  FO state: %lu packets (%llu%%)",
+	            sniffer_stats.comp_nr_pkts_per_state[ROHC_COMP_STATE_FO],
+	            compute_percent(sniffer_stats.comp_nr_pkts_per_state[ROHC_COMP_STATE_FO], total));
+	SNIFFER_LOG(LOG_INFO, "  SO state: %lu packets (%llu%%)",
+	            sniffer_stats.comp_nr_pkts_per_state[ROHC_COMP_STATE_SO],
+	            compute_percent(sniffer_stats.comp_nr_pkts_per_state[ROHC_COMP_STATE_SO], total));
 
 	/* packets per packet type */
-	printf("packets per packet type:\n");
+	SNIFFER_LOG(LOG_INFO, "packets per packet type:");
 	total = 0;
-	for(i = PACKET_IR; i < PACKET_UNKNOWN; i++)
+	for(i = ROHC_PACKET_IR; i <= ROHC_PACKET_TCP_SEQ_8; i++)
 	{
-		total += stats.comp_nr_pkts_per_pkt_type[i];
+		total += sniffer_stats.comp_nr_pkts_per_pkt_type[i];
 	}
-	for(i = PACKET_IR; i < PACKET_UNKNOWN; i++)
+	for(i = ROHC_PACKET_IR; i <= ROHC_PACKET_TCP_SEQ_8; i++)
 	{
-		printf("\tpacket type %s: %lu packets (%llu%%)\n",
-		       rohc_get_packet_descr(i),
-		       stats.comp_nr_pkts_per_pkt_type[i],
-		       percent(stats.comp_nr_pkts_per_pkt_type[i], total));
+		if(i != ROHC_PACKET_UNKNOWN &&
+		   strcmp(rohc_get_packet_descr(i), "no description") != 0)
+		{
+			SNIFFER_LOG(LOG_INFO, "  packet type %s: %lu packets (%llu%%)",
+			            rohc_get_packet_descr(i),
+			            sniffer_stats.comp_nr_pkts_per_pkt_type[i],
+			            compute_percent(sniffer_stats.comp_nr_pkts_per_pkt_type[i], total));
+		}
 	}
+
+	SNIFFER_LOG(LOG_INFO, "all ROHC sniffer statistics dumped");
 }
 
 
@@ -561,13 +849,15 @@ static void sniffer_print_stats(int signal)
  * @brief Test the ROHC library with a sniffed flow of IP packets going
  *        through one compressor/decompressor pair
  *
- * @param use_large_cid        Whether the compressor shall use large CIDs
- * @param max_contexts         The maximum number of ROHC contexts to use
- * @param device_name          The name of the network device
- * @return                     Whether the sniffer setup was OK
+ * @param cid_type          The type of CIDs that the compressor shall use
+ * @param max_contexts      The maximum number of ROHC contexts to use
+ * @param enabled_profiles  The ROHC profiles to enable
+ * @param device_name       The name of the network device
+ * @return                  Whether the sniffer setup was OK
  */
-static bool sniff(const int use_large_cid,
-                  const unsigned int max_contexts,
+static bool sniff(const rohc_cid_type_t cid_type,
+                  const size_t max_contexts,
+                  const int enabled_profiles[],
                   const char *const device_name)
 {
 	char errbuf[PCAP_ERRBUF_SIZE];
@@ -580,10 +870,12 @@ static bool sniff(const int use_large_cid,
 	struct rohc_comp *comp;
 	struct rohc_decomp *decomp;
 
-	pcap_dumper_t *dumpers[max_contexts];
+	uint8_t feedback_send_buffer[MAX_ROHC_SIZE];
+	struct rohc_buf feedback_send =
+		rohc_buf_init_empty(feedback_send_buffer, MAX_ROHC_SIZE);
 
 	int ret;
-	int i;
+	unsigned int i;
 
 	/* statistics */
 	unsigned int nb_ok = 0;
@@ -602,8 +894,8 @@ static bool sniff(const int use_large_cid,
 	handle = pcap_open_live(device_name, DEV_MTU, 0, 0, errbuf);
 	if(handle == NULL)
 	{
-		fprintf(stderr, "failed to open network device '%s': %s\n",
-		       device_name, errbuf);
+		SNIFFER_LOG(LOG_WARNING, "failed to open network device '%s': %s",
+		            device_name, errbuf);
 		goto error;
 	}
 
@@ -613,9 +905,9 @@ static bool sniff(const int use_large_cid,
 	   link_layer_type_src != DLT_LINUX_SLL &&
 	   link_layer_type_src != DLT_RAW)
 	{
-		fprintf(stderr, "link layer type %d not supported in source dump "
-		        "(supported = %d, %d, %d)\n", link_layer_type_src, DLT_EN10MB,
-		        DLT_LINUX_SLL, DLT_RAW);
+		SNIFFER_LOG(LOG_WARNING, "link layer type %d not supported in source "
+		            "dump (supported = %d, %d, %d)", link_layer_type_src,
+		            DLT_EN10MB, DLT_LINUX_SLL, DLT_RAW);
 		goto close_input;
 	}
 
@@ -633,108 +925,89 @@ static bool sniff(const int use_large_cid,
 	}
 
 	/* create the ROHC compressor */
-	comp = rohc_alloc_compressor(max_contexts - 1, 0, 0, 0);
+	comp = rohc_comp_new2(cid_type, max_contexts - 1, gen_false_random_num, NULL);
 	if(comp == NULL)
 	{
-		fprintf(stderr, "failed to create the ROHC compressor\n");
+		SNIFFER_LOG(LOG_WARNING, "failed to create the ROHC compressor");
 		goto close_input;
 	}
 
 	/* set the callback for traces on compressor */
-	if(!rohc_comp_set_traces_cb(comp, print_rohc_traces))
+	if(!rohc_comp_set_traces_cb2(comp, print_rohc_traces, NULL))
 	{
-		fprintf(stderr, "failed to set trace callback for compressor\n");
+		SNIFFER_LOG(LOG_WARNING, "failed to set the trace callback for the "
+		            "compressor");
 		goto destroy_comp;
 	}
 
-	/* enable profiles */
-	rohc_activate_profile(comp, ROHC_PROFILE_UNCOMPRESSED);
-	rohc_activate_profile(comp, ROHC_PROFILE_UDP);
-	rohc_activate_profile(comp, ROHC_PROFILE_IP);
-	rohc_activate_profile(comp, ROHC_PROFILE_UDPLITE);
-	rohc_activate_profile(comp, ROHC_PROFILE_RTP);
-	rohc_activate_profile(comp, ROHC_PROFILE_ESP);
-
-	/* configure SMALL_CID / LARGE_CID and MAX_CID */
-	rohc_c_set_large_cid(comp, use_large_cid);
-	rohc_c_set_max_cid(comp, max_contexts - 1);
-
-	/* set the callback for random numbers on compressor */
-	if(!rohc_comp_set_random_cb(comp, gen_false_random_num, NULL))
+	/* enable the compression profiles */
+	for(i = ROHC_PROFILE_UNCOMPRESSED; i <= ROHC_PROFILE_UDPLITE; i++)
 	{
-		fprintf(stderr, "failed to set the random numbers callback for "
-		        "compressor\n");
-		goto destroy_comp;
-	}
-
-	/* reset list of RTP ports for compressor */
-	if(!rohc_comp_reset_rtp_ports(comp))
-	{
-		fprintf(stderr, "failed to reset list of RTP ports for compressor\n");
-		goto destroy_comp;
+		if(enabled_profiles[i] == 1 && !rohc_comp_enable_profile(comp, i))
+		{
+			SNIFFER_LOG(LOG_WARNING, "failed to enable compression profile "
+			            "0x%04x", i);
+			goto destroy_comp;
+		}
+		else if(enabled_profiles[i] == 0 && !rohc_comp_disable_profile(comp, i))
+		{
+			SNIFFER_LOG(LOG_WARNING, "failed to disable compression profile "
+			            "0x%04x", i);
+			goto destroy_comp;
+		}
 	}
 
 	/* set the callback for RTP stream detection */
 	if(!rohc_comp_set_rtp_detection_cb(comp, rtp_detect_cb, NULL))
 	{
-		fprintf(stderr, "failed to set the RTP stream detection callback for "
-		        "compressor\n");
+		SNIFFER_LOG(LOG_WARNING, "failed to set the RTP stream detection "
+		            "callback for compressor");
 		goto destroy_comp;
 	}
 
 	/* create the decompressor (bi-directional mode) */
-	decomp = rohc_alloc_decompressor(comp);
+	decomp = rohc_decomp_new2(cid_type, max_contexts - 1, ROHC_O_MODE);
 	if(decomp == NULL)
 	{
-		fprintf(stderr, "failed to create the decompressor\n");
+		SNIFFER_LOG(LOG_WARNING, "failed to create the decompressor");
 		goto destroy_comp;
 	}
 
 	/* set the callback for traces on decompressor */
-	if(!rohc_decomp_set_traces_cb(decomp, print_rohc_traces))
+	if(!rohc_decomp_set_traces_cb2(decomp, print_rohc_traces, NULL))
 	{
-		printf("cannot set trace callback for decompressor\n");
+		SNIFFER_LOG(LOG_WARNING, "failed to set trace callback for "
+		            "decompressor");
 		goto destroy_decomp;
 	}
 
-	/* set CID type and MAX_CID for decompressor */
-	if(use_large_cid)
+	/* enable the decompression profiles */
+	for(i = ROHC_PROFILE_UNCOMPRESSED; i <= ROHC_PROFILE_UDPLITE; i++)
 	{
-		if(!rohc_decomp_set_cid_type(decomp, ROHC_LARGE_CID))
+		if(enabled_profiles[i] == 1 && !rohc_decomp_enable_profile(decomp, i))
 		{
-			fprintf(stderr, "failed to set CID type to large CIDs for "
-			        "decompressor\n");
+			SNIFFER_LOG(LOG_WARNING, "failed to enable decompression profile "
+			            "0x%04x", i);
 			goto destroy_decomp;
 		}
-		if(!rohc_decomp_set_max_cid(decomp, ROHC_LARGE_CID_MAX))
+		else if(enabled_profiles[i] == 0 &&
+		        !rohc_decomp_disable_profile(decomp, i))
 		{
-			fprintf(stderr, "failed to set MAX_CID to %d for decompressor\n",
-			        ROHC_LARGE_CID_MAX);
-			goto destroy_decomp;
-		}
-	}
-	else
-	{
-		if(!rohc_decomp_set_cid_type(decomp, ROHC_SMALL_CID))
-		{
-			fprintf(stderr, "failed to set CID type to small CIDs for "
-			        "decompressor\n");
-			goto destroy_decomp;
-		}
-		if(!rohc_decomp_set_max_cid(decomp, ROHC_SMALL_CID_MAX))
-		{
-			fprintf(stderr, "failed to set MAX_CID to %d for decompressor\n",
-			        ROHC_SMALL_CID_MAX);
+			SNIFFER_LOG(LOG_WARNING, "failed to disable decompression profile "
+			            "0x%04x", i);
 			goto destroy_decomp;
 		}
 	}
 
 	/* reset the PCAP dumpers (used to save sniffed packets in several PCAP
 	 * files, one per Context ID) */
-	bzero(dumpers, sizeof(pcap_dumper_t *) * max_contexts);
+	bzero(sniffer_dumpers, sizeof(pcap_dumper_t *) * max_contexts);
+
+	SNIFFER_LOG(LOG_INFO, "ROHC sniffer successfully started");
+	SNIFFER_LOG(LOG_INFO, "start processing captured packets");
 
 	/* for each sniffed packet */
-	stats.total_packets = 0;
+	sniffer_stats.total_packets = 0;
 	while(!stop_program)
 	{
 		unsigned int cid = 0;
@@ -747,22 +1020,23 @@ static bool sniff(const int use_large_cid,
 			continue;
 		}
 
-		stats.total_packets++;
+		sniffer_stats.total_packets++;
 
-		if(stats.total_packets == 1 || (stats.total_packets % 100) == 0)
+		if(!is_daemon &&
+		   (sniffer_stats.total_packets == 1 || (sniffer_stats.total_packets % 100) == 0))
 		{
-			if(stats.total_packets > 1)
+			if(sniffer_stats.total_packets > 1)
 			{
 				printf("\r");
 			}
-			printf("packet #%lu", stats.total_packets);
+			printf("packet #%lu", sniffer_stats.total_packets);
 			fflush(stdout);
 		}
 
 		/* compress & decompress from compressor to decompressor */
 		ret = compress_decompress(comp, decomp, header, packet,
-		                          link_len_src, use_large_cid,
-		                          handle, dumpers, &cid, &stats);
+		                          link_len_src, handle, sniffer_dumpers,
+		                          &feedback_send, &cid, &sniffer_stats);
 		if(ret == -1)
 		{
 			err_comp++;
@@ -782,85 +1056,30 @@ static bool sniff(const int use_large_cid,
 		else if(ret == -3)
 		{
 			nb_bad++;
-			stats.bad_packets++;
+			sniffer_stats.bad_packets++;
 		}
 		else
 		{
 			nb_internal_err++;
 		}
 
-		/* in case of problem (ignore bad packets), print recorded traces
-		 * then die! */
+		/* in case of problem (ignore bad packets), just die! */
 		if(ret != 1 && ret != -3)
 		{
-			const char *logfilename = "./sniffer.log";
-			FILE *logfile;
+			SNIFFER_LOG(LOG_WARNING, "packet #%lu, CID %u: stats OK, ERR(COMP), "
+			            "ERR(DECOMP), ERR(REF), ERR(BAD), ERR(INTERNAL)  =  "
+			            "%u  %u  %u  %u  %u  %u", sniffer_stats.total_packets,
+			            cid, nb_ok, err_comp, err_decomp, nb_ref, nb_bad,
+			            nb_internal_err);
 
-			fprintf(stderr, "packet #%lu, CID %u: stats OK, ERR(COMP), "
-			        "ERR(DECOMP), ERR(REF), ERR(BAD), ERR(INTERNAL)\t="
-			        "\t%u\t%u\t%u\t%u\t%u\t%u\n",
-			        stats.total_packets, cid, nb_ok, err_comp, err_decomp,
-			        nb_ref, nb_bad, nb_internal_err);
-
-			logfile = fopen(logfilename, "w");
-			if(logfile == NULL)
-			{
-				fprintf(stderr, "failed to create '%s' file: %s (%d)\n",
-				        logfilename, strerror(errno), errno);
-			}
-			else
-			{
-				fprintf(logfile, "packet #%lu, CID %u: stats OK, ERR(COMP), "
-				        "ERR(DECOMP), ERR(REF), ERR(BAD), ERR(INTERNAL)\t="
-				        "\t%u\t%u\t%u\t%u\t%u\t%u\n",
-				        stats.total_packets, cid, nb_ok, err_comp, err_decomp,
-				        nb_ref, nb_bad, nb_internal_err);
-
-				if(last_traces_first == -1 || last_traces_last == -1)
-				{
-					fprintf(stderr, "no trace to record\n");
-				}
-				else
-				{
-					if(last_traces_first <= last_traces_last)
-					{
-						fprintf(stderr, "record the last %d traces...\n",
-						        last_traces_last - last_traces_first);
-						for(i = last_traces_first; i <= last_traces_last; i++)
-						{
-							fprintf(logfile, "%s", last_traces[i]);
-						}
-					}
-					else
-					{
-						fprintf(stderr, "print the last %d traces...\n",
-						        MAX_LAST_TRACES - last_traces_first +
-						        last_traces_last);
-						for(i = last_traces_first;
-						    i <= MAX_LAST_TRACES + last_traces_last;
-						    i++)
-						{
-							fprintf(logfile, "%s", last_traces[i % MAX_LAST_TRACES]);
-						}
-					}
-				}
-
-				ret = fclose(logfile);
-				if(ret != 0)
-				{
-					fprintf(stderr, "failed to close log file '%s': %s (%d)\n",
-					        logfilename, strerror(errno), errno);
-				}
-			}
-
-			/* we discovered a problem, make the program stop now! */
+			/* last debug traces are recorded in SIGABRT handler */
 			assert(0);
 		}
 	}
 
 	if(stop_program)
 	{
-		printf("program stopped by signal\n");
+		SNIFFER_LOG(LOG_INFO, "program stopped by signal");
 	}
 
 	status = true;
@@ -868,17 +1087,17 @@ static bool sniff(const int use_large_cid,
 	/* close PCAP dumpers */
 	for(i = 0; i < max_contexts; i++)
 	{
-		if(dumpers[i] != NULL)
+		if(sniffer_dumpers[i] != NULL)
 		{
-			printf("close dump file for context with ID %d\n", i);
-			pcap_dump_close(dumpers[i]);
+			SNIFFER_LOG(LOG_INFO, "close dump file for context with ID %u", i);
+			pcap_dump_close(sniffer_dumpers[i]);
 		}
 	}
 
 destroy_decomp:
-	rohc_free_decompressor(decomp);
+	rohc_decomp_free(decomp);
 destroy_comp:
-	rohc_free_compressor(comp);
+	rohc_comp_free(comp);
 close_input:
 	pcap_close(handle);
 error:
@@ -895,7 +1114,6 @@ error:
  * @param header         The PCAP header for the packet
  * @param packet         The packet to compress/decompress (link layer included)
  * @param link_len_src   The length of the link layer header before IP data
- * @param use_large_cid  Whether use large CID or not
  * @param handle         The PCAP handler that sniffed the packet
  * @param dumpers        The PCAP dumpers, one per context
  * @param cid            OUT: the CID used for the last packet
@@ -913,22 +1131,34 @@ static int compress_decompress(struct rohc_comp *comp,
                                struct pcap_pkthdr header,
                                unsigned char *packet,
                                size_t link_len_src,
-                               bool use_large_cid,
                                pcap_t *handle,
                                pcap_dumper_t *dumpers[],
+                               struct rohc_buf *const feedback_send,
                                unsigned int *const cid,
-                               struct sniffer_stats *stats)
+                               struct sniffer_stats_t *stats)
 {
-	unsigned char *ip_packet;
-	size_t ip_size;
-	static unsigned char output_packet[max(ETHER_HDR_LEN, LINUX_COOKED_HDR_LEN) + MAX_ROHC_SIZE];
-	unsigned char *rohc_packet;
-	size_t rohc_size;
+	const struct rohc_ts arrival_time = { .sec = 0, .nsec = 0 };
+	struct rohc_buf ip_packet =
+		rohc_buf_init_full(packet, header.caplen, arrival_time);
+
+	const size_t output_packet_max_len =
+		max(ETHER_HDR_LEN, LINUX_COOKED_HDR_LEN) + MAX_ROHC_SIZE;
+	uint8_t output_packet[output_packet_max_len];
+	struct rohc_buf rohc_packet =
+		rohc_buf_init_empty(output_packet, output_packet_max_len);
+
+	uint8_t decomp_buffer[MAX_ROHC_SIZE];
+	struct rohc_buf decomp_packet =
+		rohc_buf_init_empty(decomp_buffer, MAX_ROHC_SIZE);
+
+	uint8_t rcvd_feedback_buffer[MAX_ROHC_SIZE];
+	struct rohc_buf rcvd_feedback =
+		rohc_buf_init_empty(rcvd_feedback_buffer, MAX_ROHC_SIZE);
+
 	rohc_comp_last_packet_info2_t comp_last_packet_info;
 	rohc_decomp_last_packet_info_t decomp_last_packet_info;
-	static unsigned char decomp_packet[MAX_ROHC_SIZE];
-	int decomp_size;
 	unsigned long possible_unit;
+	rohc_status_t status;
 	int ret;
 
 	/* check Ethernet frame length */
@@ -936,16 +1166,17 @@ static int compress_decompress(struct rohc_comp *comp,
 	{
 		if(is_verbose)
 		{
-			fprintf(stderr, "bad PCAP packet (len = %d, caplen = %d)\n",
-			        header.len, header.caplen);
+			SNIFFER_LOG(LOG_WARNING, "bad PCAP packet (full len = %d, capture "
+			            "len = %d)", header.len, header.caplen);
 		}
 		ret = -3;
 		goto error;
 	}
 
-	ip_packet = packet + link_len_src;
-	ip_size = header.len - link_len_src;
-	rohc_packet = output_packet + link_len_src;
+	/* skip the link layer header */
+	rohc_buf_pull(&ip_packet, link_len_src);
+	rohc_packet.len += link_len_src;
+	rohc_buf_pull(&rohc_packet, link_len_src);
 
 	/* check for padding after the IP packet in the Ethernet payload */
 	if(link_len_src == ETHER_HDR_LEN && header.len == ETHER_FRAME_MIN_LEN)
@@ -953,58 +1184,73 @@ static int compress_decompress(struct rohc_comp *comp,
 		int version;
 		uint16_t tot_len;
 
-		version = (ip_packet[0] >> 4) & 0x0f;
-
+		version = (rohc_buf_byte(ip_packet) >> 4) & 0x0f;
 		if(version == 4)
 		{
-			memcpy(&tot_len, ip_packet + 2, sizeof(uint16_t));
+			memcpy(&tot_len, rohc_buf_data_at(ip_packet, 2), sizeof(uint16_t));
 			tot_len = ntohs(tot_len);
 		}
 		else
 		{
 			const size_t ipv6_header_len = 40;
-			memcpy(&tot_len, ip_packet + 4, sizeof(uint16_t));
+			memcpy(&tot_len, rohc_buf_data_at(ip_packet, 4), sizeof(uint16_t));
 			tot_len = ipv6_header_len + ntohs(tot_len);
 		}
 
-		if(tot_len < ip_size)
+		if(tot_len < ip_packet.len)
 		{
 			if(is_verbose)
 			{
-				fprintf(stderr, "the Ethernet frame has %zd bytes of padding "
-				        "after the %u byte IP packet!\n", ip_size - tot_len,
-				        tot_len);
+				SNIFFER_LOG(LOG_INFO, "the Ethernet frame has %zd bytes of "
+				            "padding after the %u byte IP packet!",
+				            ip_packet.len - tot_len, tot_len);
 			}
-			ip_size = tot_len;
+			ip_packet.len = tot_len;
 		}
 	}
 
+	/* fix IPv4 packets with non-standard-compliant 0xffff checksums instead
+	 * of 0x0000 (Windows Vista seems to be faulty for the latter), to avoid
+	 * false comparison failures after decompression */
+	if(((rohc_buf_byte_at(ip_packet, 0) >> 4) & 0x0f) == 4 &&
+	   ip_packet.len >= 20 &&
+	   rohc_buf_byte_at(ip_packet, 10) == 0xff &&
+	   rohc_buf_byte_at(ip_packet, 11) == 0xff)
+	{
+		rohc_buf_byte_at(ip_packet, 10) = 0x00;
+		rohc_buf_byte_at(ip_packet, 11) = 0x00;
+	}
+
+	/* piggyback the feedback */
+	rohc_buf_append_buf(&rohc_packet, *feedback_send);
+	rohc_buf_pull(&rohc_packet, feedback_send->len);
+
 	/* compress the IP packet */
-	ret = rohc_compress2(comp, ip_packet, ip_size,
-	                     rohc_packet, MAX_ROHC_SIZE, &rohc_size);
-	if(ret != ROHC_OK)
+	status = rohc_compress4(comp, ip_packet, &rohc_packet);
+	if(status != ROHC_STATUS_OK)
 	{
 		pcap_dumper_t *dumper;
 
-		fprintf(stderr, "compression failed\n");
+		SNIFFER_LOG(LOG_WARNING, "compression failed");
 		ret = -1;
+		rohc_buf_push(&ip_packet, link_len_src);
 
 		/* open the new dumper */
 		dumper = pcap_dump_open(handle, "./dump_stream_default.pcap");
 		if(dumper == NULL)
 		{
-			fprintf(stderr, "failed to open new dump file '%s'\n",
-			        "./dump_stream_default.pcap");
+			SNIFFER_LOG(LOG_WARNING, "failed to open new dump file '%s'",
+			            "./dump_stream_default.pcap");
 			assert(0);
 			goto error;
 		}
 
 		/* dump the IP packet */
-		fprintf(stderr, "dump packet in file '%s'\n",
-		        "./dump_stream_default.pcap");
+		SNIFFER_LOG(LOG_INFO, "dump packet in file '%s'",
+		            "./dump_stream_default.pcap");
 		pcap_dump((u_char *) dumper, &header, packet);
 
-		fprintf(stderr, "close dump file\n");
+		SNIFFER_LOG(LOG_INFO, "close dump file");
 		pcap_dump_close(dumper);
 
 		goto error;
@@ -1015,12 +1261,12 @@ static int compress_decompress(struct rohc_comp *comp,
 	comp_last_packet_info.version_minor = 0;
 	if(!rohc_comp_get_last_packet_info2(comp, &comp_last_packet_info))
 	{
-		fprintf(stderr, "failed to get compression info\n");
+		SNIFFER_LOG(LOG_WARNING, "failed to get compression info");
 		ret = -4;
 		goto error;
 	}
-	stats->comp_pre_nr_bytes += ip_size;
-	stats->comp_post_nr_bytes += rohc_size;
+	stats->comp_pre_nr_bytes += ip_packet.len;
+	stats->comp_post_nr_bytes += rohc_packet.len;
 	possible_unit = stats->comp_unit_size;
 	if(stats->comp_unit_size == 1)
 	{
@@ -1096,8 +1342,9 @@ static int compress_decompress(struct rohc_comp *comp,
 		{
 			if(is_verbose)
 			{
-				printf("replace dump file '%s' for context with ID %u\n",
-				       dump_filename, comp_last_packet_info.context_id);
+				SNIFFER_LOG(LOG_INFO, "replace dump file '%s' for context with "
+				            "ID %u", dump_filename,
+				            comp_last_packet_info.context_id);
 			}
 			pcap_dump_close(dumpers[comp_last_packet_info.context_id]);
 			unlink(dump_filename);
@@ -1109,28 +1356,33 @@ static int compress_decompress(struct rohc_comp *comp,
 			pcap_dump_open(handle, dump_filename);
 		if(dumpers[comp_last_packet_info.context_id] == NULL)
 		{
-			fprintf(stderr, "failed to open new dump file '%s' for context "
-			        "with ID %u\n", dump_filename,
-			        comp_last_packet_info.context_id);
+			SNIFFER_LOG(LOG_WARNING, "failed to open new dump file '%s' for "
+			            "context with ID %u", dump_filename,
+			            comp_last_packet_info.context_id);
 			assert(0);
 			goto error;
 		}
 	}
 
 	/* dump the IP packet */
+	rohc_buf_push(&ip_packet, link_len_src);
 	pcap_dump((u_char *) dumpers[comp_last_packet_info.context_id],
 	          &header, packet);
+	rohc_buf_pull(&ip_packet, link_len_src);
 
 	/* record the CID */
 	*cid = comp_last_packet_info.context_id;
 
+	/* reset the feedback buffer */
+	feedback_send->data -= feedback_send->offset;
+	feedback_send->len = 0;
+
 	/* decompress the ROHC packet */
-	decomp_size = rohc_decompress(decomp,
-	                              rohc_packet, rohc_size,
-	                              decomp_packet, MAX_ROHC_SIZE);
-	if(decomp_size <= 0)
+	status = rohc_decompress3(decomp, rohc_packet, &decomp_packet,
+	                          &rcvd_feedback, feedback_send);
+	if(status != ROHC_STATUS_OK)
 	{
-		fprintf(stderr, "decompression failed\n");
+		SNIFFER_LOG(LOG_WARNING, "decompression failed");
 		ret = -2;
 		goto error;
 	}
@@ -1140,7 +1392,7 @@ static int compress_decompress(struct rohc_comp *comp,
 	decomp_last_packet_info.version_minor = 0;
 	if(!rohc_decomp_get_last_packet_info(decomp, &decomp_last_packet_info))
 	{
-		fprintf(stderr, "failed to get decompression info\n");
+		SNIFFER_LOG(LOG_WARNING, "failed to get decompression info");
 		ret = -4;
 		goto error;
 	}
@@ -1164,10 +1416,18 @@ static int compress_decompress(struct rohc_comp *comp,
 		stats->nr_duplicated_packets++;
 	}
 
-	/* compare the decompressed packet with the original one */
-	if(!compare_packets(ip_packet, ip_size, decomp_packet, decomp_size))
+	/* deliver any received feedback data to the associated compressor */
+	if(!rohc_comp_deliver_feedback2(comp, rcvd_feedback))
 	{
-		fprintf(stderr, "comparison with original packet failed\n");
+		SNIFFER_LOG(LOG_WARNING, "failed to deliver feedback");
+		ret = -4;
+		goto error;
+	}
+
+	/* compare the decompressed packet with the original one */
+	if(!compare_packets(ip_packet, decomp_packet))
+	{
+		SNIFFER_LOG(LOG_WARNING, "comparison with original packet failed");
 		ret = 0;
 	}
 	else
@@ -1185,50 +1445,58 @@ error:
  * @brief Compare two network packets and print differences if any
  *
  * @param pkt1      The first packet
- * @param pkt1_size The size of the first packet
  * @param pkt2      The second packet
- * @param pkt2_size The size of the second packet
  * @return          Whether the packets are equal or not
  */
-static int compare_packets(const unsigned char *const pkt1,
-                           const size_t pkt1_size,
-                           const unsigned char *const pkt2,
-                           const size_t pkt2_size)
+static int compare_packets(const struct rohc_buf pkt1,
+                           const struct rohc_buf pkt2)
 {
 	int valid = 1;
 	size_t min_size;
-	int i, j, k;
+	size_t i, j, k;
 	char str1[4][7], str2[4][7];
 	char sep1, sep2;
+	size_t tcp_padding_bytes;
 
 	/* do not compare more than the shortest of the 2 packets */
-	min_size = min(pkt1_size, pkt2_size);
+	min_size = min(pkt1.len, pkt2.len);
 
 	/* do not compare more than 180 bytes to avoid huge output */
 	min_size = min(180, min_size);
 
 	/* if packets are equal, do not print the packets */
-	if(pkt1_size == pkt2_size && memcmp(pkt1, pkt2, pkt1_size) == 0)
+	if(pkt1.len == pkt2.len &&
+	   memcmp(rohc_buf_data(pkt1), rohc_buf_data(pkt2), pkt1.len) == 0)
 	{
+		goto skip;
+	}
+	/* packets seem different, double check for extra padding of TCP options:
+	 * packets with extra padding at the end of TCP options cannot be compared */
+	tcp_padding_bytes = get_tcp_opt_padding(pkt1);
+	if(tcp_padding_bytes >= 4)
+	{
+		fprintf(stderr, "unexpected padding at the end of TCP options: "
+		        "%zu EOL bytes\n", tcp_padding_bytes);
 		goto skip;
 	}
 
 	/* packets are different */
 	valid = 0;
 
-	printf("------------------------------ Compare ------------------------------\n");
-	printf("--------- reference ----------         ----------- new --------------\n");
+	SNIFFER_LOG(LOG_WARNING, "------------------------------ Compare ------------------------------");
+	SNIFFER_LOG(LOG_WARNING, "--------- reference ----------         ----------- new --------------");
 
-	if(pkt1_size != pkt2_size)
+	if(pkt1.len != pkt2.len)
 	{
-		printf("packets have different sizes (%zd != %zd), compare only the %zd "
-		       "first bytes\n", pkt1_size, pkt2_size, min_size);
+		SNIFFER_LOG(LOG_WARNING, "packets have different sizes (%zd != %zd), "
+		            "compare only the %zd first bytes",
+		            pkt1.len, pkt2.len, min_size);
 	}
 
 	j = 0;
 	for(i = 0; i < min_size; i++)
 	{
-		if(pkt1[i] != pkt2[i])
+		if(rohc_buf_byte_at(pkt1, i) != rohc_buf_byte_at(pkt2, i))
 		{
 			sep1 = '#';
 			sep2 = '#';
@@ -1239,8 +1507,8 @@ static int compare_packets(const unsigned char *const pkt1,
 			sep2 = ']';
 		}
 
-		sprintf(str1[j], "%c0x%.2x%c", sep1, pkt1[i], sep2);
-		sprintf(str2[j], "%c0x%.2x%c", sep1, pkt2[i], sep2);
+		sprintf(str1[j], "%c0x%.2x%c", sep1, rohc_buf_byte_at(pkt1, i), sep2);
+		sprintf(str2[j], "%c0x%.2x%c", sep1, rohc_buf_byte_at(pkt2, i), sep2);
 
 		/* make the output human readable */
 		if(j >= 3 || (i + 1) >= min_size)
@@ -1249,22 +1517,20 @@ static int compare_packets(const unsigned char *const pkt1,
 			{
 				if(k < (j + 1))
 				{
-					printf("%s  ", str1[k]);
+					SNIFFER_LOG(LOG_WARNING, "%s  ", str1[k]);
 				}
 				else /* fill the line with blanks if nothing to print */
 				{
-					printf("        ");
+					SNIFFER_LOG(LOG_WARNING, "        ");
 				}
 			}
 
-			printf("      ");
+			SNIFFER_LOG(LOG_WARNING, "      ");
 
 			for(k = 0; k < (j + 1); k++)
 			{
-				printf("%s  ", str2[k]);
+				SNIFFER_LOG(LOG_WARNING, "%s  ", str2[k]);
 			}
-
-			printf("\n");
 
 			j = 0;
 		}
@@ -1274,7 +1540,7 @@ static int compare_packets(const unsigned char *const pkt1,
 		}
 	}
 
-	printf("----------------------- packets are different -----------------------\n");
+	SNIFFER_LOG(LOG_WARNING, "----------------------- packets are different -----------------------");
 
 skip:
 	return valid;
@@ -1282,19 +1548,123 @@ skip:
 
 
 /**
+ * @brief How many bytes of padding the packet got after TCP options?
+ *
+ * TCP options shall be padded to be aligned on 32-bit boundaries, ie. add
+ * 0 to 3 bytes of padding 0x00. Some TCP stacks however adds extra padding
+ * (4 bytes of example). This stops us to compare original and decompressed
+ * packet, since the ROHC decompressor will only add the minimal number of
+ * padding bytes.
+ *
+ * @param packet  The packet to check for padding
+ * @return        The number of padding bytes found after TCP options
+ */
+static size_t get_tcp_opt_padding(const struct rohc_buf packet)
+{
+	struct tcphdr *tcp;
+	size_t opt_len;
+	size_t nr_eol_found = 0;
+	size_t ip_len;
+	size_t i;
+
+	/* check IP version */
+	if(packet.len < 1)
+	{
+		goto too_short;
+	}
+	if((rohc_buf_byte(packet) & 0xf0) == 0x40)
+	{
+		/* IPv4 */
+		struct iphdr *ip = (struct iphdr *) rohc_buf_data(packet);
+		ip_len = ip->ihl * 4;
+		if(packet.len <= ip_len || ip->protocol != 6)
+		{
+			goto not_tcp;
+		}
+	}
+	else if((rohc_buf_byte(packet) & 0xf0) == 0x60)
+	{
+		/* IPv6 */
+		struct ip6_hdr *ip = (struct ip6_hdr *) rohc_buf_data(packet);
+		ip_len = sizeof(struct ip6_hdr);
+		if(packet.len <= ip_len || ip->ip6_nxt != 6)
+		{
+			goto not_tcp;
+		}
+	}
+	else
+	{
+		goto not_ip;
+	}
+
+	/* enough room for IP and TCP base header? */
+	if(packet.len < (ip_len + sizeof(struct tcphdr)))
+	{
+		goto malformed;
+	}
+
+	/* enough room for TCP options? */
+	tcp = (struct tcphdr *) rohc_buf_data_at(packet, ip_len);
+	if(packet.len < (ip_len + tcp->doff * 4))
+	{
+		goto malformed;
+	}
+
+	/* parse TCP options, count padding bytes */
+	nr_eol_found = 0;
+	for(i = ip_len + sizeof(struct tcphdr);
+	    i < (ip_len + tcp->doff * 4);
+	    i += opt_len)
+	{
+		switch(rohc_buf_byte_at(packet, i))
+		{
+			case 0x01: /* NOP */
+				opt_len = 1;
+				break;
+			case 0x00: /* EOL */
+				opt_len = 1;
+				nr_eol_found++;
+				break;
+			default: /* long option TLV */
+				if(packet.len <= (i + 1))
+				{
+					goto malformed;
+				}
+				opt_len = rohc_buf_byte_at(packet, i + 1);
+				if(packet.len <= (i + opt_len))
+				{
+					goto malformed;
+				}
+				break;
+		}
+	}
+
+	return nr_eol_found;
+
+not_ip:
+not_tcp:
+malformed:
+too_short:
+	return 0;
+}
+
+
+/**
  * @brief Callback to print traces of the ROHC library
  *
- * @param level    The priority level of the trace
- * @param entity   The entity that emitted the trace among:
- *                  \li ROHC_TRACE_COMPRESSOR
- *                  \li ROHC_TRACE_DECOMPRESSOR
- * @param profile  The ID of the ROHC compression/decompression profile
- *                 the trace is related to
- * @param format   The format string of the trace
+ * @param priv_ctxt  An optional private context, may be NULL
+ * @param level      The priority level of the trace
+ * @param entity     The entity that emitted the trace among:
+ *                    \li ROHC_TRACE_COMP
+ *                    \li ROHC_TRACE_DECOMP
+ * @param profile    The ID of the ROHC compression/decompression profile
+ *                   the trace is related to
+ * @param format     The format string of the trace
  */
-static void print_rohc_traces(const rohc_trace_level_t level,
-                              const rohc_trace_entity_t entity,
-                              const int profile,
+static void print_rohc_traces(void *const priv_ctxt __attribute__((unused)),
+                              const rohc_trace_level_t level,
+                              const rohc_trace_entity_t entity __attribute__((unused)),
+                              const int profile __attribute__((unused)),
                               const char *format, ...)
 {
 	const char *level_descrs[] =
@@ -1308,10 +1678,19 @@ static void print_rohc_traces(const rohc_trace_level_t level,
 	if(level >= ROHC_TRACE_WARNING || is_verbose)
 	{
 		va_list args;
-		fprintf(stdout, "[%s] ", level_descrs[level]);
-		va_start(args, format);
-		vfprintf(stdout, format, args);
-		va_end(args);
+		if(do_print_stderr)
+		{
+			fprintf(stdout, "[%s] ", level_descrs[level]);
+			va_start(args, format);
+			vfprintf(stdout, format, args);
+			va_end(args);
+		}
+		if(is_daemon)
+		{
+			va_start(args, format);
+			vsyslog(LOG_DEBUG, format, args);
+			va_end(args);
+		}
 	}
 
 	if(last_traces_last == -1)

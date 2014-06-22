@@ -14,8 +14,11 @@ Bugtracker:            http://bugs.launchpad.net/rohc
 License
 -------
 
-The project is licensed under GPL2+, see the COPYING and AUTHORS files for more
-details.
+The project is licensed under the GNU LGPL version 2.1 or later, see the COPYING
+and AUTHORS files for more details.
+
+Some network captures or small scripts used for testing are under the GNU GPL
+version 2 or later.
 
 
 Libraries
@@ -47,47 +50,6 @@ with the statistics results. The Gnuplot tool is required.
 
 See the INSTALL file to learn how to use the statistics application and the
 generate_statistics.sh script.
-
-
-Known problems
---------------
-
-The following problems are known but are not corrected in the 1.5.x branch.
-
- - RTP profile: unscaled TS shall always be encoded with W-LSB in UO* packets
-
-   According to RFC 4815, §4.1:
-     RTP Timestamp (TS) values are always encoded using W-LSB encoding,
-     both when sent scaled and unscaled. When no TS bits are transmitted
-     in a compressed packet, TS is always scaled. If a compressed packet
-     carries an Extension 3 and field(Tsc)=0, the compressed packet must
-     thus always carry unscaled TS bits. For TS values sent in Extension
-     3, W-LSB encoded values are sent using the self-describing variable-
-     length format (RFC 3095-Section 4.5.6), and this applies to both
-     scaled and unscaled values.
-   The TS bits in UO* packets shall always be transmitted encoded with W-LSB.
-   W-LSB encoding shall be used if TS is scaled or unscaled. The ROHC library
-   does use W-LSB for scaled TS but not for unscaled TS. This is not RFC
-   compliant.
-   The problem will not be fixed in the 1.6.x branch since they will be
-   invasive and would break compatibility between 1.6.x releases.
-   See https://bugs.launchpad.net/rohc/+bug/1208900
-
- - IP-ID shall be transmitted verbatim in IR and IR-DYN packets
-
-   According to RFC 4815 and discussion on the IETF list
-   (http://www.ietf.org/mail-archive/web/rohc/current/msg01675.html):
-     - "IP-ID" means that the Identification field is transmitted encoded with
-       the method "Offset IP-ID", ie. offset between SN and IP-ID and then
-       byte-swapped according to the NBO flag.
-     - "Identification" means that the Identification field is transmitted
-       verbatim, ie. unchanged wrt the non compressed packet.
-   The ROHC library is not conform: the dynamic part of the IPv4 header in the
-   IR and IR-DYN packets shall contain the verbation Identification field, not
-   the byte-swapped value.
-   The problem will not be fixed in the 1.6.x branch since they will be
-   invasive and would break compatibility between 1.6.x releases.
-   See https://bugs.launchpad.net/rohc/+bug/1210498
 
 
 References

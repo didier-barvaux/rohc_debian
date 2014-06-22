@@ -1,17 +1,17 @@
 #
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
 #
-# This program is distributed in the hope that it will be useful,
+# This library is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+# You should have received a copy of the GNU Lesser General Public License
+# along with this library; if not, write to the Free Software Foundation,
+# Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #
 #
 # Process this file with autoconf to produce a configure script.
@@ -21,7 +21,7 @@
 #          Mikhail Gruzdev <michail.gruzdev@gmail.com>
 #
 
-AC_INIT([ROHC library], 1.6.1, [http://rohc-lib.org/],
+AC_INIT([ROHC library], 1.7.0, [http://rohc-lib.org/],
         [rohc], [http://rohc-lib.org/])
 AC_CONFIG_SRCDIR([src])
 AM_CONFIG_HEADER([config.h])
@@ -60,9 +60,9 @@ AC_DEFINE_UNQUOTED([PACKAGE_REVNO], ["$PACKAGE_REVNO"],
 #  - interfaces added:                             AGE++
 #  - interfaces removed:                           AGE=0
 #
-AC_SUBST([ROHC_API_CURRENT], 1)
+AC_SUBST([ROHC_API_CURRENT], 2)
 AC_SUBST([ROHC_API_REVISION], 0)
-AC_SUBST([ROHC_API_AGE], 1)
+AC_SUBST([ROHC_API_AGE], 2)
 
 # Define a package homepage in a way compatible with autoconf < 2.64
 m4_ifndef([AC_PACKAGE_URL],
@@ -89,7 +89,9 @@ LT_PREREQ([2.2.0])
 LT_INIT([disable-static win32-dll])
 
 # CFLAGS/LDFLAGS default values, more will be added on purpose
-configure_cflags="-g -Wall -Wstrict-prototypes"
+configure_cflags="-g -Wall -Wstrict-prototypes -Wextra -Wunreachable-code"
+configure_cflags="${configure_cflags} -Wunused-function -Wunused-variable"
+configure_cflags="${configure_cflags} -Wshadow"
 configure_ldflags=""
 
 # Checks for programs.
@@ -104,8 +106,6 @@ AC_CHECK_HEADERS([arpa/inet.h]) # ntohl, htonl, ntohs, htons on Linux
 AC_CHECK_HEADERS([winsock2.h])  # ntohl, htonl, ntohs, htons on Windows
 AC_CHECK_HEADERS([sys/types.h]) # ntohl, htonl, ntohs, htons on OpenBSD
 AC_CHECK_HEADERS([linux/if_tun.h]) # TUN/TAP support on Linux
-AC_CHECK_HEADERS([sched.h]) # scheduling priority on Linux
-AC_CHECK_HEADERS([sys/mman.h]) # memory management on Linux
 
 # Handle library flags according to the platform
 if test "x$ac_cv_header_winsock2_h" = "xyes" ; then
@@ -133,33 +133,6 @@ fi
 AC_CHECK_FUNCS([malloc calloc free memcpy memcmp])
 AC_CHECK_FUNCS([ntohl htonl ntohs htons])
 
-# If sched.h is present, check sched_setscheduler() availability & usage
-if test "x$ac_cv_header_sched_h" = "xyes" ; then
-	# Check if sched_setscheduler() is available without external library then with libpthread
-	sched_lib=""
-	AC_CHECK_FUNC([sched_setscheduler], ,
-	              [AC_CHECK_LIB([pthread], sched_setscheduler,
-	                            sched_lib="-lpthread", sched_lib="")])
-	AC_SUBST([sched_lib], [$sched_lib])
-	if test "x$sched_lib" != "x" ; then
-		# Check whether sched_setscheduler() takes 2 or 3 arguments
-		AC_MSG_CHECKING([how many arguments sched_setscheduler takes])
-		AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <sched.h>
-		                                     #include <string.h>
-		                                     struct sched_param param;]],
-		                                   [[memset(&param, 0, sizeof(struct sched_param));
-		                                     sched_setscheduler(0, SCHED_FIFO, &param);]])],
-		                  [sched_setscheduler_params=3],
-		                  [sched_setscheduler_params=2])
-		AC_MSG_RESULT([$sched_setscheduler_params])
-	else
-		sched_setscheduler_params=0
-	fi
-	AC_DEFINE_UNQUOTED([SCHED_SETSCHEDULER_PARAMS],
-	                   [$sched_setscheduler_params],
-	                   [Define the number of arguments that sched_setscheduler takes])
-fi
-
 # Define uint*_t and u_int*_t if not defined on target platform
 AC_TYPE_UINT8_T
 AC_TYPE_UINT16_T
@@ -171,6 +144,10 @@ if test "x$host_os" = "xmingw32" || \
    test "x$host_os" = "xmingw64" ; then
 	# Avoid warnings about 'unknown conversion type character ‘z’ in format'
 	configure_cflags="${configure_cflags} -D__USE_MINGW_ANSI_STDIO=1"
+	# Tell mingw to pack structs and bitfields the way gcc does
+	configure_cflags="${configure_cflags} -mno-ms-bitfields"
+	# Enable dead code on mingw64 to avoid warnings
+	configure_cflags="${configure_cflags} -DENABLE_DEAD_CODE"
 	if test "x$enable_shared" = "xyes" ; then
 		configure_ldflags="${configure_ldflags} -Wl,--no-undefined"
 	fi
@@ -267,10 +244,12 @@ if test "x$enable_deprecated_api" != "xyes"; then
 	echo
 	sleep 5
 	deprecated_api=0
+	configure_cflags="${configure_cflags} -DROHC_ENABLE_DEPRECATED_API=0"
 else
+	configure_cflags="${configure_cflags} -DROHC_ENABLE_DEPRECATED_API=1"
 	deprecated_api=1
 fi
-AC_DEFINE_UNQUOTED([ENABLE_DEPRECATED_API], [$deprecated_api],
+AC_DEFINE_UNQUOTED([ROHC_ENABLE_DEPRECATED_API], [$deprecated_api],
                    [Whether deprecated API is enabled or not.])
 
 
@@ -315,14 +294,21 @@ AC_ARG_ENABLE(rohc_tests_valgrind,
 AM_CONDITIONAL([ROHC_TESTS_VALGRIND], [test x$enable_rohc_tests_valgrind = xyes])
 
 
-# check if ROHC statistics application is enabled
+# abort is --enable-rohc-stats is used as it is deprecated
 AC_ARG_ENABLE(rohc_stats,
               AS_HELP_STRING([--enable-rohc-stats],
                              [enable ROHC statistics application [[default=no]]]),
               enable_rohc_stats=$enableval,
-              enable_rohc_stats=no)
-AM_CONDITIONAL([ROHC_STATS], [test x$enable_rohc_stats = xyes])
-
+              enable_rohc_stats="undefined")
+if test "x$enable_rohc_stats" != "xundefined" ; then
+	echo
+	echo "ERROR: --enable-rohc-stats and --disable-rohc-stats are "
+	echo "       deprecated, do not use them any more."
+	echo
+	echo "Please use option --enable-app-stats or --disable-app-stats instead."
+	echo
+	exit 1
+fi
 
 # abort is --enable-rohc-apps is used as it is deprecated
 AC_ARG_ENABLE(rohc_apps,
@@ -336,10 +322,11 @@ if test "x$enable_rohc_apps" != "xundefined" ; then
 	echo "       deprecated, do not use them any more."
 	echo
 	echo "Please use a combination of the following options instead:"
-	echo "  --enable-app-fuzzer"
-	echo "  --enable-app-performance"
-	echo "  --enable-app-sniffer"
-	echo "  --enable-app-tunnel"
+	echo "  --enable-app-fuzzer / --disable-app-fuzzer"
+	echo "  --enable-app-performance / --disable-app-performance"
+	echo "  --enable-app-sniffer / --disable-app-sniffer"
+	echo "  --enable-app-tunnel / --disable-app-tunnel"
+	echo "  --enable-app-stats / --disable-app-stats"
 	echo
 	exit 1
 fi
@@ -382,6 +369,19 @@ AC_ARG_ENABLE(app_tunnel,
               enable_app_tunnel=no)
 AM_CONDITIONAL([APP_TUNNEL], [test x$enable_app_tunnel = xyes])
 
+# ROHC over UDP tunnel is now deprecated
+if test "x$enable_app_tunnel" = "xyes" ; then
+	echo
+	echo "WARNING: --enable-app-tunnel is now deprecated"
+	echo
+	echo "The ROHC over UDP tunnel is deprecated. This program was created"
+	echo "for testing purposes. The sniffer and fuzzer tools replace it for"
+	echo "testing. The IP/ROHC tunnel replaces it as tunneling solution"
+	echo "(better efficiency, designed for production)."
+	echo
+	echo "The ROHC over UDP tunnel will be removed in version 2.0.0."
+	echo
+fi
 
 # TUN interfaces are not supported on non-Linux platforms yet, so the ROHC
 # over UDP tunnel application cannot be enabled there
@@ -397,20 +397,30 @@ if test "x$enable_app_tunnel" = "xyes" && \
 fi
 
 
-# if ROHC tests or statistics are enabled:
-#  - build but do not run tests/stats if cross-compiling except if an emulator
+# check if ROHC stats tool (located in the app/stats/ subdir)
+# is enabled
+AC_ARG_ENABLE(app_stats,
+              AS_HELP_STRING([--enable-app-stats],
+                             [enable ROHC stats [default=no]]),
+              enable_app_stats=$enableval,
+              enable_app_stats=no)
+AM_CONDITIONAL([APP_STATS], [test x$enable_app_stats = xyes])
+
+
+# if ROHC tests are enabled:
+#  - build but do not run tests if cross-compiling except if an emulator
 #    is available
 #  - sed is mandatory
-if test "x$enable_rohc_tests" = "xyes" || test "x$enable_rohc_stats" = "xyes"; then
+if test "x$enable_rohc_tests" = "xyes" ; then
 
-	# cross-compiling is not fully compatible with tests and stats yet
+	# cross-compiling is not fully compatible with tests yet
 	if test "x$cross_compiling" = "xyes" ; then
 
 		# some cross-compiled binaries may be run:
-		#  - mingw cross-compilation may run the tests/stats if wine is installed,
-		#  - ARM cross-compilation may run the tests/stats if qemu-arm is installed
+		#  - mingw cross-compilation may run the tests if wine is installed,
+		#  - ARM cross-compilation may run the tests if qemu-arm is installed
 		#    and static libraries only are used,
-		#  - PPC cross-compilation may run the tests/stats if qemu-ppc is installed
+		#  - PPC cross-compilation may run the tests if qemu-ppc is installed
 		#    and static libraries only are used.
 		cross_compiling_emulator_name=""
 		cross_compiling_emulator_cmd=""
@@ -498,12 +508,11 @@ if test "x$enable_rohc_tests" = "xyes" || test "x$enable_rohc_stats" = "xyes"; t
 fi
 
 
-# if ROHC tests, statistics, or apps are enabled:
-#  - libpcap is mandatory
+# if ROHC tests or apps are enabled: libpcap is mandatory
 if test "x$enable_rohc_tests" = "xyes" || \
-   test "x$enable_rohc_stats" = "xyes" || \
    test "x$enable_app_perf" = "xyes" || \
-   test "x$enable_app_sniffer" = "xyes" ; then
+   test "x$enable_app_sniffer" = "xyes" || \
+   test "x$enable_app_stats" = "xyes" ; then
 
 	# use winpcap for mingw and cygwin, libpcap for other platforms
 	if test "x$host_os" = "xmingw32" || \
@@ -569,6 +578,24 @@ if test "x$enable_rohc_tests" = "xyes" || \
 	if test "x$dlt_linux_sll_defined" != "xyes" ; then
 		AC_DEFINE([DLT_LINUX_SLL], [113],
 		          [Define DLT_LINUX_SLL if not defined by the system])
+	fi
+fi
+
+
+# if ROHC tests are enabled: libcmocka is mandatory
+if test "x$enable_rohc_tests" = "xyes" ; then
+
+	PKG_CHECK_MODULES([CMOCKA], [cmocka >= 0.3.1],
+	                  [cmocka_found="yes"], [cmocka_found="no"])
+	if test "x$cmocka_found" != "xyes" ; then
+		echo
+		echo "ERROR: cmocka library/headers not found"
+		echo
+		echo "Go get it from http://www.cmocka.org/ or use the CMOCKA_* "
+		echo "variables, if you have it installed in unusual place. Also check if "
+		echo "it depends on another shared library that may be installed in an "
+		echo "unusual place."
+		exit 1
 	fi
 fi
 
@@ -649,7 +676,7 @@ fi
 
 
 # gnuplot, grep, sort, and tr are mandatory if ROHC statistics are enabled
-if test "x$enable_rohc_stats" = "xyes" ; then
+if test "x$enable_app_stats" = "xyes" ; then
 
 	# check for the gnuplot binary and abort if it is not found
 	AC_CHECK_PROG(is_gnuplot_found, gnuplot, "yes", "no")
@@ -774,15 +801,19 @@ AC_ARG_ENABLE(rtp_bit_type,
               AS_HELP_STRING([--enable-rtp-bit-type],
                              [enable RTP bit type (use an additionnal bit \
                               to distinguish UOR-2-TS and UOR-2-ID packets) \
-                              [[default=no]]]),
+                              [deprecated]]),
               enable_rtp_bit_type=$enableval,
               enable_rtp_bit_type=no)
 if test "$enable_rtp_bit_type" = "yes"; then
-	rtp_bit_type=1
-else
-	rtp_bit_type=0
+	echo
+	echo "The RTP bit type was not part of any RFC standard. It was also a "
+	echo "maintenance burden. It was therefore removed from the ROHC library. "
+	echo
+	echo "Please remove the --enable-rtp-bit-type option from the ./autogen.sh "
+	echo "or ./configure command to continue."
+	echo
+	exit 1
 fi
-AC_DEFINE_UNQUOTED([RTP_BIT_TYPE], [$rtp_bit_type], [Whether RTP bit type is enabled or not.])
 
 
 # check if API documentation should be generated (HTML format with doxygen)
@@ -792,6 +823,15 @@ AC_ARG_ENABLE(doc,
               [build_doc=$enableval],
               [build_doc=no])
 AM_CONDITIONAL([BUILD_DOC], [test "x$build_doc" = "xyes"])
+
+# check if API documentation should be generated (man format with doxygen
+# and a modified version of doxy2man)
+AC_ARG_ENABLE(doc-man,
+				  AS_HELP_STRING([--enable-doc-man],
+                             [generate API documentation in man format [default=no]]),
+              [build_doc_man=$enableval],
+              [build_doc_man=no])
+AM_CONDITIONAL([BUILD_DOC_MAN], [test "x$build_doc_man" = "xyes"])
 
 
 # doxygen and latex are mandatory if API documentation generation is enabled
@@ -837,6 +877,40 @@ if test "x$build_doc" = "xyes" ; then
 		exit 1
 	fi
 fi
+# if man pages need to be generated, same requirement as HTML pages in addition
+# to doxy2man
+if test "x$build_doc_man" = "xyes" ; then
+	if test "x$build_doc" != "xyes" ; then
+		echo
+		echo "ERROR: --enable-doc-man requires --enable-doc"
+		echo
+		echo "Add --enable-doc to your configure options or remove --enable-doc-man "
+		echo "from your configure options."
+		exit 1
+	fi
+
+	# check for the doxy2man binary and abort if it is not found
+	AC_CHECK_PROG(is_doxy2man_found, doxy2man, "yes", "no")
+	if test "x$is_doxy2man_found" != "xyes"; then
+		echo
+		echo "ERROR: doxy2man binary not found"
+		echo
+		echo "doxy2man is required in order to generate the man pages for the"
+		echo "library documentation."
+		exit 1
+	fi
+
+	# check for the help2man binary and abort if it is not found
+	AC_CHECK_PROG(is_help2man_found, help2man, "yes", "no")
+	if test "x$is_help2man_found" != "xyes"; then
+		echo
+		echo "ERROR: help2man binary not found"
+		echo
+		echo "help2man is required in order to generate the man pages for the "
+		echo "documentation of library's tools."
+		exit 1
+	fi
+fi
 
 
 # check if library examples should be generated
@@ -860,19 +934,24 @@ AC_CONFIG_FILES([ \
 	Makefile \
 	bzr_revno \
 	src/Makefile \
+	src/test/Makefile \
 	src/common/Makefile \
 	src/common/protocols/Makefile \
-	src/common/test/Makefile \
 	src/comp/Makefile \
 	src/comp/test/Makefile \
+	src/comp/schemes/Makefile \
+	src/comp/schemes/test/Makefile \
 	src/decomp/Makefile \
+	src/decomp/test/Makefile \
+	src/decomp/schemes/Makefile \
+	src/decomp/schemes/test/Makefile \
 	test/Makefile \
 	test/functional/Makefile \
 	test/functional/feedback2/Makefile \
-	test/functional/feedback_ring/Makefile \
+	test/functional/decompress_padding/Makefile \
 	test/functional/decompress_feedback_only/Makefile \
 	test/functional/context_reuse/Makefile \
-	test/functional/rtp_uor2_disambiguation/Makefile \
+	test/functional/rtp_uo_disambiguation/Makefile \
 	test/functional/rtp_detection/Makefile \
 	test/functional/segment/Makefile \
 	test/robustness/Makefile \
@@ -882,7 +961,7 @@ AC_CONFIG_FILES([ \
 	test/robustness/piggybacking_feedback/Makefile \
 	test/robustness/malformed_rohc_packets/Makefile \
 	test/non_regression/Makefile \
-	statistics/Makefile \
+	test/interop/Makefile \
 	examples/Makefile \
 	linux/Makefile \
 	app/Makefile \
@@ -890,8 +969,12 @@ AC_CONFIG_FILES([ \
 	app/tunnel/Makefile \
 	app/sniffer/Makefile \
 	app/fuzzer/Makefile \
-	doc/doxygen.conf \
+	app/stats/Makefile \
 	doc/Makefile \
+	doc/doxygen.conf \
+	doc/rohc.7 \
+	doc/rohc_protocol.7 \
+	doc/rohc_library.7 \
 	contrib/Makefile \
 	contrib/rohc.spec \
 	rohc.pc \

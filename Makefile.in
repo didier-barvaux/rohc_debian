@@ -362,7 +362,7 @@ TEST_LOGS = $(am__test_logs2:.test.log=.log)
 TEST_LOG_DRIVER = $(SHELL) $(top_srcdir)/test-driver
 TEST_LOG_COMPILE = $(TEST_LOG_COMPILER) $(AM_TEST_LOG_FLAGS) \
 	$(TEST_LOG_FLAGS)
-DIST_SUBDIRS = src test linux statistics app doc examples contrib
+DIST_SUBDIRS = src test linux app doc examples contrib
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 top_distdir = $(distdir)
 am__remove_distdir = \
@@ -416,6 +416,8 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CMOCKA_CFLAGS = @CMOCKA_CFLAGS@
+CMOCKA_LIBS = @CMOCKA_LIBS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CYGPATH_W = @CYGPATH_W@
@@ -462,6 +464,9 @@ PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 RANLIB = @RANLIB@
 ROHC_API_AGE = @ROHC_API_AGE@
 ROHC_API_CURRENT = @ROHC_API_CURRENT@
@@ -509,8 +514,10 @@ includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
 is_dot_found = @is_dot_found@
+is_doxy2man_found = @is_doxy2man_found@
 is_doxygen_found = @is_doxygen_found@
 is_gnuplot_found = @is_gnuplot_found@
+is_help2man_found = @is_help2man_found@
 is_latex_found = @is_latex_found@
 is_qemu_found = @is_qemu_found@
 is_sort_found = @is_sort_found@
@@ -535,7 +542,6 @@ prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
 sbindir = @sbindir@
-sched_lib = @sched_lib@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
@@ -547,8 +553,6 @@ top_srcdir = @top_srcdir@
 @ROHC_TESTS_TRUE@TESTS_DIR = test
 @ROHC_LINUX_MODULE_FALSE@LINUX_MODULE_DIR = 
 @ROHC_LINUX_MODULE_TRUE@LINUX_MODULE_DIR = linux
-@ROHC_STATS_FALSE@STATS_DIR = 
-@ROHC_STATS_TRUE@STATS_DIR = statistics
 @BUILD_DOC_FALSE@DOC_DIR = 
 @BUILD_DOC_TRUE@DOC_DIR = doc
 @BUILD_EXAMPLES_FALSE@EXAMPLES_DIR = 
@@ -557,7 +561,6 @@ SUBDIRS = \
 	src \
 	$(TESTS_DIR) \
 	$(LINUX_MODULE_DIR) \
-	$(STATS_DIR) \
 	app \
 	$(DOC_DIR) \
 	$(EXAMPLES_DIR) \
@@ -1209,7 +1212,7 @@ distclean: distclean-recursive
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -f Makefile
 distclean-am: clean-am distclean-generic distclean-hdr \
-	distclean-libtool distclean-tags
+	distclean-libtool distclean-local distclean-tags
 
 dvi: dvi-recursive
 
@@ -1279,18 +1282,18 @@ uninstall-am: uninstall-dist_docDATA uninstall-pkgconfigDATA
 	ctags-am dist dist-all dist-bzip2 dist-gzip dist-hook \
 	dist-lzip dist-shar dist-tarZ dist-xz dist-zip distcheck \
 	distclean distclean-generic distclean-hdr distclean-libtool \
-	distclean-tags distcleancheck distdir distuninstallcheck dvi \
-	dvi-am html html-am info info-am install install-am \
-	install-data install-data-am install-dist_docDATA install-dvi \
-	install-dvi-am install-exec install-exec-am install-html \
-	install-html-am install-info install-info-am install-man \
-	install-pdf install-pdf-am install-pkgconfigDATA install-ps \
-	install-ps-am install-strip installcheck installcheck-am \
-	installdirs installdirs-am maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-generic \
-	mostlyclean-libtool pdf pdf-am ps ps-am recheck tags tags-am \
-	uninstall uninstall-am uninstall-dist_docDATA \
-	uninstall-pkgconfigDATA
+	distclean-local distclean-tags distcleancheck distdir \
+	distuninstallcheck dvi dvi-am html html-am info info-am \
+	install install-am install-data install-data-am \
+	install-dist_docDATA install-dvi install-dvi-am install-exec \
+	install-exec-am install-html install-html-am install-info \
+	install-info-am install-man install-pdf install-pdf-am \
+	install-pkgconfigDATA install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs installdirs-am \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	recheck tags tags-am uninstall uninstall-am \
+	uninstall-dist_docDATA uninstall-pkgconfigDATA
 
 
 # other extra files for releases
@@ -1298,17 +1301,29 @@ dist-hook:
 	find $(distdir)/test/non_regression/inputs \
 		-type f -and \
 		-not -name source.pcap -and \
-		-not -name rohc_wlsb4_smallcid.pcap -and \
-		-not -name rohc_wlsb4_largecid.pcap -and \
-		-not -name rohc_wlsb64_smallcid.pcap -and \
-		-not -name rohc_wlsb64_largecid.pcap -and \
+		-not -name rohc_maxcontexts0_wlsb4_smallcid.pcap -and \
+		-not -name rohc_maxcontexts0_wlsb4_largecid.pcap -and \
+		-not -name rohc_maxcontexts0_wlsb64_smallcid.pcap -and \
+		-not -name rohc_maxcontexts0_wlsb64_largecid.pcap -and \
+		-not -name rohc_maxcontexts1_wlsb4_smallcid.pcap -and \
+		-not -name rohc_maxcontexts1_wlsb4_largecid.pcap -and \
+		-not -name rohc_maxcontexts1_wlsb64_smallcid.pcap -and \
+		-not -name rohc_maxcontexts1_wlsb64_largecid.pcap -and \
 		-not -name description -and \
-		-not -name rohc_sizes_wlsb4_smallcid -and \
-		-not -name rohc_sizes_wlsb4_largecid -and \
-		-not -name rohc_sizes_wlsb64_smallcid -and \
-		-not -name rohc_sizes_wlsb64_largecid -and \
+		-not -name rohc_maxcontexts0_wlsb4_smallcid.sizes -and \
+		-not -name rohc_maxcontexts0_wlsb4_largecid.sizes -and \
+		-not -name rohc_maxcontexts0_wlsb64_smallcid.sizes -and \
+		-not -name rohc_maxcontexts0_wlsb64_largecid.sizes -and \
+		-not -name rohc_maxcontexts1_wlsb4_smallcid.sizes -and \
+		-not -name rohc_maxcontexts1_wlsb4_largecid.sizes -and \
+		-not -name rohc_maxcontexts1_wlsb64_smallcid.sizes -and \
+		-not -name rohc_maxcontexts1_wlsb64_largecid.sizes -and \
 		-not -name README \
 		-exec $(RM) \{\} \;
+
+distclean-local:
+	$(RM) output.zcov
+	$(RM) -r coverage-report/
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

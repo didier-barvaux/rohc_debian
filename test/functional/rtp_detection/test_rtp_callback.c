@@ -1,17 +1,20 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2012,2013,2014 Didier Barvaux
+ * Copyright 2012 Viveris Technologies
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -30,6 +33,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #if HAVE_WINSOCK2_H == 1
 #  include <winsock2.h> /* for ntohs() on Windows */
 #endif
@@ -77,11 +81,15 @@ static bool callback_ignore(const unsigned char *const ip,
                             const unsigned int payload_size,
                             void *const rtp_private);
 
-static void print_rohc_traces(const rohc_trace_level_t level,
+static void print_rohc_traces(void *const priv_ctxt,
+                              const rohc_trace_level_t level,
                               const rohc_trace_entity_t entity,
                               const int profile,
                               const char *const format, ...)
-	__attribute__((format(printf, 4, 5), nonnull(4)));
+	__attribute__((format(printf, 5, 6), nonnull(5)));
+static int gen_random_num(const struct rohc_comp *const comp,
+                          void *const user_context)
+	__attribute__((warn_unused_result));
 
 static int compress_and_check(struct rohc_comp *comp,
                               struct pcap_pkthdr header,
@@ -90,8 +98,8 @@ static int compress_and_check(struct rohc_comp *comp,
                               int packet_counter,
                               int success_expected,
                               int profile_expected);
-static int check_profile(struct rohc_comp *comp,
-                         unsigned int profile);
+static bool check_profile(struct rohc_comp *comp,
+                          const unsigned int profile);
 
 
 /** Whether the application runs in verbose mode or not */
@@ -216,6 +224,7 @@ static int test_rtp_callback(const char *const do_detect,
 	int counter;
 	int expected_profile;
 	int success_expected;
+	unsigned int seed;
 	int is_failure = 1;
 	int ret;
 
@@ -252,8 +261,13 @@ static int test_rtp_callback(const char *const do_detect,
 		link_len = 0;
 	}
 
+	/* initialize the random generator */
+	seed = time(NULL);
+	srand(seed);
+
 	/* create the ROHC compressor with small CID */
-	comp = rohc_alloc_compressor(ROHC_SMALL_CID_MAX, 0, 0, 0);
+	comp = rohc_comp_new2(ROHC_SMALL_CID, ROHC_SMALL_CID_MAX,
+	                      gen_random_num, NULL);
 	if(comp == NULL)
 	{
 		fprintf(stderr, "failed to create the ROHC compressor\n");
@@ -261,7 +275,7 @@ static int test_rtp_callback(const char *const do_detect,
 	}
 
 	/* set the callback for traces on compressor */
-	if(!rohc_comp_set_traces_cb(comp, print_rohc_traces))
+	if(!rohc_comp_set_traces_cb2(comp, print_rohc_traces, NULL))
 	{
 		fprintf(stderr, "failed to set the callback for traces on "
 		        "compressor\n");
@@ -269,17 +283,12 @@ static int test_rtp_callback(const char *const do_detect,
 	}
 
 	/* enable profiles */
-	rohc_activate_profile(comp, ROHC_PROFILE_UNCOMPRESSED);
-	rohc_activate_profile(comp, ROHC_PROFILE_UDP);
-	rohc_activate_profile(comp, ROHC_PROFILE_IP);
-	rohc_activate_profile(comp, ROHC_PROFILE_UDPLITE);
-	rohc_activate_profile(comp, ROHC_PROFILE_RTP);
-	rohc_activate_profile(comp, ROHC_PROFILE_ESP);
-
-	/* reset list of RTP ports */
-	if(!rohc_comp_reset_rtp_ports(comp))
+	if(!rohc_comp_enable_profiles(comp, ROHC_PROFILE_UNCOMPRESSED,
+	                              ROHC_PROFILE_UDP, ROHC_PROFILE_IP,
+	                              ROHC_PROFILE_UDPLITE, ROHC_PROFILE_RTP,
+	                              ROHC_PROFILE_ESP, ROHC_PROFILE_TCP, -1))
 	{
-		fprintf(stderr, "failed to reset list of RTP ports\n");
+		fprintf(stderr, "failed to enable the compression profiles\n");
 		goto destroy_comp;
 	}
 
@@ -296,14 +305,6 @@ static int test_rtp_callback(const char *const do_detect,
 	}
 	else
 	{
-		/* add the RTP port to the list,
-		 * if the callback is activated it should not have any effect */
-		if(!rohc_comp_add_rtp_port(comp, 1234))
-		{
-			fprintf(stderr, "failed to add RTP port\n");
-			goto destroy_comp;
-		}
-
 		if(!rohc_comp_set_rtp_detection_cb(comp, callback_ignore, NULL))
 		{
 			fprintf(stderr, "failed to set RTP detection callback\n");
@@ -331,7 +332,7 @@ static int test_rtp_callback(const char *const do_detect,
 	is_failure = 0;
 
 destroy_comp:
-	rohc_free_compressor(comp);
+	rohc_comp_free(comp);
 close_input:
 	pcap_close(handle);
 error:
@@ -361,12 +362,14 @@ static int compress_and_check(struct rohc_comp *comp,
                               int success_expected,
                               int profile_expected)
 {
-	unsigned char *ip_packet;
-	size_t ip_size;
-	static unsigned char rohc_packet[MAX_ROHC_SIZE];
-	size_t rohc_size;
+	const struct rohc_ts arrival_time = { .sec = 0, .nsec = 0 };
+	struct rohc_buf ip_packet =
+		rohc_buf_init_full(packet, header.caplen, arrival_time);
+	uint8_t rohc_buffer[MAX_ROHC_SIZE];
+	struct rohc_buf rohc_packet =
+		rohc_buf_init_empty(rohc_buffer, MAX_ROHC_SIZE);
 	int is_failure = 1;
-	int ret;
+	rohc_status_t status;
 
 	/* check packet */
 	if(packet == NULL)
@@ -385,8 +388,7 @@ static int compress_and_check(struct rohc_comp *comp,
 	}
 
 	/* skip the link layer header */
-	ip_packet = packet + link_len;
-	ip_size = header.len - link_len;
+	rohc_buf_pull(&ip_packet, link_len);
 
 	/* check for padding after the IP packet in the Ethernet payload */
 	if(link_len == ETHER_HDR_LEN && header.len == ETHER_FRAME_MIN_LEN)
@@ -395,50 +397,48 @@ static int compress_and_check(struct rohc_comp *comp,
 		uint16_t tot_len;
 
 		/* get IP version */
-		ip_version = (ip_packet[0] >> 4) & 0x0f;
+		ip_version = (rohc_buf_byte(ip_packet) >> 4) & 0x0f;
 
 		/* get IP total length depending on IP version */
 		if(ip_version == 4)
 		{
-			struct ipv4_hdr *ip = (struct ipv4_hdr *) ip_packet;
+			struct ipv4_hdr *ip = (struct ipv4_hdr *) rohc_buf_data(ip_packet);
 			tot_len = ntohs(ip->tot_len);
 		}
 		else
 		{
-			struct ipv6_hdr *ip = (struct ipv6_hdr *) ip_packet;
+			struct ipv6_hdr *ip = (struct ipv6_hdr *) rohc_buf_data(ip_packet);
 			tot_len = sizeof(struct ipv6_hdr) + ntohs(ip->ip6_plen);
 		}
 
 		/* update the length of the IP packet if padding is present */
-		if(tot_len < ip_size)
+		if(tot_len < ip_packet.len)
 		{
 			fprintf(stderr, "packet #%d: the Ethernet frame has %zu bytes "
 			        "of padding after the %u-byte IP packet!\n",
-			        packet_counter, ip_size - tot_len, tot_len);
-			ip_size = tot_len;
+			        packet_counter, ip_packet.len - tot_len, tot_len);
+			ip_packet.len = tot_len;
 		}
 	}
 
-	ret = rohc_compress2(comp, ip_packet, ip_size,
-	                     rohc_packet, MAX_ROHC_SIZE, &rohc_size);
+	status = rohc_compress4(comp, ip_packet, &rohc_packet);
 
 	/* check the compression result against expected one */
-	if(success_expected && ret != ROHC_OK)
+	if(success_expected && status != ROHC_STATUS_OK)
 	{
 		fprintf(stderr, "packet #%d: failed to compress one %zd-byte IP packet\n",
-		        packet_counter, ip_size);
+		        packet_counter, ip_packet.len);
 		goto error;
 	}
-	else if(!success_expected && ret != ROHC_ERROR)
+	else if(!success_expected && status != ROHC_STATUS_ERROR)
 	{
 		fprintf(stderr, "packet #%d: compress successfully one %zd-byte IP packet "
-		        "while it should have failed\n", packet_counter, ip_size);
+		        "while it should have failed\n", packet_counter, ip_packet.len);
 		goto error;
 	}
 
-	/** Check the profile */
-	ret = check_profile(comp, profile_expected);
-	if(ret != 0)
+	/* check the profile */
+	if(!check_profile(comp, profile_expected))
 	{
 		fprintf(stderr, "packet #%d: the profile is not as expected\n",
 				packet_counter);
@@ -528,10 +528,10 @@ static bool callback_ignore(const unsigned char *const ip,
  *
  * @param comp    The ROHC compressor
  * @param profile The expected profile
- * @return        1 in case of failure, 0 otherwise
+ * @return        false in case of failure, true otherwise
  */
-static int check_profile(struct rohc_comp *comp,
-                         unsigned int profile)
+static bool check_profile(struct rohc_comp *comp,
+                          const unsigned int profile)
 {
 	rohc_comp_last_packet_info2_t info;
 
@@ -541,7 +541,7 @@ static int check_profile(struct rohc_comp *comp,
 	if(!rohc_comp_get_last_packet_info2(comp, &info))
 	{
 		fprintf(stderr, "failed to get last packet information\n");
-		return 1;
+		return false;
 	}
 
 	/* check if the profiles match */
@@ -549,25 +549,27 @@ static int check_profile(struct rohc_comp *comp,
 	{
 		fprintf(stderr, "profile %d was used instead of %d\n",
 		        info.profile_id, profile);
-		return 1;
+		return false;
 	}
 
-	return 0;
+	return true;
 }
 
 
 /**
  * @brief Callback to print traces of the ROHC library
  *
- * @param level    The priority level of the trace
- * @param entity   The entity that emitted the trace among:
- *                  \li ROHC_TRACE_COMPRESSOR
- *                  \li ROHC_TRACE_DECOMPRESSOR
- * @param profile  The ID of the ROHC compression/decompression profile
- *                 the trace is related to
- * @param format   The format string of the trace
+ * @param priv_ctxt  An optional private context, may be NULL
+ * @param level      The priority level of the trace
+ * @param entity     The entity that emitted the trace among:
+ *                    \li ROHC_TRACE_COMP
+ *                    \li ROHC_TRACE_DECOMP
+ * @param profile    The ID of the ROHC compression/decompression profile
+ *                   the trace is related to
+ * @param format     The format string of the trace
  */
-static void print_rohc_traces(const rohc_trace_level_t level,
+static void print_rohc_traces(void *const priv_ctxt,
+                              const rohc_trace_level_t level,
                               const rohc_trace_entity_t entity,
                               const int profile,
                               const char *const format,
@@ -581,5 +583,19 @@ static void print_rohc_traces(const rohc_trace_level_t level,
 		vfprintf(stdout, format, args);
 		va_end(args);
 	}
+}
+
+
+/**
+ * @brief Generate a random number
+ *
+ * @param comp          The ROHC compressor
+ * @param user_context  Should always be NULL
+ * @return              A random number
+ */
+static int gen_random_num(const struct rohc_comp *const comp,
+                          void *const user_context)
+{
+	return rand();
 }
 

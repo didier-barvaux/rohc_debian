@@ -1,17 +1,21 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2010,2011,2012,2013,2014 Didier Barvaux
+ * Copyright 2007,2008 Thales Alenia Space
+ * Copyright 2007,2008,2009,2010,2012,2014 Viveris Technologies
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -20,27 +24,19 @@
  *        profiles.
  * @author Didier Barvaux <didier.barvaux@toulouse.viveris.com>
  * @author Didier Barvaux <didier@barvaux.org>
- * @author The hackers from ROHC for Linux
  */
 
-#ifndef C_GENERIC_H
-#define C_GENERIC_H
+#ifndef ROHC_COMP_GENERIC_H
+#define ROHC_COMP_GENERIC_H
 
 #include "rohc_comp_internals.h"
 #include "rohc_packets.h"
-#include "comp_list.h"
+#include "schemes/list.h"
 #include "ip.h"
 #include "crc.h"
 
 #include <stdlib.h>
 
-
-/// The number of compression list items
-#define MAX_ITEM 15
-
-/// The number of compressed list to send to make the reference list
-/// L is the name specified in the RFC
-#define L 5
 
 /**
  * @brief Store information about an IPv4 header between the different
@@ -107,7 +103,7 @@ struct ipv6_header_info
 	/// The previous IPv6 header
 	struct ipv6_hdr old_ip;
 	/// The extension compressor
-	struct list_comp *ext_comp;
+	struct list_comp ext_comp;
 };
 
 
@@ -151,9 +147,6 @@ struct ip_header_info
  */
 struct generic_tmp_vars
 {
-	/// The number of IP headers in the packet to compress (1 or 2 only)
-	int nr_of_ip_hdr;
-
 	/// The number of fields that changed in the outer IP header
 	unsigned short changed_fields;
 	/// The number of fields that changed in the inner IP header
@@ -172,9 +165,6 @@ struct generic_tmp_vars
 
 	/// The type of packet the compressor must send: IR, IR-DYN, UO*
 	rohc_packet_t packet_type;
-
-	/// The maximal size of the compressed packet
-	size_t max_size;
 };
 
 
@@ -202,18 +192,18 @@ struct c_generic_context
 	/// @brief The number of packet sent while in SO state, used for the periodic
 	///        refreshes of the context
 	/// @see periodic_down_transition
-	int go_back_fo_count;
+	size_t go_back_fo_count;
 	/// @brief The number of packet sent while in FO or SO state, used for the
 	///        periodic refreshes of the context
 	/// @see periodic_down_transition
-	int go_back_ir_count;
+	size_t go_back_ir_count;
 
+	/** The number of IP headers */
+	size_t ip_hdr_nr;
 	/// Information about the outer IP header
-	struct ip_header_info ip_flags;
+	struct ip_header_info outer_ip_flags;
 	/// Information about the inner IP header
-	struct ip_header_info ip2_flags;
-	/// Whether the ip2_flags object is initialized or not
-	int is_ip2_initialized;
+	struct ip_header_info inner_ip_flags;
 
 	/// Temporary variables that are used during one single compression of packet
 	struct generic_tmp_vars tmp;
@@ -227,143 +217,90 @@ struct c_generic_context
 	unsigned int next_header_len;
 
 	/** The handler for encoding profile-specific uncompressed header fields */
-	int (*encode_uncomp_fields)(struct c_context *const context,
-	                            const struct ip_packet *const ip,
-	                            const struct ip_packet *const ip2,
-	                            const unsigned char *const next_header);
+	bool (*encode_uncomp_fields)(struct rohc_comp_ctxt *const context,
+	                             const struct net_pkt *const uncomp_pkt)
+		__attribute__((warn_unused_result, nonnull(1, 2)));
 
 	/// @brief The handler used to decide the state that should be used for the
 	///        next packet
-	void (*decide_state)(struct c_context *const context);
+	void (*decide_state)(struct rohc_comp_ctxt *const context);
 	/** @brief The handler used to decide which packet to send in FO state */
-	rohc_packet_t (*decide_FO_packet)(const struct c_context *context);
+	rohc_packet_t (*decide_FO_packet)(const struct rohc_comp_ctxt *context);
 	/** @brief The handler used to decide which packet to send in SO state */
-	rohc_packet_t (*decide_SO_packet)(const struct c_context *context);
+	rohc_packet_t (*decide_SO_packet)(const struct rohc_comp_ctxt *context);
 	/** The handler used to decide which extension to send */
-	rohc_ext_t (*decide_extension)(const struct c_context *context);
+	rohc_ext_t (*decide_extension)(const struct rohc_comp_ctxt *context);
 
 	/// The handler used to initialize some data just before the IR packet build
-	void (*init_at_IR)(const struct c_context *context,
+	void (*init_at_IR)(const struct rohc_comp_ctxt *context,
 	                   const unsigned char *next_header);
 
 	/** Determine the next SN value */
-	uint32_t (*get_next_sn)(const struct c_context *context,
-	                        const struct ip_packet *outer_ip,
-	                        const struct ip_packet *inner_ip);
+	uint32_t (*get_next_sn)(const struct rohc_comp_ctxt *const context,
+	                        const struct net_pkt *const uncomp_pkt)
+		__attribute__((warn_unused_result, nonnull(1, 2)));
 
 	/// @brief The handler used to add the static part of the next header to the
 	///        ROHC packet
-	int (*code_static_part)(const struct c_context *context,
-	                        const unsigned char *next_header,
-	                        unsigned char *const dest,
-	                        int counter);
+	size_t (*code_static_part)(const struct rohc_comp_ctxt *const context,
+	                           const unsigned char *const next_header,
+	                           unsigned char *const dest,
+	                           const size_t counter)
+		__attribute__((warn_unused_result, nonnull(1, 2, 3)));
 
 	/// @brief The handler used to add the dynamic part of the next header to the
 	///        ROHC pachet
-	int (*code_dynamic_part)(const struct c_context *context,
-	                         const unsigned char *next_header,
-	                         unsigned char *const dest,
-	                         int counter);
+	size_t (*code_dynamic_part)(const struct rohc_comp_ctxt *const context,
+	                            const unsigned char *const next_header,
+	                            unsigned char *const dest,
+	                            const size_t counter)
+		__attribute__((warn_unused_result, nonnull(1, 2, 3)));
 
 	/// @brief The handler used to add the IR/IR-DYN remainder header to the
 	///        ROHC pachet
-	int (*code_ir_remainder)(const struct c_context *context,
+	int (*code_ir_remainder)(const struct rohc_comp_ctxt *const context,
 	                         unsigned char *const dest,
-	                         int counter);
+	                         const size_t dest_max_len,
+	                         const size_t counter)
+		__attribute__((warn_unused_result, nonnull(1, 2)));
 
 	/// @brief The handler used to add an additional header in the head of the
 	///        UO-0, UO-1 and UO-2 packets
-	int (*code_UO_packet_head)(const struct c_context *context,
-	                           const unsigned char *next_header,
-	                           unsigned char *const dest,
-	                           int counter,
-	                           int *const first_position);
+	size_t (*code_UO_packet_head)(const struct rohc_comp_ctxt *const context,
+	                              const unsigned char *const next_header,
+	                              unsigned char *const dest,
+	                              const size_t counter,
+	                              size_t *const first_position)
+		__attribute__((warn_unused_result, nonnull(1,2, 3, 5)));
 
 	/// @brief The handler used to add an additional header in the tail of the
 	///        UO-0, UO-1 and UO-2 packets
-	int (*code_uo_remainder)(const struct c_context *context,
-	                         const unsigned char *next_header,
-	                         unsigned char *const dest,
-	                         int counter);
+	size_t (*code_uo_remainder)(const struct rohc_comp_ctxt *const context,
+	                            const unsigned char *const next_header,
+	                            unsigned char *const dest,
+	                            const size_t counter)
+		__attribute__((warn_unused_result, nonnull(1, 2, 3)));
 
 	/// @brief The handler used to compute the CRC-STATIC value
-	unsigned int (*compute_crc_static)(const unsigned char *const ip,
-	                                   const unsigned char *const ip2,
-	                                   const unsigned char *const next_header,
-	                                   const rohc_crc_type_t crc_type,
-	                                   const unsigned int init_val,
-	                                   const unsigned char *const crc_table);
+	uint8_t (*compute_crc_static)(const uint8_t *const ip,
+	                              const uint8_t *const ip2,
+	                              const uint8_t *const next_header,
+	                              const rohc_crc_type_t crc_type,
+	                              const uint8_t init_val,
+	                              const uint8_t *const crc_table)
+		__attribute__((nonnull(1, 3, 6), warn_unused_result));
 
 	/// @brief The handler used to compute the CRC-DYNAMIC value
-	unsigned int (*compute_crc_dynamic)(const unsigned char *const ip,
-	                                    const unsigned char *const ip2,
-	                                    const unsigned char *const next_header,
-	                                    const rohc_crc_type_t crc_type,
-	                                    const unsigned int init_val,
-	                                    const unsigned char *const crc_table);
+	uint8_t (*compute_crc_dynamic)(const uint8_t *const ip,
+	                               const uint8_t *const ip2,
+	                               const uint8_t *const next_header,
+	                               const rohc_crc_type_t crc_type,
+	                               const uint8_t init_val,
+	                               const uint8_t *const crc_table)
+		__attribute__((nonnull(1, 3, 6), warn_unused_result));
 
 	/// Profile-specific data
 	void *specific;
-};
-
-
-/**
- * @brief The list compressor
- */
-struct list_comp
-{
-	/** Whether the extension list is present in IP header or not */
-	bool is_present;
-	/** Whether the extension list changed in the last IP header or not */
-	bool changed;
-
-	/// The reference list
-	struct c_list *ref_list;
-	/// The current list
-	struct c_list *curr_list;
-	/// counter which indicates if ref_list is reference list
-	int counter;
-	/// The compression based table
-	struct rohc_list_item based_table[MAX_ITEM];
-	/// The translation table
-	struct c_translation trans_table[MAX_ITEM];
-
-
-	/* Functions for handling the data to compress */
-
-	/// @brief the handler used to get the extension in the IP packet
-	unsigned char * (*get_extension)(const struct ip_packet *ip,
-	                                 const int index);
-
-	/// @brief the handler used to get the index in based table for the corresponding item
-	int (*get_index_table)(const struct ip_packet *ip, const int index);
-
-	/// @brief the handler used to get the size of an extension
-	unsigned short (*get_size)(const unsigned char *ext);
-
-	/// @brief the handler used to compare two extension of the same type
-	int (*compare)(const struct list_comp *const comp,
-	               const unsigned char *const ext,
-	               const int size,
-	               const int index_table);
-
-	/// @brief the handler used to create the item with the corresponding
-	///        type of the extension
-	void (*create_item)(struct list_comp *const comp,
-	                    const unsigned int index_table,
-	                    const unsigned char *ext_data,
-	                    const size_t ext_size);
-
-	/// @brief the handler used to free the based table element
-	void (*free_table)(struct list_comp *const comp);
-
-
-	/* Traces */
-
-	/** The callback function used to manage traces */
-	rohc_trace_callback_t trace_callback;
-	/** The profile ID the compression list was created for */
-	int profile_id;
 };
 
 
@@ -371,43 +308,47 @@ struct list_comp
  * Function prototypes.
  */
 
-int c_generic_create(struct c_context *const context,
-                     const rohc_lsb_shift_t sn_shift,
-                     const struct ip_packet *ip);
-void c_generic_destroy(struct c_context *const context);
+bool c_generic_create(struct rohc_comp_ctxt *const context,
+                      const rohc_lsb_shift_t sn_shift,
+                      const struct net_pkt *const packet)
+	__attribute__((warn_unused_result, nonnull(1, 3)));
+void c_generic_destroy(struct rohc_comp_ctxt *const context)
+	__attribute__((nonnull(1)));
 
 bool c_generic_check_profile(const struct rohc_comp *const comp,
-                             const struct ip_packet *const outer_ip,
-                             const struct ip_packet *const inner_ip,
-                             const uint8_t protocol,
-                             rohc_ctxt_key_t *const ctxt_key);
+                             const struct net_pkt *const packet)
+		__attribute__((warn_unused_result, nonnull(1, 2)));
 
-void change_mode(struct c_context *const context, const rohc_mode new_mode);
-void change_state(struct c_context *const context, const rohc_c_state new_state);
+void change_state(struct rohc_comp_ctxt *const context,
+                  const rohc_comp_state_t new_state)
+	__attribute__((nonnull(1)));
 
-rohc_ext_t decide_extension(const struct c_context *context);
+rohc_ext_t decide_extension(const struct rohc_comp_ctxt *const context)
+	__attribute__((warn_unused_result, nonnull(1)));
 
-int c_generic_encode(struct c_context *const context,
-                     const struct ip_packet *ip,
-                     const size_t packet_size,
-                     unsigned char *const dest,
-                     const size_t dest_size,
+int c_generic_encode(struct rohc_comp_ctxt *const context,
+                     const struct net_pkt *const uncomp_pkt,
+                     unsigned char *const rohc_pkt,
+                     const size_t rohc_pkt_max_len,
                      rohc_packet_t *const packet_type,
-                     int *const payload_offset);
+                     size_t *const payload_offset)
+	__attribute__((warn_unused_result, nonnull(1, 2, 3, 5, 6)));
 
-bool c_generic_reinit_context(struct c_context *const context);
+bool c_generic_reinit_context(struct rohc_comp_ctxt *const context);
 
-void c_generic_feedback(struct c_context *const context,
-                        const struct c_feedback *feedback);
+bool c_generic_feedback(struct rohc_comp_ctxt *const context,
+                        const struct c_feedback *const feedback)
+	__attribute__((warn_unused_result, nonnull(1, 2)));
 
-bool c_generic_use_udp_port(const struct c_context *const context,
+bool c_generic_use_udp_port(const struct rohc_comp_ctxt *const context,
                             const unsigned int port);
 
-void decide_state(struct c_context *const context);
+void decide_state(struct rohc_comp_ctxt *const context);
 
-void rohc_get_ipid_bits(const struct c_context *context,
+void rohc_get_ipid_bits(const struct rohc_comp_ctxt *const context,
                         size_t *const nr_innermost_bits,
-                        size_t *const nr_outermost_bits);
+                        size_t *const nr_outermost_bits)
+	__attribute__((nonnull(1, 2, 3)));
 
 #endif
 

@@ -1,17 +1,21 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2011,2012,2013 Didier Barvaux
+ * Copyright 2009,2010 Thales Communications
+ * Copyright 2010,2012 Viveris Technologies
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -27,6 +31,9 @@
 #define ROHC_TRACES_INTERNAL_H
 
 #include "rohc_traces.h"
+#include "rohc_buf.h"
+
+#include "config.h" /* for ROHC_ENABLE_DEPRECATED_API */
 
 #include <stdlib.h>
 #include <assert.h>
@@ -34,23 +41,56 @@
 #include "dllexport.h"
 
 
+#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 /** Print information depending on the debug level (internal usage) */
-#define __rohc_print(trace_cb, level, entity, profile, format, ...) \
+#define __rohc_print(trace_cb, trace_cb2, trace_cb_priv, \
+                     level, entity, profile, format, ...) \
 	do { \
-		if(trace_cb != NULL) { \
-			trace_cb(level, entity, profile, "[%s:%d %s()] " format, \
+		if(trace_cb2 != NULL) { \
+			trace_cb2(trace_cb_priv, level, entity, profile, \
+			         "[%s:%d %s()] " format "\n", \
+			         __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__); \
+		} else if(trace_cb != NULL) { \
+			trace_cb(level, entity, profile, \
+			         "[%s:%d %s()] " format "\n", \
 			         __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__); \
 		} \
 	} while(0)
+#else
+/** Print information depending on the debug level (internal usage) */
+#define __rohc_print(trace_cb, trace_cb_priv, \
+                     level, entity, profile, format, ...) \
+	do { \
+		if(trace_cb != NULL) { \
+			trace_cb(trace_cb_priv, level, entity, profile, \
+			         "[%s:%d %s()] " format "\n", \
+			         __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__); \
+		} \
+	} while(0)
+#endif
 
+#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 /** Print information depending on the debug level */
 #define rohc_print(entity_struct, level, entity, profile, format, ...) \
 	do { \
 		assert((entity_struct) != NULL); \
 		__rohc_print((entity_struct)->trace_callback, \
+		             (entity_struct)->trace_callback2, \
+		             (entity_struct)->trace_callback_priv, \
 		             level, entity, profile, \
 		             format, ##__VA_ARGS__); \
 	} while(0)
+#else
+/** Print information depending on the debug level */
+#define rohc_print(entity_struct, level, entity, profile, format, ...) \
+	do { \
+		assert((entity_struct) != NULL); \
+		__rohc_print((entity_struct)->trace_callback2, \
+		             (entity_struct)->trace_callback_priv, \
+		             level, entity, profile, \
+		             format, ##__VA_ARGS__); \
+	} while(0)
+#endif
 
 /** Print debug messages prefixed with the function name */
 #define rohc_debug(entity_struct, entity, profile, format, ...) \
@@ -93,14 +133,28 @@
 	} while(0)
 
 
-void ROHC_EXPORT rohc_dump_packet(const rohc_trace_callback_t trace_cb,
+void ROHC_EXPORT rohc_dump_packet(
+#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
+                                  const rohc_trace_callback_t trace_cb,
+#endif
+                                  const rohc_trace_callback2_t trace_cb2,
+                                  void *const trace_cb_priv,
                                   const rohc_trace_entity_t trace_entity,
                                   const rohc_trace_level_t trace_level,
                                   const char *const descr,
-                                  const unsigned char *const packet,
-                                  const size_t length)
-	__attribute__((nonnull(4, 5)));
+                                  const struct rohc_buf packet);
 
+void ROHC_EXPORT rohc_dump_buf(
+#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
+                               const rohc_trace_callback_t trace_cb,
+#endif
+                               const rohc_trace_callback2_t trace_cb2,
+                               void *const trace_cb_priv,
+                               const rohc_trace_entity_t trace_entity,
+                               const rohc_trace_level_t trace_level,
+                               const char *const descr,
+                               const unsigned char *const packet,
+                               const size_t length);
 
 #endif
 

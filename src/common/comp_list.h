@@ -1,45 +1,44 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2012,2013,2014 Didier Barvaux
+ * Copyright 2008,2010,2012 Viveris Technologies
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
  * @file comp_list.h
  * @brief Define list compression with its function
- * @author Emmanuelle Pechereau <epechereau@toulouse.viveris.com>
  * @author Didier Barvaux <didier@barvaux.org>
  */
 
-#ifndef COMP_LIST_H
-#define COMP_LIST_H
+#ifndef ROHC_COMMON_COMP_LIST_H
+#define ROHC_COMMON_COMP_LIST_H
 
-#include "dllexport.h"
 #include "protocols/ipv6.h"
 #include "protocols/ip_numbers.h"
 
 #include <stdlib.h>
 
+#include "dllexport.h"
 
-/** Print a debug trace for the given compression list */
-#define rc_list_debug(comp_list, format, ...) \
-	rohc_debug(comp_list, ROHC_TRACE_COMP, (comp_list)->profile_id, \
-	           format, ##__VA_ARGS__)
 
-/** Print a debug trace for the given decompression list */
-#define rd_list_debug(decomp_list, format, ...) \
-	rohc_debug(decomp_list, ROHC_TRACE_DECOMP, (decomp_list)->profile_id, \
-	           format, ##__VA_ARGS__)
+/** The maximum number of items in compressed lists */
+#define ROHC_LIST_MAX_ITEM  16U
+#if ROHC_LIST_MAX_ITEM <= 7
+#  error "translation table must be larger enough for indexes stored on 3 bits"
+#endif
 
 
 /// Header version
@@ -53,114 +52,91 @@ typedef enum
 } ext_header_version;
 
 
-/**
- * @brief A list item
- */
-struct rohc_list_item
-{
-	/// item type
-	ext_header_version type;
-	/// size of the data in bytes
-	size_t length;
-	/// item data
-	unsigned char *data;
-};
-
-
-/**
- * @brief Define a generic element in a compression list
- */
-struct list_elt
-{
-	/// element
-	struct rohc_list_item *item;
-	/// index
-	int index_table;
-	/// next element of the list
-	struct list_elt *next_elt;
-	/// previous element
-	struct list_elt *prev_elt;
-};
+/** The largest gen_id value */
+#define ROHC_LIST_GEN_ID_MAX   0xffU
+#define ROHC_LIST_GEN_ID_NONE  (ROHC_LIST_GEN_ID_MAX + 1)
+#define ROHC_LIST_GEN_ID_ANON  (ROHC_LIST_GEN_ID_MAX + 2)
 
 
 /**
  * @brief Define a list for compression
  */
-struct c_list
+struct rohc_list
 {
-	///generation identifier
-	int gen_id;
-	/// first element of the list
-	struct list_elt *first_elt;
+	/** The ID of the compressed list */
+	unsigned int id;
+/** The maximum number of items in a list (required by packet formats) */
+#define ROHC_LIST_ITEMS_MAX  15U
+	/** The items in the list */
+	struct rohc_list_item *items[ROHC_LIST_ITEMS_MAX];
+	/** The number of items in the list */
+	size_t items_nr;
+	/** How many times the list was transmitted? */
+	size_t counter;
 };
 
 
 /**
- * @brief Define a compression translation table element
+ * @brief A list item
  */
-struct c_translation
+struct rohc_list_item
 {
-	/// flag which indicates the mapping between an item with its index
-	/// 1 if the mapping is established, 0 if not
-	int known;
-	/// item
-	struct rohc_list_item *item;
-	/// counter
-	int counter;
-};
+	/** The type of the item */
+	ext_header_version type;
 
+	/** Is the compressor confident that the decompressor knows the item? */
+	bool known;
+	/** How many times the item was transmitted? */
+	size_t counter;
 
 /**
- * @brief Define a decompression translation table element
+ * @brief The maximum length (in bytes) of item data
+ *
+ * Sized for IPv6 extension headers that may reach:
+ *   (0xff + 1) * 8 = 2048 bytes
  */
-struct d_translation
-{
-	/// flag which indicates the mapping between an item with its index
-	/// 1 if the mapping is established, 0 if not
-	int known;
-	/// item
-	struct rohc_list_item *item;
+#define ROHC_LIST_ITEM_DATA_MAX 2048U
+
+	/** The length of the item data (in bytes) */
+	size_t length;
+	/** The item data */
+	uint8_t data[ROHC_LIST_ITEM_DATA_MAX];
 };
+
+
+/** The handler used to compare two items */
+typedef bool (*rohc_list_item_cmp) (const struct rohc_list_item *const item,
+                                    const uint8_t ext_type,
+                                    const uint8_t *const ext_data,
+                                    const size_t ext_len)
+	__attribute__((warn_unused_result, nonnull(1, 3)));
+
 
 
 /**
  * Functions prototypes
  */
 
-/* create, destroy list */
-struct c_list * ROHC_EXPORT list_create(void)
-	__attribute__((warn_unused_result));
-void ROHC_EXPORT list_destroy(struct c_list *list);
+void ROHC_EXPORT rohc_list_reset(struct rohc_list *const list)
+	__attribute__((nonnull(1)));
 
-/* add elements */
-int ROHC_EXPORT list_add_at_beginning(struct c_list *list,
-                          struct rohc_list_item *item,
-                          int index);
-int ROHC_EXPORT list_add_at_end(struct c_list *list,
-                    struct rohc_list_item *item,
-                    int index);
-int ROHC_EXPORT list_add_at_index(struct c_list *list,
-                      struct rohc_list_item *item,
-                      int index,
-                      int index_table);
+bool ROHC_EXPORT rohc_list_equal(const struct rohc_list *const list1,
+                                 const struct rohc_list *const list2)
+	__attribute__((warn_unused_result, nonnull(1, 2)));
 
-/* get an element from its position or the position from the element */
-struct list_elt * ROHC_EXPORT list_get_elt_by_index(struct c_list *list,
-																	 int index);
-int ROHC_EXPORT list_get_index_by_elt(struct c_list *list,
-                                      struct rohc_list_item *item);
+bool ROHC_EXPORT rohc_list_supersede(const struct rohc_list *const large,
+                                     const struct rohc_list *const small)
+	__attribute__((warn_unused_result, nonnull(1, 2)));
 
-/* remove an element or empty the list */
-void ROHC_EXPORT list_remove(struct c_list *list,
-                             struct rohc_list_item *item);
-void ROHC_EXPORT rohc_list_empty(struct c_list *list);
+void ROHC_EXPORT rohc_list_item_reset(struct rohc_list_item *const list_item)
+	__attribute__((nonnull(1)));
 
-/* retrieve information about an element of the list */
-int ROHC_EXPORT list_type_is_present(struct c_list *list,
-                                     struct rohc_list_item *item);
-
-/* get the size of the list */
-size_t ROHC_EXPORT list_get_size(const struct c_list *const list);
+int ROHC_EXPORT rohc_list_item_update_if_changed(rohc_list_item_cmp cmp_item,
+                                                 struct rohc_list_item *const list_item,
+                                                 const uint8_t item_type,
+                                                 const uint8_t *const item_data,
+                                                 const size_t item_len)
+	__attribute__((warn_unused_result, nonnull(2, 4)));
 
 #endif
 

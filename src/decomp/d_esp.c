@@ -1,17 +1,21 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2012,2013,2014 Didier Barvaux
+ * Copyright 2009,2010 Thales Communications
+ * Copyright 2012,2013 Viveris Technologies
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -21,7 +25,6 @@
  * @author Didier Barvaux <didier@barvaux.org>
  */
 
-#include "d_esp.h"
 #include "d_generic.h"
 #include "d_ip.h"
 #include "rohc_traces_internal.h"
@@ -29,8 +32,7 @@
 #include "rohc_utils.h"
 #include "crc.h"
 #include "protocols/esp.h"
-#include "lsb_decode.h"
-#include "rohc_decomp_internals.h"
+#include "schemes/wlsb.h"
 
 #include <stdint.h>
 #ifndef __KERNEL__
@@ -59,31 +61,33 @@ struct d_esp_context
  * Private function prototypes.
  */
 
-static void * d_esp_create(const struct d_context *const context);
+static void * d_esp_create(const struct rohc_decomp_ctxt *const context);
 static void d_esp_destroy(void *const context)
 	__attribute__((nonnull(1)));
 
-static int esp_parse_static_esp(const struct d_context *const context,
+static int esp_parse_static_esp(const struct rohc_decomp_ctxt *const context,
                                 const unsigned char *packet,
-                                unsigned int length,
-                                struct rohc_extr_bits *const bits);
+                                size_t length,
+                                struct rohc_extr_bits *const bits)
+	__attribute__((warn_unused_result, nonnull(1, 2, 4)));
 
-static int esp_parse_dynamic_esp(const struct d_context *const context,
-                                 const unsigned char *packet,
-                                 unsigned int length,
+static int esp_parse_dynamic_esp(const struct rohc_decomp_ctxt *const context,
+                                 const uint8_t *packet,
+                                 const size_t length,
                                  struct rohc_extr_bits *const bits);
 
-static bool esp_decode_values_from_bits(const struct d_context *context,
+static bool esp_decode_values_from_bits(const struct rohc_decomp_ctxt *context,
                                         const struct rohc_extr_bits bits,
                                         struct rohc_decoded_values *const decoded);
 
-static int esp_build_uncomp_esp(const struct d_context *const context,
+static int esp_build_uncomp_esp(const struct rohc_decomp_ctxt *const context,
                                 const struct rohc_decoded_values decoded,
                                 unsigned char *dest,
                                 const unsigned int payload_len);
 
-static void esp_update_context(const struct d_context *context,
-                               const struct rohc_decoded_values decoded);
+static void esp_update_context(const struct rohc_decomp_ctxt *context,
+                               const struct rohc_decoded_values decoded)
+	__attribute__((nonnull(1)));
 
 
 /*
@@ -99,7 +103,7 @@ static void esp_update_context(const struct d_context *context,
  * @param context  The decompression context
  * @return         The newly-created ESP decompression context
  */
-static void * d_esp_create(const struct d_context *const context)
+static void * d_esp_create(const struct rohc_decomp_ctxt *const context)
 {
 	struct d_generic_context *g_context;
 	struct d_esp_context *esp_context;
@@ -110,12 +114,16 @@ static void * d_esp_create(const struct d_context *const context)
 
 	/* create the generic context */
 	g_context = d_generic_create(context,
+#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 	                             context->decompressor->trace_callback,
+#endif
+	                             context->decompressor->trace_callback2,
+	                             context->decompressor->trace_callback_priv,
 	                             context->profile->id);
 	if(g_context == NULL)
 	{
 		rohc_error(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
-		           "failed to create the generic decompression context\n");
+		           "failed to create the generic decompression context");
 		goto quit;
 	}
 	g_context->specific = NULL;
@@ -125,7 +133,7 @@ static void * d_esp_create(const struct d_context *const context)
 	if(esp_context == NULL)
 	{
 		rohc_error(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
-		           "cannot allocate memory for the ESP-specific context\n");
+		           "cannot allocate memory for the ESP-specific context");
 		goto destroy_context;
 	}
 	memset(esp_context, 0, sizeof(struct d_esp_context));
@@ -136,15 +144,15 @@ static void * d_esp_create(const struct d_context *const context)
 	if(g_context->sn_lsb_ctxt == NULL)
 	{
 		rohc_error(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
-		           "failed to create the LSB decoding context for SN\n");
+		           "failed to create the LSB decoding context for SN");
 		goto free_esp_context;
 	}
 
 	/* some ESP-specific values and functions */
 	g_context->next_header_len = sizeof(struct esphdr);
-	g_context->detect_packet_type = ip_detect_packet_type;
 	g_context->parse_static_next_hdr = esp_parse_static_esp;
 	g_context->parse_dyn_next_hdr = esp_parse_dynamic_esp;
+	g_context->parse_ext3 = ip_parse_ext3;
 	g_context->parse_uo_remainder = NULL;
 	g_context->decode_values_from_bits = esp_decode_values_from_bits;
 	g_context->build_next_header = esp_build_uncomp_esp;
@@ -154,25 +162,23 @@ static void * d_esp_create(const struct d_context *const context)
 
 	/* create the ESP-specific part of the header changes */
 	g_context->outer_ip_changes->next_header_len = sizeof(struct esphdr);
-	g_context->outer_ip_changes->next_header =
-		(unsigned char *) malloc(sizeof(struct esphdr));
+	g_context->outer_ip_changes->next_header = malloc(sizeof(struct esphdr));
 	if(g_context->outer_ip_changes->next_header == NULL)
 	{
 		rohc_error(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
 		           "cannot allocate memory for the ESP-specific part of the "
-		           "outer IP header changes\n");
+		           "outer IP header changes");
 		goto free_lsb_sn;
 	}
 	memset(g_context->outer_ip_changes->next_header, 0, sizeof(struct esphdr));
 
 	g_context->inner_ip_changes->next_header_len = sizeof(struct esphdr);
-	g_context->inner_ip_changes->next_header =
-		(unsigned char *) malloc(sizeof(struct esphdr));
+	g_context->inner_ip_changes->next_header = malloc(sizeof(struct esphdr));
 	if(g_context->inner_ip_changes->next_header == NULL)
 	{
 		rohc_error(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
 		           "cannot allocate memory for the ESP-specific part of the "
-		           "inner IP header changes\n");
+		           "inner IP header changes");
 		goto free_outer_ip_changes_next_header;
 	}
 	memset(g_context->inner_ip_changes->next_header, 0, sizeof(struct esphdr));
@@ -236,15 +242,15 @@ static void d_esp_destroy(void *const context)
  * @return        The number of bytes read in the ROHC packet,
  *                -1 in case of failure
  */
-static int esp_parse_static_esp(const struct d_context *const context,
+static int esp_parse_static_esp(const struct rohc_decomp_ctxt *const context,
                                 const unsigned char *packet,
-                                unsigned int length,
+                                size_t length,
                                 struct rohc_extr_bits *const bits)
 {
 	const size_t spi_length = sizeof(uint32_t);
 	struct d_generic_context *g_context;
 	struct d_esp_context *esp_context;
-	int read = 0; /* number of bytes read from the packet */
+	size_t read = 0; /* number of bytes read from the packet */
 
 	assert(context != NULL);
 	assert(context->specific != NULL);
@@ -257,17 +263,17 @@ static int esp_parse_static_esp(const struct d_context *const context,
 	/* check the minimal length to parse the ESP static part */
 	if(length < spi_length)
 	{
-		rohc_warning(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
-		             "ROHC packet too small (len = %d)\n", length);
+		rohc_decomp_warn(context, "ROHC packet too small (len = %zu)", length);
 		goto error;
 	}
 
 	/* SPI */
 	memcpy(&bits->esp_spi, packet, spi_length);
 	bits->esp_spi_nr = spi_length * 8;
-	rohc_decomp_debug(context, "ESP SPI = 0x%08x\n",
-	                  rohc_ntoh32(bits->esp_spi));
+	rohc_decomp_debug(context, "ESP SPI = 0x%08x", rohc_ntoh32(bits->esp_spi));
+#ifndef __clang_analyzer__ /* silent warning about dead in/decrement */
 	packet += spi_length;
+#endif
 	read += spi_length;
 
 	/* is context re-used? */
@@ -275,7 +281,7 @@ static int esp_parse_static_esp(const struct d_context *const context,
 	   memcmp(&bits->esp_spi, &esp_context->spi, spi_length) != 0)
 	{
 		rohc_decomp_debug(context, "ESP SPI mismatch (packet = 0x%08x, "
-		                  "context = 0x%08x) -> context is being reused\n",
+		                  "context = 0x%08x) -> context is being reused",
 		                  bits->esp_spi, esp_context->spi);
 		bits->is_context_reused = true;
 	}
@@ -298,9 +304,9 @@ error:
  * @return         The number of bytes read in the ROHC packet,
  *                 -1 in case of failure
  */
-static int esp_parse_dynamic_esp(const struct d_context *const context,
-                                 const unsigned char *packet,
-                                 unsigned int length,
+static int esp_parse_dynamic_esp(const struct rohc_decomp_ctxt *const context,
+                                 const uint8_t *packet,
+                                 const size_t length,
                                  struct rohc_extr_bits *const bits)
 {
 	const size_t sn_length = sizeof(uint32_t);
@@ -314,18 +320,20 @@ static int esp_parse_dynamic_esp(const struct d_context *const context,
 	/* check the minimal length to parse the ESP dynamic part */
 	if(length < sn_length)
 	{
-		rohc_warning(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
-		             "ROHC packet too small (len = %d)\n", length);
+		rohc_decomp_warn(context, "ROHC packet too small (len = %zu)", length);
 		goto error;
 	}
 
 	/* retrieve the ESP sequence number from the ROHC packet */
 	memcpy(&sn, packet, sn_length);
+#ifndef __clang_analyzer__ /* silent warning about dead in/decrement */
 	packet += sn_length;
+#endif
 	read += sn_length;
 	bits->sn = rohc_ntoh32(sn);
 	bits->sn_nr = sn_length * 8;
-	rohc_decomp_debug(context, "ESP SN = 0x%08x\n", bits->sn);
+	bits->is_sn_enc = false;
+	rohc_decomp_debug(context, "ESP SN = 0x%08x", bits->sn);
 
 	return read;
 
@@ -345,7 +353,7 @@ error:
  * @param decoded  OUT: The corresponding decoded values
  * @return         true if decoding is successful, false otherwise
  */
-static bool esp_decode_values_from_bits(const struct d_context *context,
+static bool esp_decode_values_from_bits(const struct rohc_decomp_ctxt *context,
                                         const struct rohc_extr_bits bits,
                                         struct rohc_decoded_values *const decoded)
 {
@@ -372,7 +380,7 @@ static bool esp_decode_values_from_bits(const struct d_context *context,
 		/* keep context value */
 		memcpy(&decoded->esp_spi, &esp->spi, spi_length);
 	}
-	rohc_decomp_debug(context, "decoded SPI = 0x%08x\n",
+	rohc_decomp_debug(context, "decoded SPI = 0x%08x",
 	                  rohc_ntoh32(decoded->esp_spi));
 
 	return true;
@@ -390,21 +398,21 @@ static bool esp_decode_values_from_bits(const struct d_context *context,
  * @return             The length of the next header (ie. the ESP header),
  *                     -1 in case of error
  */
-static int esp_build_uncomp_esp(const struct d_context *const context,
+static int esp_build_uncomp_esp(const struct rohc_decomp_ctxt *const context,
                                 const struct rohc_decoded_values decoded,
                                 unsigned char *dest,
-                                const unsigned int payload_len)
+                                const unsigned int payload_len __attribute__((unused)))
 {
 	const size_t spi_length = sizeof(uint32_t);
 	struct esphdr *const esp = (struct esphdr *) dest;
 
 	/* static SPI field */
 	memcpy(&esp->spi, &decoded.esp_spi, spi_length);
-	rohc_decomp_debug(context, "SPI = 0x%08x\n", rohc_ntoh32(esp->spi));
+	rohc_decomp_debug(context, "SPI = 0x%08x", rohc_ntoh32(esp->spi));
 
 	/* dynamic SN field */
 	esp->sn = rohc_hton32(decoded.sn);
-	rohc_decomp_debug(context, "SN = 0x%08x\n", rohc_ntoh32(esp->sn));
+	rohc_decomp_debug(context, "SN = 0x%08x", rohc_ntoh32(esp->sn));
 
 	return sizeof(struct esphdr);
 }
@@ -419,7 +427,7 @@ static int esp_build_uncomp_esp(const struct d_context *const context,
  * @param context  The decompression context
  * @param decoded  The decoded values to update in the context
  */
-static void esp_update_context(const struct d_context *context,
+static void esp_update_context(const struct rohc_decomp_ctxt *context,
                                const struct rohc_decoded_values decoded)
 {
 	struct d_generic_context *g_context;
@@ -438,13 +446,13 @@ static void esp_update_context(const struct d_context *context,
  * @brief Define the decompression part of the ESP profile as described
  *        in the RFC 3095.
  */
-struct d_profile d_esp_profile =
+const struct rohc_decomp_profile d_esp_profile =
 {
-	ROHC_PROFILE_ESP,       /* profile ID (see 8 in RFC 3095) */
-	"ESP / Decompressor",   /* profile description */
-	d_generic_decode,       /* profile handlers */
-	d_esp_create,
-	d_esp_destroy,
-	d_generic_get_sn,
+	.id              = ROHC_PROFILE_ESP, /* profile ID (RFC 3095, §8) */
+	.new_context     = d_esp_create,
+	.free_context    = d_esp_destroy,
+	.decode          = d_generic_decode,
+	.detect_pkt_type = ip_detect_packet_type,
+	.get_sn          = d_generic_get_sn,
 };
 

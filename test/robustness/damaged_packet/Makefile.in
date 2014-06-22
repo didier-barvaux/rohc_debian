@@ -386,6 +386,8 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CMOCKA_CFLAGS = @CMOCKA_CFLAGS@
+CMOCKA_LIBS = @CMOCKA_LIBS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CYGPATH_W = @CYGPATH_W@
@@ -432,6 +434,9 @@ PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 RANLIB = @RANLIB@
 ROHC_API_AGE = @ROHC_API_AGE@
 ROHC_API_CURRENT = @ROHC_API_CURRENT@
@@ -479,8 +484,10 @@ includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
 is_dot_found = @is_dot_found@
+is_doxy2man_found = @is_doxy2man_found@
 is_doxygen_found = @is_doxygen_found@
 is_gnuplot_found = @is_gnuplot_found@
+is_help2man_found = @is_help2man_found@
 is_latex_found = @is_latex_found@
 is_qemu_found = @is_qemu_found@
 is_sort_found = @is_sort_found@
@@ -505,7 +512,6 @@ prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
 sbindir = @sbindir@
-sched_lib = @sched_lib@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
@@ -522,10 +528,13 @@ TESTS = \
 	test_damaged_packet_8_uo1id.sh \
 	test_damaged_packet_8_uor2ts_without-ext3.sh \
 	test_damaged_packet_8_uor2ts_with-ext3-and-ts-stride.sh \
-	test_damaged_packet_8_uor2_with-ext3-but-not-ts-stride.sh
+	test_damaged_packet_8_uor2_with-ext3-but-not-ts-stride.sh \
+	test_damaged_packet_273_uo0_repair.sh
 
 test_damaged_packet_CFLAGS = \
-	$(configure_cflags)
+	$(configure_cflags) \
+	-Wno-unused-parameter \
+	-Wno-sign-compare
 
 test_damaged_packet_CPPFLAGS = \
 	-I$(top_srcdir)/test \
@@ -552,6 +561,8 @@ test_damaged_packet_LDADD = \
 
 EXTRA_DIST = \
 	test_damaged_packet.sh \
+	test_damaged_packet_repair.sh \
+	test_damaged_packet_norepair.sh \
 	$(TESTS) \
 	inputs
 
@@ -904,6 +915,13 @@ test_damaged_packet_8_uor2ts_with-ext3-and-ts-stride.sh.log: test_damaged_packet
 test_damaged_packet_8_uor2_with-ext3-but-not-ts-stride.sh.log: test_damaged_packet_8_uor2_with-ext3-but-not-ts-stride.sh
 	@p='test_damaged_packet_8_uor2_with-ext3-but-not-ts-stride.sh'; \
 	b='test_damaged_packet_8_uor2_with-ext3-but-not-ts-stride.sh'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_damaged_packet_273_uo0_repair.sh.log: test_damaged_packet_273_uo0_repair.sh
+	@p='test_damaged_packet_273_uo0_repair.sh'; \
+	b='test_damaged_packet_273_uo0_repair.sh'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

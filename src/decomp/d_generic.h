@@ -1,17 +1,21 @@
 /*
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Copyright 2010,2011,2012,2013,2014 Didier Barvaux
+ * Copyright 2007,2008 Thales Alenia Space
+ * Copyright 2007,2008,2009,2010,2012,2013 Viveris Technologies
  *
- * This program is distributed in the hope that it will be useful,
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
 /**
@@ -20,19 +24,19 @@
  *        profiles.
  * @author Didier Barvaux <didier.barvaux@toulouse.viveris.com>
  * @author Didier Barvaux <didier@barvaux.org>
- * @author The hackers from ROHC for Linux
  * @author David Moreau from TAS
  */
 
-#ifndef D_GENERIC_H
-#define D_GENERIC_H
+#ifndef ROHC_DECOMP_GENERIC_H
+#define ROHC_DECOMP_GENERIC_H
 
 #include "rohc_decomp.h"
 #include "rohc_decomp_internals.h"
 #include "rohc_packets.h"
 #include "comp_list.h"
-#include "lsb_decode.h"
-#include "ip_id_offset_decode.h"
+#include "schemes/wlsb.h"
+#include "schemes/ip_id_offset.h"
+#include "schemes/list.h"
 #include "ip.h"
 #include "crc.h"
 
@@ -42,16 +46,6 @@
 #else
 #	include <stdbool.h>
 #endif
-
-
-#define MAX_ITEM 15
-#if MAX_ITEM <= 7
-	#error "translation table must be larger enough for indexes stored on 3 bits"
-#endif
-
-#define LIST_COMP_WINDOW 100
-
-#define L 5
 
 
 /** The outer or inner IP bits extracted from ROHC headers */
@@ -68,6 +62,7 @@ struct rohc_extr_ip_bits
 	                      header, in UO* base header, in extension header and
 	                      in remainder of UO* header */
 	size_t id_nr;    /**< The number of IP-ID bits found */
+	bool is_id_enc;  /**< Whether value(IP-ID) is encoded or not */
 
 	uint8_t df:1;    /**< The DF bits found in dynamic chain of IR/IR-DYN
 	                      header or in extension header */
@@ -119,8 +114,13 @@ struct rohc_extr_bits
 	bool is_context_reused; /**< Whether the context is re-used or not */
 
 	/* SN */
-	uint32_t sn;            /**< The SN bits found in ROHC header */
-	size_t sn_nr;           /**< The number of SN bits found in ROHC header */
+	uint32_t sn;         /**< The SN bits found in ROHC header */
+	size_t sn_nr;        /**< The number of SN bits found in ROHC header */
+	bool is_sn_enc;      /**< Whether value(SN) is encoded with W-LSB or not */
+	rohc_lsb_ref_t sn_ref_type; /**< The SN reference to use for LSB decoding
+	                                 (used for context repair after CRC failure) */
+	bool sn_ref_offset;         /**< Optional offset to add to the reference SN
+	                                 (used for context repair after CRC failure) */
 
 	/** bits related to outer IP header */
 	struct rohc_extr_ip_bits outer_ip;
@@ -129,11 +129,16 @@ struct rohc_extr_bits
 	struct rohc_extr_ip_bits inner_ip;
 
 	/* CRC */
-	uint8_t crc;            /**< The CRC bits found in ROHC header */
-	size_t crc_nr;          /**< The number of CRC bits found in ROHC header */
+	rohc_crc_type_t crc_type; /**< The type of CRC that protect the ROHC header */
+	uint8_t crc;              /**< The CRC bits found in ROHC header */
+	size_t crc_nr;            /**< The number of CRC bits found in ROHC header */
 
 	/* X (extension) flag */
 	uint8_t ext_flag:1;     /**< X (extension) flag */
+
+	/* Mode bits */
+	uint8_t mode:2;         /**< The Mode bits found in ROHC header */
+	size_t mode_nr;         /**< The number of Mode bits found in ROHC header */
 
 
 	/* bits below are for UDP-based profiles only
@@ -304,10 +309,22 @@ struct d_generic_changes
 	int sid;
 
 	/// The next header located after the IP header(s)
-	unsigned char *next_header;
+	void *next_header;
 	/// The length of the next header
 	unsigned int next_header_len;
 };
+
+
+/**
+ * @brief The different correction algorithms available in case of CRC failure
+ */
+typedef enum
+{
+	ROHC_DECOMP_CRC_CORR_SN_NONE    = 0, /**< No correction */
+	ROHC_DECOMP_CRC_CORR_SN_WRAP    = 1, /**< Correction of SN wraparound */
+	ROHC_DECOMP_CRC_CORR_SN_UPDATES = 2, /**< Correction of incorrect SN updates */
+
+} rohc_decomp_crc_corr_t;
 
 
 /**
@@ -332,15 +349,12 @@ struct d_generic_context
 	struct ip_id_offset_decode *inner_ip_id_offset_ctxt;
 
 	/// The list decompressor of the outer IP header
-	struct list_decomp *list_decomp1;
+	struct list_decomp list_decomp1;
 	/// The list decompressor of the inner IP header
-	struct list_decomp *list_decomp2;
+	struct list_decomp list_decomp2;
 
 	/// Whether the decompressed packet contains a 2nd IP header
 	int multiple_ip;
-
-	/// The type of packet the decompressor may receive: IR, IR-DYN, UO*
-	rohc_packet_t packet_type;
 
 	/* below are some information and handlers to manage the next header
 	 * (if any) located just after the IP headers (1 or 2 IP headers) */
@@ -351,122 +365,99 @@ struct d_generic_context
 	/// The length of the next header
 	unsigned int next_header_len;
 
-	/** The handler used to detect the packet type */
-	rohc_packet_t (*detect_packet_type)(struct rohc_decomp *decomp,
-	                                    struct d_context *context,
-	                                    const unsigned char *packet,
-	                                    const size_t rohc_length,
-	                                    const size_t large_cid_len);
-
 	/// @brief The handler used to parse the static part of the next header
 	///        in the ROHC packet
-	int (*parse_static_next_hdr)(const struct d_context *const context,
+	int (*parse_static_next_hdr)(const struct rohc_decomp_ctxt *const context,
 	                             const unsigned char *packet,
-	                             unsigned int length,
+	                             size_t length,
 	                             struct rohc_extr_bits *const bits);
 
 	/// @brief The handler used to parse the dynamic part of the next header
 	///        in the ROHC packet
-	int (*parse_dyn_next_hdr)(const struct d_context *const context,
-	                          const unsigned char *packet,
-	                          unsigned int length,
+	int (*parse_dyn_next_hdr)(const struct rohc_decomp_ctxt *const context,
+	                          const uint8_t *packet,
+	                          const size_t length,
 	                          struct rohc_extr_bits *const bits);
 
+	/**
+	 * @brief The handler used to parse the extension 3 of the UO* ROHC packet
+	 *
+	 * @param context           The decompression context
+	 * @param rohc_data         The ROHC data to parse
+	 * @param rohc_data_len     The length of the ROHC data to parse
+	 * @param packet_type       The type of ROHC packet to parse
+	 * @param bits              IN: the bits already found in base header
+	 *                          OUT: the bits found in the extension header 3
+	 * @return                  The data length read from the ROHC packet,
+	 *                          -2 in case packet must be reparsed,
+	 *                          -1 in case of error
+	 */
+	int (*parse_ext3)(const struct rohc_decomp_ctxt *const context,
+	                  const unsigned char *const rohc_data,
+	                  const size_t rohc_data_len,
+	                  const rohc_packet_t packet_type,
+	                  struct rohc_extr_bits *const bits)
+		__attribute__((warn_unused_result, nonnull(1, 2, 5)));
+
 	/// The handler used to parse the tail of the UO* ROHC packet
-	int (*parse_uo_remainder)(const struct d_context *const context,
+	int (*parse_uo_remainder)(const struct rohc_decomp_ctxt *const context,
 	                          const unsigned char *packet,
 	                          unsigned int length,
 	                          struct rohc_extr_bits *const bits);
 
 	/** The handler used to decode extracted for next header */
-	bool (*decode_values_from_bits)(const struct d_context *context,
+	bool (*decode_values_from_bits)(const struct rohc_decomp_ctxt *context,
 	                                const struct rohc_extr_bits bits,
 	                                struct rohc_decoded_values *const decoded);
 
 	/** The handler used to build the uncompressed next header */
-	int (*build_next_header)(const struct d_context *const context,
+	int (*build_next_header)(const struct rohc_decomp_ctxt *const context,
 	                         const struct rohc_decoded_values decoded,
 	                         unsigned char *dest,
 	                         const unsigned int payload_len);
 
 	/// @brief The handler used to compute the CRC-STATIC value
-	unsigned int (*compute_crc_static)(const unsigned char *const ip,
-	                                   const unsigned char *const ip2,
-	                                   const unsigned char *const next_header,
-	                                   const rohc_crc_type_t crc_type,
-	                                   const unsigned int init_val,
-	                                   const unsigned char *const crc_table);
+	uint8_t (*compute_crc_static)(const uint8_t *const ip,
+	                              const uint8_t *const ip2,
+	                              const uint8_t *const next_header,
+	                              const rohc_crc_type_t crc_type,
+	                              const uint8_t init_val,
+	                              const uint8_t *const crc_table);
 
 	/// @brief The handler used to compute the CRC-DYNAMIC value
-	unsigned int (*compute_crc_dynamic)(const unsigned char *const ip,
-	                                    const unsigned char *const ip2,
-	                                    const unsigned char *const next_header,
-	                                    const rohc_crc_type_t crc_type,
-	                                    const unsigned int init_val,
-	                                    const unsigned char *const crc_table);
+	uint8_t (*compute_crc_dynamic)(const uint8_t *const ip,
+	                               const uint8_t *const ip2,
+	                               const uint8_t *const next_header,
+	                               const rohc_crc_type_t crc_type,
+	                               const uint8_t init_val,
+	                               const uint8_t *const crc_table);
 
 	/** The handler used to update context with decoded next header fields */
-	void (*update_context)(const struct d_context *context,
+	void (*update_context)(const struct rohc_decomp_ctxt *context,
 	                       const struct rohc_decoded_values decoded);
 
 	/// Profile-specific data
 	void *specific;
 
-	/// Correction counter (see e and f in 5.3.2.2.4 of the RFC 3095)
-	unsigned int correction_counter;
-};
 
+	/*
+	 * for correction upon CRC failure
+	 */
 
-/**
- * @brief The list decompressor
- */
-struct list_decomp
-{
-	/// The reference list
-	struct c_list *ref_list;
-	/// The table of lists
-	struct c_list *list_table[LIST_COMP_WINDOW];
-	/// The compression based table
-	struct rohc_list_item based_table[MAX_ITEM];
-	/// The translation table
-	struct d_translation trans_table[MAX_ITEM];
-	/// counter in list table
-	int counter_list;
-	/// counter which indicates if the list is reference list
-	int counter;
-	/// boolean which indicates if there is a list to decompress
-	bool is_present;
-	/// boolean which indicates if the ref list must be decompressed
-	int ref_ok;
-
-
-	/* Functions for handling the data to decompress */
-
-	/// The handler used to free the based table
-	void (*free_table)(struct list_decomp *decomp);
-	/// The handler used to add the extension to IP packet
-	int (*encode_extension)(struct list_decomp *const decomp,
-	                        const uint8_t ip_nh_type,
-	                        unsigned char *dest);
-	/// The handler used to check if the index
-	/// corresponds to an existing item
-	int (*check_index)(struct list_decomp *decomp, int index);
-	/// The handler used to create the item at
-	/// the corresponding index of the based table
-	bool (*create_item)(const unsigned char *data,
-	                    int length,
-	                    int index,
-	                    struct list_decomp *decomp);
-	/// The handler used to get the size of an extension
-	int (*get_ext_size)(const unsigned char *data, const size_t data_len);
-
-
-	/* Traces */
-
-	/** The callback function used to manage traces */
-	rohc_trace_callback_t trace_callback;
-	/** The profile ID the decompression list was created for */
-	int profile_id;
+	/** The algorithm being used for correction CRC failure */
+	rohc_decomp_crc_corr_t crc_corr;
+	/** Correction counter (see e and f in 5.3.2.2.4 of the RFC 3095) */
+	size_t correction_counter;
+/** The number of last packets to record arrival times for */
+#define ROHC_MAX_ARRIVAL_TIMES  10U
+	/** The arrival times for the last packets */
+	struct rohc_ts arrival_times[ROHC_MAX_ARRIVAL_TIMES];
+	/** The number of arrival times in arrival_times */
+	size_t arrival_times_nr;
+	/** The index for the arrival time of the next packet */
+	size_t arrival_times_index;
+	/** The arrival time of the current packet */
+	struct rohc_ts cur_arrival_time;
 };
 
 
@@ -474,23 +465,81 @@ struct list_decomp
  * Public function prototypes.
  */
 
-void * d_generic_create(const struct d_context *const context,
-                        rohc_trace_callback_t trace_callback,
+void * d_generic_create(const struct rohc_decomp_ctxt *const context,
+#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
+                        rohc_trace_callback_t trace_cb,
+#endif
+                        rohc_trace_callback2_t trace_cb2,
+                        void *const trace_cb_priv,
                         const int profile_id)
-	__attribute__((nonnull(1, 2), warn_unused_result));
+	__attribute__((nonnull(1), warn_unused_result));
 
 void d_generic_destroy(void *const context)
 	__attribute__((nonnull(1)));
 
-int d_generic_decode(struct rohc_decomp *decomp,
-                     struct d_context *context,
-                     const unsigned char *const rohc_packet,
-                     const unsigned int rohc_length,
-                     const size_t add_cid_len,
-                     const size_t large_cid_len,
-                     unsigned char *dest);
+rohc_status_t d_generic_decode(struct rohc_decomp *const decomp,
+                               struct rohc_decomp_ctxt *const context,
+                               const struct rohc_buf rohc_packet,
+                               const size_t add_cid_len,
+                               const size_t large_cid_len,
+                               struct rohc_buf *const uncomp_packet,
+                               rohc_packet_t *const packet_type)
+	__attribute__((warn_unused_result, nonnull(1, 2, 6, 7)));
 
-int d_generic_get_sn(struct d_context *context);
+uint32_t d_generic_get_sn(const struct rohc_decomp_ctxt *const context);
+
+
+
+/*
+ * Helper functions
+ */
+
+
+static inline bool is_ipv4_pkt(const struct rohc_extr_ip_bits bits)
+	__attribute__((warn_unused_result, const));
+
+static inline bool is_ipv4_rnd_pkt(const struct rohc_extr_ip_bits bits)
+	__attribute__((warn_unused_result, const));
+
+static inline bool is_ipv4_non_rnd_pkt(const struct rohc_extr_ip_bits bits)
+	__attribute__((warn_unused_result, const));
+
+
+/**
+ * @brief Is the given IP header IPV4 wrt packet?
+ *
+ * @param bits  The bits extracted from packet
+ * @return      true if IPv4, false if IPv6
+ */
+static inline bool is_ipv4_pkt(const struct rohc_extr_ip_bits bits)
+{
+	return (bits.version == IPV4);
+}
+
+
+/**
+ * @brief Is the given IP header IPv4 and its IP-ID random wrt packet?
+ *
+ * @param bits  The bits extracted from packet
+ * @return      true if IPv4 and random, false otherwise
+ */
+static inline bool is_ipv4_rnd_pkt(const struct rohc_extr_ip_bits bits)
+{
+	return (is_ipv4_pkt(bits) && bits.rnd == 1);
+}
+
+
+/**
+ * @brief Is the given IP header IPv4 and its IP-ID non-random wrt packet?
+ *
+ * @param bits  The bits extracted from packet
+ * @return      true if IPv4 and non-random, false otherwise
+ */
+static inline bool is_ipv4_non_rnd_pkt(const struct rohc_extr_ip_bits bits)
+{
+	return (is_ipv4_pkt(bits) && bits.rnd == 0);
+}
+
 
 #endif
 

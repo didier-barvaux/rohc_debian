@@ -86,14 +86,16 @@ build_triplet = @build@
 host_triplet = @host@
 subdir = doc
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
-	$(srcdir)/doxygen.conf.in
+	$(srcdir)/doxygen.conf.in $(srcdir)/rohc.7.in \
+	$(srcdir)/rohc_protocol.7.in $(srcdir)/rohc_library.7.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
-CONFIG_CLEAN_FILES = doxygen.conf
+CONFIG_CLEAN_FILES = doxygen.conf rohc.7 rohc_protocol.7 \
+	rohc_library.7
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -141,7 +143,12 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(htmldir)"
+man3dir = $(mandir)/man3
+am__installdirs = "$(DESTDIR)$(man3dir)" "$(DESTDIR)$(man7dir)" \
+	"$(DESTDIR)$(htmldir)"
+man7dir = $(mandir)/man7
+NROFF = nroff
+MANS = $(man_MANS)
 DATA = $(html_DATA)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -157,6 +164,8 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CMOCKA_CFLAGS = @CMOCKA_CFLAGS@
+CMOCKA_LIBS = @CMOCKA_LIBS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CYGPATH_W = @CYGPATH_W@
@@ -203,6 +212,9 @@ PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+PKG_CONFIG = @PKG_CONFIG@
+PKG_CONFIG_LIBDIR = @PKG_CONFIG_LIBDIR@
+PKG_CONFIG_PATH = @PKG_CONFIG_PATH@
 RANLIB = @RANLIB@
 ROHC_API_AGE = @ROHC_API_AGE@
 ROHC_API_CURRENT = @ROHC_API_CURRENT@
@@ -250,8 +262,10 @@ includedir = @includedir@
 infodir = @infodir@
 install_sh = @install_sh@
 is_dot_found = @is_dot_found@
+is_doxy2man_found = @is_doxy2man_found@
 is_doxygen_found = @is_doxygen_found@
 is_gnuplot_found = @is_gnuplot_found@
+is_help2man_found = @is_help2man_found@
 is_latex_found = @is_latex_found@
 is_qemu_found = @is_qemu_found@
 is_sort_found = @is_sort_found@
@@ -276,7 +290,6 @@ prefix = @prefix@
 program_transform_name = @program_transform_name@
 psdir = @psdir@
 sbindir = @sbindir@
-sched_lib = @sched_lib@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
 sysconfdir = @sysconfdir@
@@ -289,6 +302,147 @@ html_DATA = \
 	html/*.map \
 	html/*.css \
 	html/*.png
+
+rohc_common_man = \
+	man/man3/rohc.h.3
+
+rohc_common_mans = \
+	man/man3/rohc_version.3 \
+	man/man3/rohc_get_mode_descr.3 \
+	man/man3/rohc_get_profile_descr.3 \
+	man/man3/rohc_get_packet_descr.3 \
+	man/man3/rohc_get_ext_descr.3
+
+rohc_comp_man = \
+	man/man3/rohc_comp.h.3
+
+rohc_comp_mans = \
+	man/man3/rohc_comp_new.3 \
+	man/man3/rohc_comp_free.3 \
+	man/man3/rohc_compress3.3 \
+	man/man3/rohc_comp_get_segment.3 \
+	man/man3/rohc_comp_profile_enabled.3 \
+	man/man3/rohc_comp_enable_profile.3 \
+	man/man3/rohc_comp_enable_profiles.3 \
+	man/man3/rohc_comp_disable_profile.3 \
+	man/man3/rohc_comp_disable_profiles.3 \
+	man/man3/rohc_comp_set_random_cb.3 \
+	man/man3/rohc_comp_set_traces_cb.3 \
+	man/man3/rohc_comp_set_rtp_detection_cb.3 \
+	man/man3/rohc_comp_add_rtp_port.3 \
+	man/man3/rohc_comp_remove_rtp_port.3 \
+	man/man3/rohc_comp_reset_rtp_ports.3 \
+	man/man3/rohc_comp_force_contexts_reinit.3 \
+	man/man3/rohc_comp_get_cid_type.3 \
+	man/man3/rohc_comp_get_max_cid.3 \
+	man/man3/rohc_comp_set_periodic_refreshes.3 \
+	man/man3/rohc_comp_set_wlsb_window_width.3 \
+	man/man3/rohc_comp_get_mrru.3 \
+	man/man3/rohc_comp_set_mrru.3 \
+	man/man3/rohc_comp_get_state_descr.3 \
+	man/man3/rohc_comp_get_general_info.3 \
+	man/man3/rohc_comp_get_last_packet_info2.3 \
+	man/man3/rohc_feedback_avail_bytes.3 \
+	man/man3/rohc_feedback_flush.3 \
+	man/man3/rohc_feedback_remove_locked.3 \
+	man/man3/rohc_feedback_unlock.3
+
+rohc_decomp_man = \
+	man/man3/rohc_decomp.h.3
+
+rohc_decomp_mans = \
+	man/man3/rohc_decomp_new.3 \
+	man/man3/rohc_decomp_free.3 \
+	man/man3/rohc_decompress2.3 \
+	man/man3/rohc_decomp_profile_enabled.3 \
+	man/man3/rohc_decomp_enable_profile.3 \
+	man/man3/rohc_decomp_enable_profiles.3 \
+	man/man3/rohc_decomp_disable_profile.3 \
+	man/man3/rohc_decomp_disable_profiles.3 \
+	man/man3/rohc_decomp_set_features.3 \
+	man/man3/rohc_decomp_set_traces_cb.3 \
+	man/man3/rohc_decomp_get_cid_type.3 \
+	man/man3/rohc_decomp_get_max_cid.3 \
+	man/man3/rohc_decomp_set_mrru.3 \
+	man/man3/rohc_decomp_get_mrru.3 \
+	man/man3/rohc_decomp_get_state_descr.3 \
+	man/man3/rohc_decomp_get_general_info.3 \
+	man/man3/rohc_decomp_get_last_packet_info.3
+
+@BUILD_DOC_MAN_FALSE@man_MANS = 
+@BUILD_DOC_MAN_TRUE@man_MANS = \
+@BUILD_DOC_MAN_TRUE@	rohc.7 \
+@BUILD_DOC_MAN_TRUE@	rohc_protocol.7 \
+@BUILD_DOC_MAN_TRUE@	rohc_library.7 \
+@BUILD_DOC_MAN_TRUE@	$(rohc_common_man) \
+@BUILD_DOC_MAN_TRUE@	$(rohc_common_mans) \
+@BUILD_DOC_MAN_TRUE@	$(rohc_comp_man) \
+@BUILD_DOC_MAN_TRUE@	$(rohc_comp_mans) \
+@BUILD_DOC_MAN_TRUE@	$(rohc_decomp_man) \
+@BUILD_DOC_MAN_TRUE@	$(rohc_decomp_mans)
+
+rohc_all_sources = \
+	$(top_srcdir)/src/*.h \
+	$(top_srcdir)/src/test/*.c \
+	$(top_srcdir)/src/common/*.c \
+	$(top_srcdir)/src/common/*.h \
+	$(top_srcdir)/src/common/protocols/*.c \
+	$(top_srcdir)/src/common/protocols/*.h \
+	$(top_srcdir)/src/comp/*.c \
+	$(top_srcdir)/src/comp/*.h \
+	$(top_srcdir)/src/comp/test/*.c \
+	$(top_srcdir)/src/comp/schemes/*.c \
+	$(top_srcdir)/src/comp/schemes/*.h \
+	$(top_srcdir)/src/comp/schemes/test/*.c \
+	$(top_srcdir)/src/decomp/*.c \
+	$(top_srcdir)/src/decomp/*.h \
+	$(top_srcdir)/src/decomp/test/*.c \
+	$(top_srcdir)/src/decomp/schemes/*.c \
+	$(top_srcdir)/src/decomp/schemes/*.h \
+	$(top_srcdir)/src/decomp/schemes/test/*.c \
+	$(top_srcdir)/examples/*.c \
+	$(top_srcdir)/app/fuzzer/*.c \
+	$(top_srcdir)/app/performance/*.c \
+	$(top_srcdir)/app/sniffer/*.c \
+	$(top_srcdir)/app/tunnel/*.c \
+	$(top_srcdir)/app/stats/*.c \
+	$(top_srcdir)/linux/include/*.h \
+	$(top_srcdir)/linux/*.c \
+	$(top_srcdir)/test/*.h \
+	$(top_srcdir)/test/functional/context_reuse/*.c \
+	$(top_srcdir)/test/functional/decompress_feedback_only/*.c \
+	$(top_srcdir)/test/functional/feedback2/*.c \
+	$(top_srcdir)/test/functional/rtp_detection/*.c \
+	$(top_srcdir)/test/functional/rtp_uo_disambiguation/*.c \
+	$(top_srcdir)/test/functional/segment/*.c \
+	$(top_srcdir)/test/robustness/damaged_packet/*.c \
+	$(top_srcdir)/test/robustness/empty_payload/*.c \
+	$(top_srcdir)/test/robustness/lost_packet/*.c \
+	$(top_srcdir)/test/robustness/malformed_rohc_packets/*.c \
+	$(top_srcdir)/test/robustness/piggybacking_feedback/*.c \
+	$(top_srcdir)/test/non_regression/*.c
+
+rohc_examples_sources = \
+	$(top_srcdir)/examples/*.c
+
+doxy2man_options = \
+	--out man/man3/ --noseealsoall --nosort --include-prefix "rohc/" \
+	--short-pkg "ROHC" --pkg "ROHC library Programmer's Manual"
+
+rohc_common_sources = \
+	$(top_srcdir)/src/common/rohc_common.c \
+	$(top_srcdir)/src/common/rohc.h \
+	$(top_srcdir)/src/common/rohc_packets.c \
+	$(top_srcdir)/src/common/rohc_packets.h \
+	$(top_srcdir)/src/common/rohc_traces.h
+
+rohc_comp_sources = \
+	$(top_srcdir)/src/comp/rohc_comp.c \
+	$(top_srcdir)/src/comp/rohc_comp.h
+
+rohc_decomp_sources = \
+	$(top_srcdir)/src/decomp/rohc_decomp.c \
+	$(top_srcdir)/src/decomp/rohc_decomp.h
 
 
 # extra files for releases
@@ -330,12 +484,104 @@ $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 $(am__aclocal_m4_deps):
 doxygen.conf: $(top_builddir)/config.status $(srcdir)/doxygen.conf.in
 	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+rohc.7: $(top_builddir)/config.status $(srcdir)/rohc.7.in
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+rohc_protocol.7: $(top_builddir)/config.status $(srcdir)/rohc_protocol.7.in
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
+rohc_library.7: $(top_builddir)/config.status $(srcdir)/rohc_library.7.in
+	cd $(top_builddir) && $(SHELL) ./config.status $(subdir)/$@
 
 mostlyclean-libtool:
 	-rm -f *.lo
 
 clean-libtool:
 	-rm -rf .libs _libs
+install-man3: $(man_MANS)
+	@$(NORMAL_INSTALL)
+	@list1=''; \
+	list2='$(man_MANS)'; \
+	test -n "$(man3dir)" \
+	  && test -n "`echo $$list1$$list2`" \
+	  || exit 0; \
+	echo " $(MKDIR_P) '$(DESTDIR)$(man3dir)'"; \
+	$(MKDIR_P) "$(DESTDIR)$(man3dir)" || exit 1; \
+	{ for i in $$list1; do echo "$$i"; done;  \
+	if test -n "$$list2"; then \
+	  for i in $$list2; do echo "$$i"; done \
+	    | sed -n '/\.3[a-z]*$$/p'; \
+	fi; \
+	} | while read p; do \
+	  if test -f $$p; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; echo "$$p"; \
+	done | \
+	sed -e 'n;s,.*/,,;p;h;s,.*\.,,;s,^[^3][0-9a-z]*$$,3,;x' \
+	      -e 's,\.[0-9a-z]*$$,,;$(transform);G;s,\n,.,' | \
+	sed 'N;N;s,\n, ,g' | { \
+	list=; while read file base inst; do \
+	  if test "$$base" = "$$inst"; then list="$$list $$file"; else \
+	    echo " $(INSTALL_DATA) '$$file' '$(DESTDIR)$(man3dir)/$$inst'"; \
+	    $(INSTALL_DATA) "$$file" "$(DESTDIR)$(man3dir)/$$inst" || exit $$?; \
+	  fi; \
+	done; \
+	for i in $$list; do echo "$$i"; done | $(am__base_list) | \
+	while read files; do \
+	  test -z "$$files" || { \
+	    echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(man3dir)'"; \
+	    $(INSTALL_DATA) $$files "$(DESTDIR)$(man3dir)" || exit $$?; }; \
+	done; }
+
+uninstall-man3:
+	@$(NORMAL_UNINSTALL)
+	@list=''; test -n "$(man3dir)" || exit 0; \
+	files=`{ for i in $$list; do echo "$$i"; done; \
+	l2='$(man_MANS)'; for i in $$l2; do echo "$$i"; done | \
+	  sed -n '/\.3[a-z]*$$/p'; \
+	} | sed -e 's,.*/,,;h;s,.*\.,,;s,^[^3][0-9a-z]*$$,3,;x' \
+	      -e 's,\.[0-9a-z]*$$,,;$(transform);G;s,\n,.,'`; \
+	dir='$(DESTDIR)$(man3dir)'; $(am__uninstall_files_from_dir)
+install-man7: $(man_MANS)
+	@$(NORMAL_INSTALL)
+	@list1=''; \
+	list2='$(man_MANS)'; \
+	test -n "$(man7dir)" \
+	  && test -n "`echo $$list1$$list2`" \
+	  || exit 0; \
+	echo " $(MKDIR_P) '$(DESTDIR)$(man7dir)'"; \
+	$(MKDIR_P) "$(DESTDIR)$(man7dir)" || exit 1; \
+	{ for i in $$list1; do echo "$$i"; done;  \
+	if test -n "$$list2"; then \
+	  for i in $$list2; do echo "$$i"; done \
+	    | sed -n '/\.7[a-z]*$$/p'; \
+	fi; \
+	} | while read p; do \
+	  if test -f $$p; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; echo "$$p"; \
+	done | \
+	sed -e 'n;s,.*/,,;p;h;s,.*\.,,;s,^[^7][0-9a-z]*$$,7,;x' \
+	      -e 's,\.[0-9a-z]*$$,,;$(transform);G;s,\n,.,' | \
+	sed 'N;N;s,\n, ,g' | { \
+	list=; while read file base inst; do \
+	  if test "$$base" = "$$inst"; then list="$$list $$file"; else \
+	    echo " $(INSTALL_DATA) '$$file' '$(DESTDIR)$(man7dir)/$$inst'"; \
+	    $(INSTALL_DATA) "$$file" "$(DESTDIR)$(man7dir)/$$inst" || exit $$?; \
+	  fi; \
+	done; \
+	for i in $$list; do echo "$$i"; done | $(am__base_list) | \
+	while read files; do \
+	  test -z "$$files" || { \
+	    echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(man7dir)'"; \
+	    $(INSTALL_DATA) $$files "$(DESTDIR)$(man7dir)" || exit $$?; }; \
+	done; }
+
+uninstall-man7:
+	@$(NORMAL_UNINSTALL)
+	@list=''; test -n "$(man7dir)" || exit 0; \
+	files=`{ for i in $$list; do echo "$$i"; done; \
+	l2='$(man_MANS)'; for i in $$l2; do echo "$$i"; done | \
+	  sed -n '/\.7[a-z]*$$/p'; \
+	} | sed -e 's,.*/,,;h;s,.*\.,,;s,^[^7][0-9a-z]*$$,7,;x' \
+	      -e 's,\.[0-9a-z]*$$,,;$(transform);G;s,\n,.,'`; \
+	dir='$(DESTDIR)$(man7dir)'; $(am__uninstall_files_from_dir)
 install-htmlDATA: $(html_DATA)
 	@$(NORMAL_INSTALL)
 	@list='$(html_DATA)'; test -n "$(htmldir)" || list=; \
@@ -396,9 +642,9 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(DATA)
+all-am: Makefile $(MANS) $(DATA)
 installdirs:
-	for dir in "$(DESTDIR)$(htmldir)"; do \
+	for dir in "$(DESTDIR)$(man3dir)" "$(DESTDIR)$(man7dir)" "$(DESTDIR)$(htmldir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -445,11 +691,13 @@ dvi-am:
 
 html: html-am
 
+html-am:
+
 info: info-am
 
 info-am:
 
-install-data-am: install-htmlDATA
+install-data-am: install-htmlDATA install-man
 
 install-dvi: install-dvi-am
 
@@ -465,7 +713,7 @@ install-info: install-info-am
 
 install-info-am:
 
-install-man:
+install-man: install-man3 install-man7
 
 install-pdf: install-pdf-am
 
@@ -493,7 +741,9 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-htmlDATA
+uninstall-am: uninstall-htmlDATA uninstall-man
+
+uninstall-man: uninstall-man3 uninstall-man7
 
 .MAKE: install-am install-strip
 
@@ -503,25 +753,41 @@ uninstall-am: uninstall-htmlDATA
 	install install-am install-data install-data-am install-dvi \
 	install-dvi-am install-exec install-exec-am install-html \
 	install-html-am install-htmlDATA install-info install-info-am \
-	install-man install-pdf install-pdf-am install-ps \
-	install-ps-am install-strip installcheck installcheck-am \
-	installdirs maintainer-clean maintainer-clean-generic \
-	mostlyclean mostlyclean-generic mostlyclean-libtool pdf pdf-am \
-	ps ps-am tags-am uninstall uninstall-am uninstall-htmlDATA
+	install-man install-man3 install-man7 install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-generic \
+	mostlyclean-libtool pdf pdf-am ps ps-am tags-am uninstall \
+	uninstall-am uninstall-htmlDATA uninstall-man uninstall-man3 \
+	uninstall-man7
 
 
-html/*.html: html-am
-html/*.map: html-am
-html/*.css: html-am
-html/*.png: html-am
-
-html-am: htmldoc
-
-htmldoc:
+doxygen: $(rohc_all_sources)
 	$(AM_V_GEN)doxygen doxygen.conf
+	@touch doxygen
+
+html/*.html: $(rohc_all_sources) | doxygen
+html/*.map: $(rohc_all_sources) | doxygen
+html/*.css: $(rohc_all_sources) | doxygen
+html/*.png: $(rohc_all_sources) | doxygen
+
+$(rohc_common_man): $(rohc_common_sources) $(rohc_examples_sources) | doxygen
+	$(AM_V_GEN)doxy2man $(doxy2man_options) xml/group__rohc.xml
+$(rohc_common_mans):
+
+$(rohc_comp_man): $(rohc_comp_sources) $(rohc_examples_sources) | doxygen
+	$(AM_V_GEN)doxy2man $(doxy2man_options) xml/group__rohc__comp.xml
+$(rohc_comp_mans):
+
+$(rohc_decomp_man): $(rohc_decomp_sources) $(rohc_examples_sources) | doxygen
+	$(AM_V_GEN)doxy2man $(doxy2man_options) xml/group__rohc__decomp.xml
+$(rohc_decomp_mans):
 
 clean-local:
-	-$(RM) -rf html/
+	-$(RM) doxygen
+	-$(RM) -r html/
+	-$(RM) -r xml/
+	-$(RM) -r man/
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

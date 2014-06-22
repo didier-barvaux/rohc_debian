@@ -1,22 +1,128 @@
-15 Aug 2013 - release 1.6.1
+21 June 2014 - release 1.7.0
   Compatibility:
-    Version 1.6.1 is compatible with all previous 1.6.x versions.
+    - Version 1.7.0 is not compatible with versions < 1.7.0 with respect to
+      packet format because of several fixes related to IETF RFCs that change
+      the format of ROHC packets. Compatibility may however be required with
+      the library feature ROHC_COMP_FEATURE_COMPAT_1_6_x.
+    - The library API is fully compatible with earlier versions.
+
   License/Authors:
-    No change.
+    - Viveris Technologies for the packet/context repair upon CRC failure.
+    - Viveris Technologies for better conformance to ROHC standards.
+    - FWX for ROHCv1 TCP profile.
+    - Remove the Lulea University of Technology from the authors: code changed
+      so much since fork that nothing remains from the initial code.
+    - Remove fuzzer's co-author: he gave ownership and copyright to Didier
+      Barvaux.
+    - Add copyright information to all source files.
+    - Change license from GPLv2+ to LGPLv2.1+
+
   Acknowledgments for bug reports and/or bug fixes:
-    None.
-  Improvements:
-    Add spec file for building RPMs of the ROHC library.
+    - Thanks to Friedrich for his help designing the new API function
+      rohc_feedback_avail_bytes().
+    - Thanks to Fabrice Bellard for finding several non-conformances to ROHC
+      standards.
+
+  Main changes:
+    - ROHC protocol:
+       - Add support for packet/context repair upon CRC failure.
+       - Add support for extensions on UO-1-ID packets.
+       - Add support for the ROHCv1 TCP profile (beta quality).
+       - RTP profile: avoid the Tsc = 0 and no TS bit situation
+       - Use the Uncompressed profile if IPv4 checksum is incorrect
+       - Add a compatibility mode with ROHC library 1.6.x.
+    - Major rework of the API (compatibility preserved), see
+       https://rohc-lib.org/wiki/doku.php?id=library-migration#api_changes_between_16x_and_17x
+    - Improve library documentation
+    - Man pages are now available for public API and tools
+    - Install ROHC public headers in a rohc/ subdirectory
+    - New librohc.so available: it gathers all librohc_*.so (old libs still
+      available)
+    - Update public headers to be compatible with C++
+
+  Build system:
+    - Refresh HTML and man documentation only if source code changed.
+    - Remove zcov result files and directories on distclean.
+
+  Q&A:
+    - Parse IP headers/extensions once, factorize many related code
+    - Rework list compression, especially IPv6 extension headers.
+    - Add test_lsb_decode unit test
+    - Add new non-regression test for list compression and context re-use.
+    - Improve library documentation.
+    - Reduce graph of header dependencies.
+    - Many, many small cleanup everywhere.
+    - Non-regression test: get rid of XML output
+    - Fix warnings found by the Clang static analyzer.
+    - Fix warnings found by the Smatch.
+    - Fix bashisms in non-regression shell script.
+    - Build library with -Wextra, -Wunreachable-code, -Wshadow,
+      -Wunused-function and -Wunused-variable compiler flags
+    - Export only public symbols for libraries.
+    - Introduce interoperability tests of the ROHC library with other
+      implementations.
+    - Make feedback parsing at compressor more robust
+
+  Performances:
+    - Greatly improve the performances of the W-LSB decoding algorithm for
+      large windows and lossy streams.
+    - Avoid memory allocation when prepending CID to feedback.
+    - In case of failure, dump the content of packets only if
+      --enable-rohc-debug was specified
+
+  Applications:
+    ROHC-over-UDP tunnel:
+      - Deprecate the ROHC over UDP tunnel. Use the IP/ROHC tunnel instead.
+    ROHC sniffer:
+      - Run in brackground mode and use syslog.
+      - add --daemon/-d option to make daemon mode optional.
+      - Add option --pidfile/-p to write the child PID in a file.
+      - Add --disable option to disable one or more ROHC profiles.
+      - Add Gentoo init script.
+      - Do not set MAX_CID > ROHC_SMALL_CID_MAX before changing CID type.
+      - Update statistics output for the TCP profile.
+      - Fix IPv4 packets with the non-standard 0xffff checksum.
+      - Do not compare TCP packets with extra padding after TCP options.
+      - Enable all decompression profiles.
+      - Correctly close the PCAP dumps upon segfault
+    ROHC fuzzer:
+      - Enable all decompression profiles.
+      - Use correct length for array traces
+      - Mention truncated traces
+      - Install in bin/ instead of sbin/
+    ROHC fuzzer for RTP traffic:
+      - new application: same as RTP fuzzer but targets RTP streams
+      - Install in bin/ instead of sbin/
+    Performances test:
+      - Use perf to compute elapsed time, no need to be root anymore
+      - Use 'comp' and 'decomp' as action parameters.
+      - Enable all decompression profiles.
+      - Fix build on x86_64
+      - Install in bin/ instead of sbin/
+    ROHC stream generator:
+      - Add a new tool named 'rohc_gen_stream' that generates large
+        (un)compressed stream for performance testing.
+    Stats:
+      - The statistics tests are now an app in app/stats/
+
   Bug fixes:
-    Bug #1209260: Wrong W-LSB decoding if interpretation interval straddles
-                  the field boundaries
-    Bug #1212769: Fail to unlock/remove feedbacks if ring is full of locked
-                  feedbacks
-    Bug #1212775: Array overflow with too many RTP ports
-  Bug not fixed in order to not change ROHC packet format:
+    Bug # 809028: Write man pages for public API
+    Bug # 896842: Add extension support for UO-1-ID packet
+    Bug #1075922: Aligment problem with Timestamp TCP option on ARM
     Bug #1208900: RTP profile: unscaled TS shall always be encoded with W-LSB
                   in UO* packets
+    Bug #1209260: Wrong W-LSB decoding if interpretation interval straddles
+                  the field boundaries
     Bug #1210498: IP-ID shall be transmitted verbatim in IR and IR-DYN packets
+    Bug #1212769: Fail to unlock/remove feedbacks if ring is full of locked
+                  feedbacks
+    Bug #1244990: gen_id optional for lists of IPv6 extension headers
+    Bug #1265304: RTP decompression failure with repeated constant TS
+    Bug #1301518: Interoperability problems with Aeroflex TM500(LTE)
+    Bug #1319889: missing 'extern "C"' closure in header
+    Bug #1321398: "please define a callback for random numbers" printed even
+                  if callback is set
+
 
 09 Jun 2013 - release 1.6.0
   Compatibility:
@@ -55,6 +161,8 @@
        - Support for Linux kernel.
        - Support for OpenBSD (tested on 5.3 thanks to Audric Schiltknecht).
        - Support for mingw64.
+       - Support for CYGWIN.
+       - Support for GCC 4.8, Clang 3.2, and TCC.
        - RPM spec file for CentOS 5/6, Fedora 17/18 and RHEL 5.
 
   API changes:

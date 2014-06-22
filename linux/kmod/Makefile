@@ -12,24 +12,29 @@ rohc_test_modname = rohc_test
 
 
 rohc_common_sources = \
+	../../src/common/protocols/ip_numbers.c \
 	../../src/common/rohc_common.c \
-	../../src/common/rohc_utils.c \
 	../../src/common/rohc_packets.c \
 	../../src/common/rohc_traces_internal.c \
+	../../src/common/rohc_utils.c \
+	../../src/common/rohc_buf.c \
 	../../src/common/crc.c \
-	../../src/common/decode.c \
-	../../src/common/ip_id_offset_decode.c \
+	../../src/common/rohc_add_cid.c \
 	../../src/common/interval.c \
-	../../src/common/lsb_decode.c \
 	../../src/common/sdvl.c \
-	../../src/common/wlsb.c \
 	../../src/common/ip.c \
-	../../src/common/ts_sc_comp.c \
-	../../src/common/ts_sc_decomp.c \
+	../../src/common/net_pkt.c \
 	../../src/common/comp_list.c \
-	../../src/common/cid.c
+	../../src/common/rohc_stats.c \
+	../../src/common/feedback_parse.c
 
 rohc_comp_sources = \
+	../../src/comp/schemes/cid.c \
+	../../src/comp/schemes/wlsb.c \
+	../../src/comp/schemes/scaled_rtp_ts.c \
+	../../src/comp/schemes/list.c \
+	../../src/comp/schemes/list_ipv6.c \
+	../../src/comp/schemes/rfc4996.c \
 	../../src/comp/rohc_comp.c \
 	../../src/comp/c_uncompressed.c \
 	../../src/comp/c_generic.c \
@@ -37,18 +42,27 @@ rohc_comp_sources = \
 	../../src/comp/c_udp.c \
 	../../src/comp/c_udp_lite.c \
 	../../src/comp/c_rtp.c \
-	../../src/comp/c_esp.c
+	../../src/comp/c_esp.c \
+	../../src/comp/c_tcp.c
 
 rohc_decomp_sources = \
+	../../src/decomp/schemes/wlsb.c \
+	../../src/decomp/schemes/ip_id_offset.c \
+	../../src/decomp/schemes/scaled_rtp_ts.c \
+	../../src/decomp/schemes/list.c \
+	../../src/decomp/schemes/list_ipv6.c \
+	../../src/decomp/schemes/rfc4996.c \
+	../../src/decomp/rohc_decomp_detect_packet.c \
 	../../src/decomp/rohc_decomp.c \
-	../../src/decomp/feedback.c \
+	../../src/decomp/feedback_create.c \
 	../../src/decomp/d_uncompressed.c \
 	../../src/decomp/d_generic.c \
 	../../src/decomp/d_ip.c \
 	../../src/decomp/d_udp.c \
 	../../src/decomp/d_udp_lite.c \
 	../../src/decomp/d_rtp.c \
-	../../src/decomp/d_esp.c
+	../../src/decomp/d_esp.c \
+	../../src/decomp/d_tcp.c
 
 rohc_sources = \
 	../kmod.c \
