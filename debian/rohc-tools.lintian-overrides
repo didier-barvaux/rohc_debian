@@ -1,0 +1,2 @@
+# rohctunnel is obsolete and will be removed from next releases
+rohc-tools: binary-without-manpage usr/sbin/rohctunnel
