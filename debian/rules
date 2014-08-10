@@ -9,14 +9,14 @@
 
 override_dh_auto_configure:
 	dh_auto_configure -- \
-		--enable-fortify-sources \
-		--enable-static \
-		--enable-shared \
 		--enable-app-fuzzer \
 		--enable-app-performance \
 		--enable-app-sniffer \
 		--enable-app-tunnel \
-		--enable-examples \
 		--enable-doc \
+		--enable-examples \
+		--enable-fail-on-warning \
+		--enable-fortify-sources \
 		--enable-rohc-tests \
-		--enable-fail-on-warning
+		--enable-shared \
+		--enable-static \
