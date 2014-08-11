@@ -1,13 +1,13 @@
 Source: rohc
 Priority: optional
 Maintainer: Simon Paillard <spaillard@debian.org>
-Build-Depends: debhelper (>= 9), autotools-dev, pkg-config,
+Build-Depends: autotools-dev, debhelper (>= 9), pkg-config,
 # for tests only
  libpcap0.8-dev,
 # for unit tests (if enable_rohc_tests)
  libcmocka-dev,
 # for rohc-doc
- doc-base, doxygen, texlive-latex-base, graphviz
+ doc-base, doxygen, texlive-latex-base, graphviz,
 Standards-Version: 3.9.5
 Section: libs
 Homepage: http://rohc-lib.org/
@@ -30,7 +30,7 @@ Multi-Arch: same
 Package: librohc0
 Section: libs
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: RObust Header Compression (ROHC) library
  RObust Header Compression (ROHC) is a standardized method defined by the IETF
  in RFC3095 to compress the IP, UDP, RTP, and TCP headers of Internet packets.
@@ -53,7 +53,7 @@ Multi-Arch: foreign
 
 Package: rohc-tools
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: Miscellaneous tools that come along the ROHC library
  The following tools are included:
   * rohc_fuzzer: library testing using fuzzing technique
