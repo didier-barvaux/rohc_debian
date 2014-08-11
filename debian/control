@@ -11,8 +11,8 @@ Build-Depends: debhelper (>= 9), autotools-dev, pkg-config,
 Standards-Version: 3.9.5
 Section: libs
 Homepage: http://rohc-lib.org/
-#Vcs-Git: git://git.debian.org/collab-maint/rohc.git
-#Vcs-Browser: http://git.debian.org/?p=collab-maint/rohc.git;a=summary
+Vcs-Git: git://git.debian.org/collab-maint/rohc.git
+Vcs-Browser: http://git.debian.org/?p=collab-maint/rohc.git
 
 Package: librohc-dev
 Section: libdevel
