@@ -978,34 +978,8 @@ Files: app/performance/rohc_gen_stream.c
  test/robustness/lost_packet/test_lost_packet.c
  test/robustness/piggybacking_feedback/test_piggybacking_feedback.c
  test/test.h
-Copyright: 2007,2009-2010, Viveris Technologies
-  2007,2009-2010,2012, Viveris Technologies
-  2007,2009-2010,2012,2014, Viveris Technologies
-  2007,2009-2010,2012-2013, Viveris Technologies
-  2007,2009-2010,2012-2014, Viveris Technologies
-  2007,2009-2010,2013, Viveris Technologies
-  2008,2010,2012, Viveris Technologies
-  2010,2012, Viveris Technologies
-  2010,2012-2013, Didier Barvaux
-  2010,2012-2013, Viveris Technologies
-  2010,2012-2014, Didier Barvaux
-  2010,2013, Viveris Technologies
-  2010-2013, Didier Barvaux
+Copyright: 2007-2010,2012-2014, Viveris Technologies
   2010-2014, Didier Barvaux
-  2011,2013-2014, Didier Barvaux
-  2011-2013, Didier Barvaux
-  2011-2014, Didier Barvaux
-  2012, Didier Barvaux
-  2012, Viveris Technologies
-  2012-2013, Didier Barvaux
-  2012-2013, Viveris Technologies
-  2012-2014, Didier Barvaux
-  2012-2014, Viveris Technologies
-  2013, Didier Barvaux
-  2013, Viveris Technologies
-  2013-2014, Didier Barvaux
-  2014, Didier Barvaux
-  2014, Viveris Technologies
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public
@@ -1056,13 +1030,7 @@ Files: app/fuzzer/fuzzer.c
  src/test/test_wlsb_wraparound.c
  test/functional/decompress_padding/test_decompress_padding.c
  test/robustness/malformed_rohc_packets/test_malformed_rohc_packets.c
-Copyright: 2010,2012, Didier Barvaux
-  2011-2013, Didier Barvaux
-  2012-2013, Didier Barvaux
-  2012-2014, Didier Barvaux
-  2013, Didier Barvaux
-  2013-2014, Didier Barvaux
-  2014, Didier Barvaux
+Copyright: 2010-2014, Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public
@@ -1096,21 +1064,9 @@ Files: src/common/ip.c
  src/decomp/d_udp.c
  src/decomp/d_udp.h
  src/decomp/d_udp_lite.c
-Copyright: 2007,2009-2010,2012, Viveris Technologies
-  2007,2009-2010,2012,2014, Viveris Technologies
-  2007,2009-2010,2012-2014, Viveris Technologies
-  2007,2009-2010,2013-2014, Viveris Technologies
-  2007,2009-2010,2014, Viveris Technologies
+Copyright: 2007-2010,2012-2014, Viveris Technologies
   2007-2008, Thales Alenia Space
-  2007-2010,2012, Viveris Technologies
-  2007-2010,2012,2014, Viveris Technologies
-  2007-2010,2012-2013, Viveris Technologies
-  2007-2010,2012-2014, Viveris Technologies
-  2010,2012-2014, Didier Barvaux
   2010-2014, Didier Barvaux
-  2012-2013, Didier Barvaux
-  2012-2014, Didier Barvaux
-  2013, Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public
@@ -1137,7 +1093,6 @@ Files: src/comp/schemes/list.c
  src/decomp/schemes/list_ipv6.c
  src/decomp/schemes/list_ipv6.h
 Copyright: 2007-2008, Thales Alenia Space
-  2013, Didier Barvaux
   2013-2014, Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
@@ -1165,16 +1120,8 @@ Files: linux/kmod_test.c
  src/comp/c_esp.c
  src/decomp/d_esp.c
 Copyright: 2009-2010, Thales Communications
-  2010,2012, Viveris Technologies
-  2010,2013, Viveris Technologies
-  2011-2013, Didier Barvaux
-  2012, Viveris Technologies
-  2012-2013, Didier Barvaux
-  2012-2013, Viveris Technologies
-  2012-2014, Didier Barvaux
-  2012-2014, Viveris Technologies
-  2013, Viveris Technologies
-  2013-2014, Didier Barvaux
+  2010,2012-2014, Viveris Technologies
+  2011-2014, Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public
@@ -1199,8 +1146,7 @@ Files: examples/rtp_detection.c
  linux/include/stdio.h
  linux/include/stdlib.h
  test/interop/test_interop.c
-Copyright: 2013, Viveris Technologies
-  2014, Viveris Technologies
+Copyright: 2013-2014, Viveris Technologies
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public
@@ -1224,16 +1170,10 @@ Files: src/common/protocols/rtp.h
  src/decomp/d_rtp.c
  src/decomp/schemes/scaled_rtp_ts.c
  src/decomp/schemes/scaled_rtp_ts.h
-Copyright: 2007,2009-2010, Viveris Technologies
-  2007,2009-2010,2012-2014, Viveris Technologies
-  2007,2010, Viveris Technologies
-  2007,2010,2012-2014, Viveris Technologies
+Copyright: 2007-2010,2012-2014, Viveris Technologies
   2007-2008, CNES
   2007-2008, Thales Alenia Space
-  2007-2010,2012-2014, Viveris Technologies
-  2010-2013, Didier Barvaux
   2010-2014, Didier Barvaux
-  2011-2013, Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public
@@ -1256,10 +1196,8 @@ Files: src/comp/schemes/rfc4996.c
  src/decomp/schemes/rfc4996.c
  src/decomp/schemes/rfc4996.h
  src/dllexport.h
-Copyright: 2012, WBX
-  2012-2013, Didier Barvaux
+Copyright: 2012-2013, WBX
   2012-2014, Didier Barvaux
-  2013, WBX
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public
@@ -1284,9 +1222,6 @@ Files: src/common/protocols/tcp.h
 Copyright: 2007,2009-2010,2012-2014, Viveris Technologies
   2010-2014, Didier Barvaux
   2012, WBX
-  2012-2014, Didier Barvaux
-  2013, Viveris Technologies
-  2013-2014, Viveris Technologies
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public
@@ -1331,7 +1266,6 @@ Copyright: 2007,2009-2010,2012-2013, Viveris Technologies
   2007-2008, Thales Alenia Space
   2009-2010, Thales Communications
   2010-2014, Didier Barvaux
-  2011-2013, Didier Barvaux
   2012, WBX
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
