@@ -2,12 +2,14 @@ Source: rohc
 Priority: optional
 Maintainer: Simon Paillard <spaillard@debian.org>
 Build-Depends: autotools-dev, debhelper (>= 9), pkg-config,
-# for tests only
+# for tests and tools
  libpcap0.8-dev,
 # for unit tests (if enable_rohc_tests)
  libcmocka-dev,
 # for rohc-doc
  doc-base, doxygen, graphviz,
+# for rohc-tools
+ gnuplot,
 Standards-Version: 3.9.5
 Section: libs
 Homepage: http://rohc-lib.org/
@@ -53,7 +55,7 @@ Multi-Arch: foreign
 
 Package: rohc-tools
 Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}, libpcap0.8, gnuplot
 Description: Miscellaneous tools that come along the ROHC library
  The following tools are included:
   * rohc_sniffer: library testing on live trafic
