@@ -34,19 +34,14 @@ test_empty_payload_CPPFLAGS = \
 	$(libpcap_includes)
 
 test_empty_payload_LDFLAGS = \
-	$(configure_ldflags) \
-	-L$(top_builddir)/src/common/.libs \
-	-L$(top_builddir)/src/comp/.libs \
-	-L$(top_builddir)/src/decomp/.libs
+	$(configure_ldflags)
 
 test_empty_payload_SOURCES = \
 	test_empty_payload.c
 
 test_empty_payload_LDADD = \
 	-l$(pcap_lib_name) \
-	-lrohc_comp \
-	-lrohc_decomp \
-	-lrohc_common \
+	$(top_builddir)/src/librohc.la \
 	$(additional_platform_libs)
 
 EXTRA_DIST = \

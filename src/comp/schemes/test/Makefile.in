@@ -83,7 +83,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-check_PROGRAMS = test_rfc4996$(EXEEXT)
+check_PROGRAMS = test_rfc4996$(EXEEXT) test_tcp_ts_opt$(EXEEXT)
 subdir = src/comp/schemes/test
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/depcomp $(top_srcdir)/test-driver
@@ -95,7 +95,7 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-am_test_rfc4996_OBJECTS = test_rfc4996-wlsb.$(OBJEXT) \
+am_test_rfc4996_OBJECTS = test_rfc4996-comp_wlsb.$(OBJEXT) \
 	test_rfc4996-rfc4996.$(OBJEXT) \
 	test_rfc4996-test_rfc4996.$(OBJEXT)
 test_rfc4996_OBJECTS = $(am_test_rfc4996_OBJECTS)
@@ -107,6 +107,15 @@ am__v_lt_1 =
 test_rfc4996_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(test_rfc4996_CFLAGS) \
 	$(CFLAGS) $(test_rfc4996_LDFLAGS) $(LDFLAGS) -o $@
+am_test_tcp_ts_opt_OBJECTS = test_tcp_ts_opt-tcp_ts.$(OBJEXT) \
+	test_tcp_ts_opt-test_tcp_ts_opt.$(OBJEXT)
+test_tcp_ts_opt_OBJECTS = $(am_test_tcp_ts_opt_OBJECTS)
+am__DEPENDENCIES_1 =
+test_tcp_ts_opt_DEPENDENCIES = $(am__DEPENDENCIES_1)
+test_tcp_ts_opt_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
+	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
+	$(test_tcp_ts_opt_CFLAGS) $(CFLAGS) $(test_tcp_ts_opt_LDFLAGS) \
+	$(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -141,8 +150,8 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(test_rfc4996_SOURCES)
-DIST_SOURCES = $(test_rfc4996_SOURCES)
+SOURCES = $(test_rfc4996_SOURCES) $(test_tcp_ts_opt_SOURCES)
+DIST_SOURCES = $(test_rfc4996_SOURCES) $(test_tcp_ts_opt_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -414,6 +423,7 @@ LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
@@ -466,6 +476,7 @@ build_os = @build_os@
 build_vendor = @build_vendor@
 builddir = @builddir@
 configure_cflags = @configure_cflags@
+configure_cflags_for_lib = @configure_cflags_for_lib@
 configure_ldflags = @configure_ldflags@
 datadir = @datadir@
 datarootdir = @datarootdir@
@@ -486,15 +497,14 @@ is_doxy2man_found = @is_doxy2man_found@
 is_doxygen_found = @is_doxygen_found@
 is_gnuplot_found = @is_gnuplot_found@
 is_help2man_found = @is_help2man_found@
-is_latex_found = @is_latex_found@
+is_lcov_found = @is_lcov_found@
+is_lcov_genhtml_found = @is_lcov_genhtml_found@
 is_qemu_found = @is_qemu_found@
 is_sort_found = @is_sort_found@
 is_tr_found = @is_tr_found@
 is_valgrind_found = @is_valgrind_found@
 is_wine_found = @is_wine_found@
 is_xsltproc_found = @is_xsltproc_found@
-is_zcov_genhtml_found = @is_zcov_genhtml_found@
-is_zcov_scan_found = @is_zcov_scan_found@
 libdir = @libdir@
 libexecdir = @libexecdir@
 libpcap_includes = @libpcap_includes@
@@ -518,10 +528,11 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 TESTS = \
-	test_rfc4996.sh
+	test_rfc4996.sh \
+	test_tcp_ts_opt.sh
 
 test_rfc4996_SOURCES = \
-	$(srcdir)/../wlsb.c \
+	$(srcdir)/../comp_wlsb.c \
 	$(srcdir)/../rfc4996.c \
 	test_rfc4996.c
 
@@ -540,8 +551,28 @@ test_rfc4996_CPPFLAGS = \
 	-I$(top_srcdir)/src/comp/ \
 	-I$(srcdir)/..
 
+test_tcp_ts_opt_SOURCES = \
+	$(srcdir)/../tcp_ts.c \
+	test_tcp_ts_opt.c
+
+test_tcp_ts_opt_LDADD = \
+	$(CMOCKA_LIBS)
+
+test_tcp_ts_opt_LDFLAGS = \
+	$(configure_ldflags)
+
+test_tcp_ts_opt_CFLAGS = \
+	$(configure_cflags) \
+	$(CMOCKA_CFLAGS)
+
+test_tcp_ts_opt_CPPFLAGS = \
+	-I$(top_srcdir)/src/common \
+	-I$(top_srcdir)/src/comp \
+	-I$(srcdir)/..
+
 EXTRA_DIST = \
-	test_rfc4996.sh
+	test_rfc4996.sh \
+	test_tcp_ts_opt.sh
 
 all: all-am
 
@@ -591,15 +622,21 @@ test_rfc4996$(EXEEXT): $(test_rfc4996_OBJECTS) $(test_rfc4996_DEPENDENCIES) $(EX
 	@rm -f test_rfc4996$(EXEEXT)
 	$(AM_V_CCLD)$(test_rfc4996_LINK) $(test_rfc4996_OBJECTS) $(test_rfc4996_LDADD) $(LIBS)
 
+test_tcp_ts_opt$(EXEEXT): $(test_tcp_ts_opt_OBJECTS) $(test_tcp_ts_opt_DEPENDENCIES) $(EXTRA_test_tcp_ts_opt_DEPENDENCIES) 
+	@rm -f test_tcp_ts_opt$(EXEEXT)
+	$(AM_V_CCLD)$(test_tcp_ts_opt_LINK) $(test_tcp_ts_opt_OBJECTS) $(test_tcp_ts_opt_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_rfc4996-comp_wlsb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_rfc4996-rfc4996.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_rfc4996-test_rfc4996.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_rfc4996-wlsb.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_tcp_ts_opt-tcp_ts.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test_tcp_ts_opt-test_tcp_ts_opt.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -622,19 +659,19 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
 
-test_rfc4996-wlsb.o: $(srcdir)/../wlsb.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_rfc4996_CPPFLAGS) $(CPPFLAGS) $(test_rfc4996_CFLAGS) $(CFLAGS) -MT test_rfc4996-wlsb.o -MD -MP -MF $(DEPDIR)/test_rfc4996-wlsb.Tpo -c -o test_rfc4996-wlsb.o `test -f '$(srcdir)/../wlsb.c' || echo '$(srcdir)/'`$(srcdir)/../wlsb.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_rfc4996-wlsb.Tpo $(DEPDIR)/test_rfc4996-wlsb.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(srcdir)/../wlsb.c' object='test_rfc4996-wlsb.o' libtool=no @AMDEPBACKSLASH@
+test_rfc4996-comp_wlsb.o: $(srcdir)/../comp_wlsb.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_rfc4996_CPPFLAGS) $(CPPFLAGS) $(test_rfc4996_CFLAGS) $(CFLAGS) -MT test_rfc4996-comp_wlsb.o -MD -MP -MF $(DEPDIR)/test_rfc4996-comp_wlsb.Tpo -c -o test_rfc4996-comp_wlsb.o `test -f '$(srcdir)/../comp_wlsb.c' || echo '$(srcdir)/'`$(srcdir)/../comp_wlsb.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_rfc4996-comp_wlsb.Tpo $(DEPDIR)/test_rfc4996-comp_wlsb.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(srcdir)/../comp_wlsb.c' object='test_rfc4996-comp_wlsb.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_rfc4996_CPPFLAGS) $(CPPFLAGS) $(test_rfc4996_CFLAGS) $(CFLAGS) -c -o test_rfc4996-wlsb.o `test -f '$(srcdir)/../wlsb.c' || echo '$(srcdir)/'`$(srcdir)/../wlsb.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_rfc4996_CPPFLAGS) $(CPPFLAGS) $(test_rfc4996_CFLAGS) $(CFLAGS) -c -o test_rfc4996-comp_wlsb.o `test -f '$(srcdir)/../comp_wlsb.c' || echo '$(srcdir)/'`$(srcdir)/../comp_wlsb.c
 
-test_rfc4996-wlsb.obj: $(srcdir)/../wlsb.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_rfc4996_CPPFLAGS) $(CPPFLAGS) $(test_rfc4996_CFLAGS) $(CFLAGS) -MT test_rfc4996-wlsb.obj -MD -MP -MF $(DEPDIR)/test_rfc4996-wlsb.Tpo -c -o test_rfc4996-wlsb.obj `if test -f '$(srcdir)/../wlsb.c'; then $(CYGPATH_W) '$(srcdir)/../wlsb.c'; else $(CYGPATH_W) '$(srcdir)/$(srcdir)/../wlsb.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_rfc4996-wlsb.Tpo $(DEPDIR)/test_rfc4996-wlsb.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(srcdir)/../wlsb.c' object='test_rfc4996-wlsb.obj' libtool=no @AMDEPBACKSLASH@
+test_rfc4996-comp_wlsb.obj: $(srcdir)/../comp_wlsb.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_rfc4996_CPPFLAGS) $(CPPFLAGS) $(test_rfc4996_CFLAGS) $(CFLAGS) -MT test_rfc4996-comp_wlsb.obj -MD -MP -MF $(DEPDIR)/test_rfc4996-comp_wlsb.Tpo -c -o test_rfc4996-comp_wlsb.obj `if test -f '$(srcdir)/../comp_wlsb.c'; then $(CYGPATH_W) '$(srcdir)/../comp_wlsb.c'; else $(CYGPATH_W) '$(srcdir)/$(srcdir)/../comp_wlsb.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_rfc4996-comp_wlsb.Tpo $(DEPDIR)/test_rfc4996-comp_wlsb.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(srcdir)/../comp_wlsb.c' object='test_rfc4996-comp_wlsb.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_rfc4996_CPPFLAGS) $(CPPFLAGS) $(test_rfc4996_CFLAGS) $(CFLAGS) -c -o test_rfc4996-wlsb.obj `if test -f '$(srcdir)/../wlsb.c'; then $(CYGPATH_W) '$(srcdir)/../wlsb.c'; else $(CYGPATH_W) '$(srcdir)/$(srcdir)/../wlsb.c'; fi`
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_rfc4996_CPPFLAGS) $(CPPFLAGS) $(test_rfc4996_CFLAGS) $(CFLAGS) -c -o test_rfc4996-comp_wlsb.obj `if test -f '$(srcdir)/../comp_wlsb.c'; then $(CYGPATH_W) '$(srcdir)/../comp_wlsb.c'; else $(CYGPATH_W) '$(srcdir)/$(srcdir)/../comp_wlsb.c'; fi`
 
 test_rfc4996-rfc4996.o: $(srcdir)/../rfc4996.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_rfc4996_CPPFLAGS) $(CPPFLAGS) $(test_rfc4996_CFLAGS) $(CFLAGS) -MT test_rfc4996-rfc4996.o -MD -MP -MF $(DEPDIR)/test_rfc4996-rfc4996.Tpo -c -o test_rfc4996-rfc4996.o `test -f '$(srcdir)/../rfc4996.c' || echo '$(srcdir)/'`$(srcdir)/../rfc4996.c
@@ -663,6 +700,34 @@ test_rfc4996-test_rfc4996.obj: test_rfc4996.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test_rfc4996.c' object='test_rfc4996-test_rfc4996.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_rfc4996_CPPFLAGS) $(CPPFLAGS) $(test_rfc4996_CFLAGS) $(CFLAGS) -c -o test_rfc4996-test_rfc4996.obj `if test -f 'test_rfc4996.c'; then $(CYGPATH_W) 'test_rfc4996.c'; else $(CYGPATH_W) '$(srcdir)/test_rfc4996.c'; fi`
+
+test_tcp_ts_opt-tcp_ts.o: $(srcdir)/../tcp_ts.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_tcp_ts_opt_CPPFLAGS) $(CPPFLAGS) $(test_tcp_ts_opt_CFLAGS) $(CFLAGS) -MT test_tcp_ts_opt-tcp_ts.o -MD -MP -MF $(DEPDIR)/test_tcp_ts_opt-tcp_ts.Tpo -c -o test_tcp_ts_opt-tcp_ts.o `test -f '$(srcdir)/../tcp_ts.c' || echo '$(srcdir)/'`$(srcdir)/../tcp_ts.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_tcp_ts_opt-tcp_ts.Tpo $(DEPDIR)/test_tcp_ts_opt-tcp_ts.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(srcdir)/../tcp_ts.c' object='test_tcp_ts_opt-tcp_ts.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_tcp_ts_opt_CPPFLAGS) $(CPPFLAGS) $(test_tcp_ts_opt_CFLAGS) $(CFLAGS) -c -o test_tcp_ts_opt-tcp_ts.o `test -f '$(srcdir)/../tcp_ts.c' || echo '$(srcdir)/'`$(srcdir)/../tcp_ts.c
+
+test_tcp_ts_opt-tcp_ts.obj: $(srcdir)/../tcp_ts.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_tcp_ts_opt_CPPFLAGS) $(CPPFLAGS) $(test_tcp_ts_opt_CFLAGS) $(CFLAGS) -MT test_tcp_ts_opt-tcp_ts.obj -MD -MP -MF $(DEPDIR)/test_tcp_ts_opt-tcp_ts.Tpo -c -o test_tcp_ts_opt-tcp_ts.obj `if test -f '$(srcdir)/../tcp_ts.c'; then $(CYGPATH_W) '$(srcdir)/../tcp_ts.c'; else $(CYGPATH_W) '$(srcdir)/$(srcdir)/../tcp_ts.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_tcp_ts_opt-tcp_ts.Tpo $(DEPDIR)/test_tcp_ts_opt-tcp_ts.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$(srcdir)/../tcp_ts.c' object='test_tcp_ts_opt-tcp_ts.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_tcp_ts_opt_CPPFLAGS) $(CPPFLAGS) $(test_tcp_ts_opt_CFLAGS) $(CFLAGS) -c -o test_tcp_ts_opt-tcp_ts.obj `if test -f '$(srcdir)/../tcp_ts.c'; then $(CYGPATH_W) '$(srcdir)/../tcp_ts.c'; else $(CYGPATH_W) '$(srcdir)/$(srcdir)/../tcp_ts.c'; fi`
+
+test_tcp_ts_opt-test_tcp_ts_opt.o: test_tcp_ts_opt.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_tcp_ts_opt_CPPFLAGS) $(CPPFLAGS) $(test_tcp_ts_opt_CFLAGS) $(CFLAGS) -MT test_tcp_ts_opt-test_tcp_ts_opt.o -MD -MP -MF $(DEPDIR)/test_tcp_ts_opt-test_tcp_ts_opt.Tpo -c -o test_tcp_ts_opt-test_tcp_ts_opt.o `test -f 'test_tcp_ts_opt.c' || echo '$(srcdir)/'`test_tcp_ts_opt.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_tcp_ts_opt-test_tcp_ts_opt.Tpo $(DEPDIR)/test_tcp_ts_opt-test_tcp_ts_opt.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test_tcp_ts_opt.c' object='test_tcp_ts_opt-test_tcp_ts_opt.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_tcp_ts_opt_CPPFLAGS) $(CPPFLAGS) $(test_tcp_ts_opt_CFLAGS) $(CFLAGS) -c -o test_tcp_ts_opt-test_tcp_ts_opt.o `test -f 'test_tcp_ts_opt.c' || echo '$(srcdir)/'`test_tcp_ts_opt.c
+
+test_tcp_ts_opt-test_tcp_ts_opt.obj: test_tcp_ts_opt.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_tcp_ts_opt_CPPFLAGS) $(CPPFLAGS) $(test_tcp_ts_opt_CFLAGS) $(CFLAGS) -MT test_tcp_ts_opt-test_tcp_ts_opt.obj -MD -MP -MF $(DEPDIR)/test_tcp_ts_opt-test_tcp_ts_opt.Tpo -c -o test_tcp_ts_opt-test_tcp_ts_opt.obj `if test -f 'test_tcp_ts_opt.c'; then $(CYGPATH_W) 'test_tcp_ts_opt.c'; else $(CYGPATH_W) '$(srcdir)/test_tcp_ts_opt.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/test_tcp_ts_opt-test_tcp_ts_opt.Tpo $(DEPDIR)/test_tcp_ts_opt-test_tcp_ts_opt.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='test_tcp_ts_opt.c' object='test_tcp_ts_opt-test_tcp_ts_opt.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_tcp_ts_opt_CPPFLAGS) $(CPPFLAGS) $(test_tcp_ts_opt_CFLAGS) $(CFLAGS) -c -o test_tcp_ts_opt-test_tcp_ts_opt.obj `if test -f 'test_tcp_ts_opt.c'; then $(CYGPATH_W) 'test_tcp_ts_opt.c'; else $(CYGPATH_W) '$(srcdir)/test_tcp_ts_opt.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
@@ -866,6 +931,13 @@ recheck: all $(check_PROGRAMS)
 test_rfc4996.sh.log: test_rfc4996.sh
 	@p='test_rfc4996.sh'; \
 	b='test_rfc4996.sh'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+test_tcp_ts_opt.sh.log: test_tcp_ts_opt.sh
+	@p='test_tcp_ts_opt.sh'; \
+	b='test_tcp_ts_opt.sh'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

@@ -25,7 +25,7 @@
  * @author Didier Barvaux <didier@barvaux.org>
  */
 
-#include "c_generic.h"
+#include "rohc_comp_rfc3095.h"
 #include "c_ip.h"
 #include "rohc_traces_internal.h"
 #include "crc.h"
@@ -33,12 +33,12 @@
 #include "rohc_utils.h"
 
 #ifdef __KERNEL__
-#	include <linux/types.h>
+#  include <linux/types.h>
 #else
-#	include <stdbool.h>
+#  include <stdbool.h>
 #endif
 #ifndef __KERNEL__
-#	include <string.h>
+#  include <string.h>
 #endif
 #include <assert.h>
 
@@ -51,9 +51,9 @@
  * @brief Define the ESP part of the profile decompression context
  *
  * This object must be used with the generic part of the decompression
- * context c_generic_context.
+ * context rohc_comp_rfc3095_ctxt.
  *
- * @see c_generic_context
+ * @see rohc_comp_rfc3095_ctxt
  */
 struct sc_esp_context
 {
@@ -76,11 +76,11 @@ static bool c_esp_check_profile(const struct rohc_comp *const comp,
 
 static bool c_esp_check_context(const struct rohc_comp_ctxt *const context,
                                 const struct net_pkt *const packet)
-	__attribute__((warn_unused_result, nonnull(1, 2)));
+	__attribute__((warn_unused_result, nonnull(1, 2), pure));
 
 static int c_esp_encode(struct rohc_comp_ctxt *const context,
                         const struct net_pkt *const packet,
-                        unsigned char *const rohc_pkt,
+                        uint8_t *const rohc_pkt,
                         const size_t rohc_pkt_max_len,
                         rohc_packet_t *const packet_type,
                         size_t *const payload_offset)
@@ -91,14 +91,14 @@ static uint32_t c_esp_get_next_sn(const struct rohc_comp_ctxt *const context,
 	__attribute__((warn_unused_result, nonnull(1, 2)));
 
 static size_t esp_code_static_esp_part(const struct rohc_comp_ctxt *const context,
-                                       const unsigned char *const next_header,
-                                       unsigned char *const dest,
+                                       const uint8_t *const next_header,
+                                       uint8_t *const dest,
                                        const size_t counter)
 	__attribute__((warn_unused_result, nonnull(1, 2, 3)));
 
 static size_t esp_code_dynamic_esp_part(const struct rohc_comp_ctxt *const context,
-                                        const unsigned char *const next_header,
-                                        unsigned char *const dest,
+                                        const uint8_t *const next_header,
+                                        uint8_t *const dest,
                                         const size_t counter)
 	__attribute__((warn_unused_result, nonnull(1, 2, 3)));
 
@@ -121,7 +121,7 @@ static size_t esp_code_dynamic_esp_part(const struct rohc_comp_ctxt *const conte
 static bool c_esp_create(struct rohc_comp_ctxt *const context,
                          const struct net_pkt *const packet)
 {
-	struct c_generic_context *g_context;
+	struct rohc_comp_rfc3095_ctxt *rfc3095_ctxt;
 	struct sc_esp_context *esp_context;
 	const struct esphdr *esp;
 
@@ -130,12 +130,12 @@ static bool c_esp_create(struct rohc_comp_ctxt *const context,
 	assert(packet != NULL);
 
 	/* create and initialize the generic part of the profile context */
-	if(!c_generic_create(context, ROHC_LSB_SHIFT_ESP_SN, packet))
+	if(!rohc_comp_rfc3095_create(context, ROHC_LSB_SHIFT_ESP_SN, packet))
 	{
 		rohc_comp_warn(context, "generic context creation failed");
 		goto quit;
 	}
-	g_context = (struct c_generic_context *) context->specific;
+	rfc3095_ctxt = (struct rohc_comp_rfc3095_ctxt *) context->specific;
 
 	/* check that transport protocol is ESP */
 	assert(packet->transport->proto == ROHC_IPPROTO_ESP);
@@ -143,9 +143,9 @@ static bool c_esp_create(struct rohc_comp_ctxt *const context,
 	esp = (struct esphdr *) packet->transport->data;
 
 	/* initialize SN with the SN found in the ESP header */
-	g_context->sn = rohc_ntoh32(esp->sn);
+	rfc3095_ctxt->sn = rohc_ntoh32(esp->sn);
 	rohc_comp_debug(context, "initialize context(SN) = hdr(SN) of first "
-	                "packet = %u", g_context->sn);
+	                "packet = %u", rfc3095_ctxt->sn);
 
 	/* create the ESP part of the profile context */
 	esp_context = malloc(sizeof(struct sc_esp_context));
@@ -155,32 +155,32 @@ static bool c_esp_create(struct rohc_comp_ctxt *const context,
 		           "no memory for the ESP part of the profile context");
 		goto clean;
 	}
-	g_context->specific = esp_context;
+	rfc3095_ctxt->specific = esp_context;
 
 	/* initialize the ESP part of the profile context */
 	memcpy(&(esp_context->old_esp), esp, sizeof(struct esphdr));
 
 	/* init the ESP-specific variables and functions */
-	g_context->next_header_len = sizeof(struct esphdr);
-	g_context->encode_uncomp_fields = NULL;
-	g_context->decide_state = decide_state;
-	g_context->decide_FO_packet = c_ip_decide_FO_packet;
-	g_context->decide_SO_packet = c_ip_decide_SO_packet;
-	g_context->decide_extension = decide_extension;
-	g_context->init_at_IR = NULL;
-	g_context->get_next_sn = c_esp_get_next_sn;
-	g_context->code_static_part = esp_code_static_esp_part;
-	g_context->code_dynamic_part = esp_code_dynamic_esp_part;
-	g_context->code_ir_remainder = NULL;
-	g_context->code_UO_packet_head = NULL;
-	g_context->code_uo_remainder = NULL;
-	g_context->compute_crc_static = esp_compute_crc_static;
-	g_context->compute_crc_dynamic = esp_compute_crc_dynamic;
+	rfc3095_ctxt->next_header_len = sizeof(struct esphdr);
+	rfc3095_ctxt->encode_uncomp_fields = NULL;
+	rfc3095_ctxt->decide_state = rohc_comp_rfc3095_decide_state;
+	rfc3095_ctxt->decide_FO_packet = c_ip_decide_FO_packet;
+	rfc3095_ctxt->decide_SO_packet = c_ip_decide_SO_packet;
+	rfc3095_ctxt->decide_extension = decide_extension;
+	rfc3095_ctxt->init_at_IR = NULL;
+	rfc3095_ctxt->get_next_sn = c_esp_get_next_sn;
+	rfc3095_ctxt->code_static_part = esp_code_static_esp_part;
+	rfc3095_ctxt->code_dynamic_part = esp_code_dynamic_esp_part;
+	rfc3095_ctxt->code_ir_remainder = NULL;
+	rfc3095_ctxt->code_UO_packet_head = NULL;
+	rfc3095_ctxt->code_uo_remainder = NULL;
+	rfc3095_ctxt->compute_crc_static = esp_compute_crc_static;
+	rfc3095_ctxt->compute_crc_dynamic = esp_compute_crc_dynamic;
 
 	return true;
 
 clean:
-	c_generic_destroy(context);
+	rohc_comp_rfc3095_destroy(context);
 quit:
 	return false;
 }
@@ -198,7 +198,7 @@ quit:
  *  \li if there are at least 2 IP headers, the inner IP header is not an IP
  *      fragment
  *
- * @see c_generic_check_profile
+ * @see rohc_comp_rfc3095_check_profile
  *
  * This function is one of the functions that must exist in one profile for the
  * framework to work.
@@ -220,7 +220,7 @@ static bool c_esp_check_profile(const struct rohc_comp *const comp,
 
 	/* check that the the versions of outer and inner IP headers are 4 or 6
 	   and that outer and inner IP headers are not IP fragments */
-	ip_check = c_generic_check_profile(comp, packet);
+	ip_check = rohc_comp_rfc3095_check_profile(comp, packet);
 	if(!ip_check)
 	{
 		goto bad_profile;
@@ -272,17 +272,11 @@ bad_profile:
 static bool c_esp_check_context(const struct rohc_comp_ctxt *const context,
                                 const struct net_pkt *const packet)
 {
-	struct c_generic_context *g_context;
-	struct sc_esp_context *esp_context;
-	const struct esphdr *esp;
-
-	assert(context != NULL);
-	assert(packet != NULL);
-
-	assert(context->specific != NULL);
-	g_context = (struct c_generic_context *) context->specific;
-	assert(g_context->specific != NULL);
-	esp_context = (struct sc_esp_context *) g_context->specific;
+	const struct rohc_comp_rfc3095_ctxt *const rfc3095_ctxt =
+		(struct rohc_comp_rfc3095_ctxt *) context->specific;
+	const struct sc_esp_context *const esp_context =
+		(struct sc_esp_context *) rfc3095_ctxt->specific;
+	const struct esphdr *const esp = (struct esphdr *) packet->transport->data;
 
 	/* first, check the same parameters as for the IP-only profile */
 	if(!c_ip_check_context(context, packet))
@@ -291,8 +285,6 @@ static bool c_esp_check_context(const struct rohc_comp_ctxt *const context,
 	}
 
 	/* in addition, check Security parameters index (SPI) */
-	assert(packet->transport->data != NULL);
-	esp = (struct esphdr *) packet->transport->data;
 	if(esp_context->old_esp.spi != esp->spi)
 	{
 		goto bad_context;
@@ -320,12 +312,12 @@ bad_context:
  */
 static int c_esp_encode(struct rohc_comp_ctxt *const context,
                         const struct net_pkt *const uncomp_pkt,
-                        unsigned char *const rohc_pkt,
+                        uint8_t *const rohc_pkt,
                         const size_t rohc_pkt_max_len,
                         rohc_packet_t *const packet_type,
                         size_t *const payload_offset)
 {
-	struct c_generic_context *g_context;
+	struct rohc_comp_rfc3095_ctxt *rfc3095_ctxt;
 	struct sc_esp_context *esp_context;
 	const struct esphdr *esp;
 	int size;
@@ -336,25 +328,25 @@ static int c_esp_encode(struct rohc_comp_ctxt *const context,
 	assert(packet_type != NULL);
 
 	assert(context->specific != NULL);
-	g_context = (struct c_generic_context *) context->specific;
-	assert(g_context->specific != NULL);
-	esp_context = (struct sc_esp_context *) g_context->specific;
+	rfc3095_ctxt = (struct rohc_comp_rfc3095_ctxt *) context->specific;
+	assert(rfc3095_ctxt->specific != NULL);
+	esp_context = (struct sc_esp_context *) rfc3095_ctxt->specific;
 
 	/* retrieve the ESP header */
 	assert(uncomp_pkt->transport->data != NULL);
 	esp = (struct esphdr *) uncomp_pkt->transport->data;
 
 	/* encode the IP packet */
-	size = c_generic_encode(context, uncomp_pkt, rohc_pkt, rohc_pkt_max_len,
-	                        packet_type, payload_offset);
+	size = rohc_comp_rfc3095_encode(context, uncomp_pkt, rohc_pkt, rohc_pkt_max_len,
+	                                packet_type, payload_offset);
 	if(size < 0)
 	{
 		goto quit;
 	}
 
 	/* update the context with the new ESP header */
-	if(g_context->tmp.packet_type == ROHC_PACKET_IR ||
-	   g_context->tmp.packet_type == ROHC_PACKET_IR_DYN)
+	if(rfc3095_ctxt->tmp.packet_type == ROHC_PACKET_IR ||
+	   rfc3095_ctxt->tmp.packet_type == ROHC_PACKET_IR_DYN)
 	{
 		memcpy(&(esp_context->old_esp), esp, sizeof(struct esphdr));
 	}
@@ -376,8 +368,7 @@ quit:
 static uint32_t c_esp_get_next_sn(const struct rohc_comp_ctxt *const context __attribute__((unused)),
                                   const struct net_pkt *const uncomp_pkt)
 {
-	const struct esphdr *const esp =
-		(struct esphdr *) uncomp_pkt->transport->data;
+	const struct esphdr *const esp = (struct esphdr *) uncomp_pkt->transport->data;
 
 	return rohc_ntoh32(esp->sn);
 }
@@ -405,8 +396,8 @@ static uint32_t c_esp_get_next_sn(const struct rohc_comp_ctxt *const context __a
  * @return            The new position in the rohc-packet-under-build buffer
  */
 static size_t esp_code_static_esp_part(const struct rohc_comp_ctxt *const context,
-                                       const unsigned char *const next_header,
-                                       unsigned char *const dest,
+                                       const uint8_t *const next_header,
+                                       uint8_t *const dest,
                                        const size_t counter)
 {
 	const struct esphdr *const esp = (struct esphdr *) next_header;
@@ -441,8 +432,8 @@ static size_t esp_code_static_esp_part(const struct rohc_comp_ctxt *const contex
  * @return            The new position in the rohc-packet-under-build buffer
  */
 static size_t esp_code_dynamic_esp_part(const struct rohc_comp_ctxt *const context,
-                                        const unsigned char *const next_header,
-                                        unsigned char *const dest,
+                                        const uint8_t *const next_header,
+                                        uint8_t *const dest,
                                         const size_t counter)
 {
 	const struct esphdr *const esp = (struct esphdr *) next_header;
@@ -466,12 +457,11 @@ const struct rohc_comp_profile c_esp_profile =
 	.id             = ROHC_PROFILE_ESP, /* profile ID (see 8 in RFC 3095) */
 	.protocol       = ROHC_IPPROTO_ESP, /* IP protocol */
 	.create         = c_esp_create,     /* profile handlers */
-	.destroy        = c_generic_destroy,
+	.destroy        = rohc_comp_rfc3095_destroy,
 	.check_profile  = c_esp_check_profile,
 	.check_context  = c_esp_check_context,
 	.encode         = c_esp_encode,
-	.reinit_context = c_generic_reinit_context,
-	.feedback       = c_generic_feedback,
-	.use_udp_port   = c_generic_use_udp_port,
+	.reinit_context = rohc_comp_reinit_context,
+	.feedback       = rohc_comp_rfc3095_feedback,
 };
 

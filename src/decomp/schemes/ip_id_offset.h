@@ -18,7 +18,7 @@
  */
 
 /**
- * @file   ip_id_offset.h
+ * @file   decomp/schemes/ip_id_offset.h
  * @brief  Offset IP-ID decoding
  * @author Didier Barvaux <didier.barvaux@toulouse.viveris.com>
  * @author Didier Barvaux <didier@barvaux.org>
@@ -27,15 +27,15 @@
 #ifndef ROHC_DECOMP_IP_ID_OFFSET_H
 #define ROHC_DECOMP_IP_ID_OFFSET_H
 
+#include "decomp_wlsb.h"
+
 #include <stdint.h>
 #include <stdlib.h>
 #ifdef __KERNEL__
-#	include <linux/types.h>
+#  include <linux/types.h>
 #else
-#	include <stdbool.h>
+#  include <stdbool.h>
 #endif
-
-#include "dllexport.h"
 
 
 /* The definition of the Offset IP-ID decoding object is private */
@@ -46,21 +46,23 @@ struct ip_id_offset_decode;
  * Function prototypes.
  */
 
-struct ip_id_offset_decode * ROHC_EXPORT ip_id_offset_new(void);
+struct ip_id_offset_decode * ip_id_offset_new(void);
 
-void ROHC_EXPORT ip_id_offset_free(struct ip_id_offset_decode *const ipid)
+void ip_id_offset_free(struct ip_id_offset_decode *const ipid)
 	__attribute__((nonnull(1)));
 
-bool ROHC_EXPORT ip_id_offset_decode(const struct ip_id_offset_decode *const ipid,
-                                     const uint16_t m,
-                                     const size_t k,
-                                     const uint32_t sn,
-                                     uint16_t *const decoded)
-	__attribute__((nonnull(1, 5), warn_unused_result));
+bool ip_id_offset_decode(const struct ip_id_offset_decode *const ipid,
+                         const rohc_lsb_ref_t ref_type,
+                         const uint16_t m,
+                         const size_t k,
+                         const uint32_t sn,
+                         uint16_t *const decoded)
+	__attribute__((nonnull(1, 6), warn_unused_result));
 
-void ROHC_EXPORT ip_id_offset_set_ref(struct ip_id_offset_decode *const ipid,
-                                      const uint16_t id_ref,
-                                      const uint32_t sn_ref)
+void ip_id_offset_set_ref(struct ip_id_offset_decode *const ipid,
+                          const uint16_t id_ref,
+                          const uint32_t sn_ref,
+                          const bool keep_ref_minus_1)
 	__attribute__((nonnull(1)));
 
 #endif

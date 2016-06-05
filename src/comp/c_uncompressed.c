@@ -34,25 +34,6 @@
 #include <assert.h>
 
 
-/**
- * @brief The Uncompressed context
- *
- * The object defines the Uncompressed context that manages all kinds of
- * packets and headers.
- */
-struct sc_uncompressed_context
-{
-	/// The number of IR packets sent by the compressor
-	size_t ir_count;
-	/// The number of Normal packets sent by the compressor
-	size_t normal_count;
-	/// @brief The number of packet sent while in non-IR states, used for the
-	///        periodic refreshes of the context
-	/// @see uncompressed_periodic_down_transition
-	size_t go_back_ir_count;
-};
-
-
 /*
  * Prototypes of private functions
  */
@@ -65,9 +46,7 @@ static void c_uncompressed_destroy(struct rohc_comp_ctxt *const context)
 	__attribute__((nonnull(1)));
 static bool c_uncompressed_check_profile(const struct rohc_comp *const comp,
                                          const struct net_pkt *const packet)
-		__attribute__((warn_unused_result, nonnull(1, 2)));
-bool c_uncompressed_use_udp_port(const struct rohc_comp_ctxt *const context,
-                                 const unsigned int port);
+	__attribute__((warn_unused_result, nonnull(1, 2)));
 
 /* check whether a packet belongs to a context */
 static bool c_uncompressed_check_context(const struct rohc_comp_ctxt *const context,
@@ -77,49 +56,47 @@ static bool c_uncompressed_check_context(const struct rohc_comp_ctxt *const cont
 /* encode uncompressed packets */
 static int c_uncompressed_encode(struct rohc_comp_ctxt *const context,
                                  const struct net_pkt *const uncomp_pkt,
-                                 unsigned char *const rohc_pkt,
+                                 uint8_t *const rohc_pkt,
                                  const size_t rohc_pkt_max_len,
                                  rohc_packet_t *const packet_type,
                                  size_t *const payload_offset)
-		__attribute__((warn_unused_result, nonnull(1, 2, 3, 5, 6)));
-static int uncompressed_code_packet(const struct rohc_comp_ctxt *const context,
+	__attribute__((warn_unused_result, nonnull(1, 2, 3, 5, 6)));
+static int uncompressed_code_packet(struct rohc_comp_ctxt *const context,
                                     const struct net_pkt *const uncomp_pkt,
-                                    unsigned char *const rohc_pkt,
+                                    uint8_t *const rohc_pkt,
                                     const size_t rohc_pkt_max_len,
                                     rohc_packet_t *const packet_type,
                                     size_t *const payload_offset)
-		__attribute__((warn_unused_result, nonnull(1, 2, 3, 5, 6)));
+	__attribute__((warn_unused_result, nonnull(1, 2, 3, 5, 6)));
 static int uncompressed_code_IR_packet(const struct rohc_comp_ctxt *const context,
                                        const struct net_pkt *const uncomp_pkt,
-                                       unsigned char *const rohc_pkt,
+                                       uint8_t *const rohc_pkt,
                                        const size_t rohc_pkt_max_len,
                                        size_t *const payload_offset)
-		__attribute__((warn_unused_result, nonnull(1, 2, 3, 5)));
+	__attribute__((warn_unused_result, nonnull(1, 2, 3, 5)));
 static int uncompressed_code_normal_packet(const struct rohc_comp_ctxt *const context,
                                            const struct net_pkt *const uncomp_pkt,
-                                           unsigned char *const rohc_pkt,
+                                           uint8_t *const rohc_pkt,
                                            const size_t rohc_pkt_max_len,
                                            size_t *const payload_offset)
-		__attribute__((warn_unused_result, nonnull(1, 2, 3, 5)));
+	__attribute__((warn_unused_result, nonnull(1, 2, 3, 5)));
 
 /* re-initialize a context */
 static bool c_uncompressed_reinit_context(struct rohc_comp_ctxt *const context);
 
 /* deliver feedbacks */
 static bool uncomp_feedback(struct rohc_comp_ctxt *const context,
-                            const struct c_feedback *const feedback)
-	__attribute__((warn_unused_result, nonnull(1, 2)));
-static bool uncomp_feedback_2(struct rohc_comp_ctxt *const context,
-                              const struct c_feedback *const feedback)
-	__attribute__((warn_unused_result, nonnull(1, 2)));
+                            const enum rohc_feedback_type feedback_type,
+                            const uint8_t *const packet,
+                            const size_t packet_len,
+                            const uint8_t *const feedback_data,
+                            const size_t feedback_data_len)
+	__attribute__((warn_unused_result, nonnull(1, 3, 5)));
 
 /* mode and state transitions */
-static void uncompressed_decide_state(struct rohc_comp_ctxt *const context);
-static void uncompressed_periodic_down_transition(struct rohc_comp_ctxt *const context);
-static void uncompressed_change_mode(struct rohc_comp_ctxt *const context,
-                                     const rohc_mode_t new_mode);
-static void uncompressed_change_state(struct rohc_comp_ctxt *const context,
-                                      const rohc_comp_state_t new_state);
+static void uncompressed_decide_state(struct rohc_comp_ctxt *const context,
+                                      const ip_version ip_vers)
+	__attribute__((nonnull(1)));
 
 
 
@@ -142,30 +119,13 @@ static void uncompressed_change_state(struct rohc_comp_ctxt *const context,
 static bool c_uncompressed_create(struct rohc_comp_ctxt *const context,
                                   const struct net_pkt *const packet)
 {
-	struct sc_uncompressed_context *uncomp_context;
-	bool success = false;
-
 	assert(context != NULL);
 	assert(context->profile != NULL);
 	assert(packet != NULL);
 
-	uncomp_context = malloc(sizeof(struct sc_uncompressed_context));
-	if(uncomp_context == NULL)
-	{
-		rohc_error(context->compressor, ROHC_TRACE_COMP, context->profile->id,
-		           "no memory for the uncompressed context");
-		goto quit;
-	}
-	context->specific = uncomp_context;
+	context->specific = NULL;
 
-	uncomp_context->ir_count = 0;
-	uncomp_context->normal_count = 0;
-	uncomp_context->go_back_ir_count = 0;
-
-	success = true;
-
-quit:
-	return success;
+	return true;
 }
 
 
@@ -179,10 +139,7 @@ quit:
  */
 static void c_uncompressed_destroy(struct rohc_comp_ctxt *const context)
 {
-	if(context->specific != NULL)
-	{
-		zfree(context->specific);
-	}
+	zfree(context->specific);
 }
 
 
@@ -249,7 +206,7 @@ static bool c_uncompressed_check_context(const struct rohc_comp_ctxt *const cont
  */
 static int c_uncompressed_encode(struct rohc_comp_ctxt *const context,
                                  const struct net_pkt *const uncomp_pkt,
-                                 unsigned char *const rohc_pkt,
+                                 uint8_t *const rohc_pkt,
                                  const size_t rohc_pkt_max_len,
                                  rohc_packet_t *const packet_type,
                                  size_t *const payload_offset)
@@ -257,7 +214,7 @@ static int c_uncompressed_encode(struct rohc_comp_ctxt *const context,
 	int size;
 
 	/* STEP 1: decide state */
-	uncompressed_decide_state(context);
+	uncompressed_decide_state(context, ip_get_version(&uncomp_pkt->outer_ip));
 
 	/* STEP 2: Code packet */
 	size = uncompressed_code_packet(context, uncomp_pkt,
@@ -282,8 +239,8 @@ static bool c_uncompressed_reinit_context(struct rohc_comp_ctxt *const context)
 	assert(context != NULL);
 
 	/* go back to U-mode and IR state */
-	uncompressed_change_mode(context, ROHC_U_MODE);
-	uncompressed_change_state(context, ROHC_COMP_STATE_IR);
+	rohc_comp_change_mode(context, ROHC_U_MODE);
+	rohc_comp_change_state(context, ROHC_COMP_STATE_IR);
 
 	return true;
 }
@@ -295,184 +252,56 @@ static bool c_uncompressed_reinit_context(struct rohc_comp_ctxt *const context)
  * This function is one of the functions that must exist in one profile for
  * the framework to work.
  *
- * @param context  The compression context
- * @param feedback The feedback information
- * @return         true if the feedback was successfully handled,
- *                 false if the feedback could not be taken into account
+ * @param context            The compression context
+ * @param feedback_type      The feedback type among ROHC_FEEDBACK_1 and ROHC_FEEDBACK_2
+ * @param packet             The whole feedback packet with CID bits
+ * @param packet_len         The length of the whole feedback packet with CID bits
+ * @param feedback_data      The feedback data without the CID bits
+ * @param feedback_data_len  The length of the feedback data without the CID bits
+ * @return                   true if the feedback was successfully handled,
+ *                           false if the feedback could not be taken into account
  */
 static bool uncomp_feedback(struct rohc_comp_ctxt *const context,
-                            const struct c_feedback *const feedback)
+                            const enum rohc_feedback_type feedback_type,
+                            const uint8_t *const packet __attribute__((unused)),
+                            const size_t packet_len __attribute__((unused)),
+                            const uint8_t *const feedback_data,
+                            const size_t feedback_data_len)
 {
-	uint8_t *remain_data;
-	size_t remain_len;
+	const uint8_t *remain_data = feedback_data;
+	size_t remain_len = feedback_data_len;
 
-	assert(context->specific != NULL);
-	assert(context->used == 1);
-	assert(feedback->cid == context->cid);
-	assert(feedback->data != NULL);
-
-	remain_data = feedback->data + feedback->specific_offset;
-	remain_len = feedback->specific_size;
-
-	switch(feedback->type)
+	/* only FEEDBACK-1 is support by the Uncompressed profile */
+	if(feedback_type != ROHC_FEEDBACK_1)
 	{
-		case 1: /* FEEDBACK-1 ACK */
-			rohc_comp_debug(context, "FEEDBACK-1 received");
-			assert(remain_len == 1);
-			if(remain_data[0] != 0x00)
-			{
-				rohc_comp_warn(context, "profile-specific byte in FEEDBACK-1 "
-				               "should be zero for Uncompressed profile but it "
-				               "is 0x%02x", remain_data[0]);
-			}
-			break;
-		case 2: /* FEEDBACK-2 */
-			rohc_comp_debug(context, "FEEDBACK-2 received");
-			assert(remain_len >= 2);
-			if(!uncomp_feedback_2(context, feedback))
-			{
-				rohc_comp_warn(context, "failed to handle FEEDBACK-2");
-				goto error;
-			}
-			break;
-		default: /* not FEEDBACK-1 nor FEEDBACK-2 */
-			rohc_comp_warn(context, "feedback type not implemented (%d)",
-			               feedback->type);
-			goto error;
+		rohc_comp_warn(context, "feedback type not handled (%d)", feedback_type);
+		goto error;
 	}
 
-	return true;
+	rohc_comp_debug(context, "FEEDBACK-1 received");
+	assert(remain_len == 1);
 
-error:
-	return false;
-}
-
-
-/**
- * @brief Update the profile when a FEEDBACK-2 is received
- *
- * @param context  The compression context
- * @param feedback The feedback information
- * @return         true if the feedback was successfully handled,
- *                 false if the feedback could not be taken into account
- */
-static bool uncomp_feedback_2(struct rohc_comp_ctxt *const context,
-                              const struct c_feedback *const feedback)
-{
-	uint8_t *remain_data = feedback->data + feedback->specific_offset;
-	size_t remain_len = feedback->specific_size;
-	uint8_t crc_in_packet = 0; /* initialized to avoid a GCC warning */
-	bool is_crc_used = false;
-	uint8_t mode;
-
-	assert(remain_len >= 2);
-	mode = (remain_data[0] >> 4) & 3;
-	remain_data += 2;
-	remain_len -= 2;
-
-	/* parse FEEDBACK-2 options */
-	while(remain_len > 0)
+	/* FEEDBACK-1 profile-specific octet shall be 0 */
+	if(remain_data[0] != 0x00)
 	{
-		const uint8_t opt = (remain_data[0] >> 4) & 0x0f;
-		const uint8_t optlen = (remain_data[0] & 0x0f) + 1;
-
-		/* check min length */
-		if(remain_len < optlen)
-		{
-			rohc_comp_warn(context, "%zu-byte FEEDBACK-2 is too short for "
-			               "%u-byte option %u", remain_len, optlen, opt);
-			goto error;
-		}
-
-		switch(opt)
-		{
-			case 1: /* CRC */
-				crc_in_packet = remain_data[1];
-				is_crc_used = true;
-				remain_data[1] = 0; /* set to zero for crc computation */
-				break;
-			case 2: /* Reject */
-				/* ignore the option */
-				rohc_comp_warn(context, "ignore FEEDBACK-2 Reject option");
-				break;
-			case 3: /* SN-Not-Valid */
-				/* ignore the option */
-				rohc_comp_warn(context, "ignore FEEDBACK-2 SN-Not-Valid option");
-				break;
-			case 4: /* SN */
-				/* ignore the option */
-				rohc_comp_warn(context, "ignore FEEDBACK-2 SN option");
-				break;
-			case 7: /* Loss */
-				/* ignore the option */
-				rohc_comp_warn(context, "ignore FEEDBACK-2 Loss option");
-				break;
-			default:
-				rohc_comp_warn(context, "unknown feedback option %u", opt);
-				break;
-		}
-
-		remain_data += optlen;
-		remain_len -= optlen;
+		rohc_comp_warn(context, "profile-specific byte in FEEDBACK-1 should be zero "
+		               "for Uncompressed profile but it is 0x%02x", remain_data[0]);
+#ifdef ROHC_RFC_STRICT_DECOMPRESSOR
+		goto error;
+#endif
 	}
 
-	/* check CRC if present in feedback */
-	if(is_crc_used)
+	/* positive ACK received in U-mode: switch to O-mode */
+	if(context->mode == ROHC_U_MODE)
 	{
-		uint8_t crc_computed;
-
-		/* compute the CRC of the feedback packet */
-		crc_computed = crc_calculate(ROHC_CRC_TYPE_8, feedback->data,
-		                             feedback->size, CRC_INIT_8,
-		                             context->compressor->crc_table_8);
-
-		/* ignore feedback in case of bad CRC */
-		if(crc_in_packet != crc_computed)
-		{
-			rohc_comp_warn(context, "CRC check failed (size = %zu)", feedback->size);
-			goto error;
-		}
+		rohc_comp_change_mode(context, ROHC_O_MODE);
 	}
 
-	/* change mode if present in feedback */
-	if(mode != 0 && mode != context->mode)
+	/* positive ACK received in IR state: the compressor got the confidence that
+	 * the decompressor fully received the context, so switch to FO state */
+	if(context->state == ROHC_COMP_STATE_IR)
 	{
-		rohc_info(context->compressor, ROHC_TRACE_COMP, context->profile->id,
-		          "mode change (%d -> %d) requested by feedback for CID %d",
-		          context->mode, mode, context->profile->id);
-
-		/* mode can be changed only if feedback is protected by a CRC */
-		if(is_crc_used)
-		{
-			uncompressed_change_mode(context, mode);
-		}
-		else
-		{
-			rohc_comp_warn(context, "mode change requested without CRC");
-		}
-	}
-
-	switch(feedback->acktype)
-	{
-		case ACK:
-			rohc_info(context->compressor, ROHC_TRACE_COMP,
-			          context->profile->id, "ACK received");
-			break;
-		case NACK:
-			rohc_comp_warn(context, "NACK received");
-			break;
-		case STATIC_NACK:
-			rohc_comp_warn(context, "STATIC-NACK received");
-			uncompressed_change_state(context, ROHC_COMP_STATE_IR);
-			break;
-		case RESERVED:
-			rohc_comp_warn(context, "reserved field used");
-			break;
-		default:
-			/* impossible value */
-			rohc_comp_warn(context, "unknown ACK type (%d)",
-			               feedback->acktype);
-			goto error;
+		rohc_comp_change_state(context, ROHC_COMP_STATE_FO);
 	}
 
 	return true;
@@ -485,90 +314,34 @@ error:
 /**
  * @brief Decide the state that should be used for the next packet.
  *
- * @param context The compression context
+ * @param context  The compression context
+ * @param ip_vers  The IP version of the packet among IPV4, IPV6, IP_UNKNOWN,
+ *                 IPV4_MALFORMED, or IPV6_MALFORMED.
  */
-static void uncompressed_decide_state(struct rohc_comp_ctxt *const context)
+static void uncompressed_decide_state(struct rohc_comp_ctxt *const context,
+                                      const ip_version ip_vers)
 {
-	struct sc_uncompressed_context *uncomp_context =
-		(struct sc_uncompressed_context *) context->specific;
-
-	if(context->state == ROHC_COMP_STATE_IR &&
-	   uncomp_context->ir_count >= MAX_IR_COUNT)
+	/* non-IPv4/6 packets cannot be compressed with Normal packets because the
+	 * first byte could be mis-interpreted as ROHC packet types (see note at
+	 * the end of §5.10.2 in RFC 3095) */
+	if(ip_vers != IPV4 && ip_vers != IPV6)
 	{
-		uncompressed_change_state(context, ROHC_COMP_STATE_FO);
+		rohc_comp_debug(context, "force IR packet to avoid conflict between "
+		                "first payload byte and ROHC packet types");
+		rohc_comp_change_state(context, ROHC_COMP_STATE_IR);
+	}
+	else if(context->state == ROHC_COMP_STATE_IR &&
+	        context->ir_count >= MAX_IR_COUNT)
+	{
+		/* the compressor got the confidence that the decompressor fully received
+		 * the context: enough IR packets transmitted or positive ACK received */
+		rohc_comp_change_state(context, ROHC_COMP_STATE_FO);
 	}
 
+	/* periodic refreshes in U-mode only */
 	if(context->mode == ROHC_U_MODE)
 	{
-		uncompressed_periodic_down_transition(context);
-	}
-}
-
-
-/**
- * @brief Periodically change the context state after a certain number
- *        of packets.
- *
- * @param context The compression context
- */
-static void uncompressed_periodic_down_transition(struct rohc_comp_ctxt *const context)
-{
-	struct sc_uncompressed_context *uncomp_context =
-		(struct sc_uncompressed_context *) context->specific;
-
-	if(uncomp_context->go_back_ir_count >=
-	   context->compressor->periodic_refreshes_ir_timeout)
-	{
-		rohc_comp_debug(context, "periodic change to IR state");
-		uncomp_context->go_back_ir_count = 0;
-		uncompressed_change_state(context, ROHC_COMP_STATE_IR);
-	}
-
-	if(context->state == ROHC_COMP_STATE_FO)
-	{
-		uncomp_context->go_back_ir_count++;
-	}
-}
-
-
-/**
- * @brief Change the mode of the context.
- *
- * @param context  The compression context
- * @param new_mode The new mode the context must enter in
- */
-static void uncompressed_change_mode(struct rohc_comp_ctxt *const context,
-                                     const rohc_mode_t new_mode)
-{
-	if(context->mode != new_mode)
-	{
-		context->mode = new_mode;
-		uncompressed_change_state(context, ROHC_COMP_STATE_IR);
-	}
-}
-
-
-/**
- * @brief Change the state of the context.
- *
- * @param context   The compression context
- * @param new_state The new state the context must enter in
- */
-static void uncompressed_change_state(struct rohc_comp_ctxt *const context,
-                                      const rohc_comp_state_t new_state)
-{
-	struct sc_uncompressed_context *uncomp_context =
-		(struct sc_uncompressed_context *) context->specific;
-
-	/* reset counters only if different state */
-	if(context->state != new_state)
-	{
-		/* reset counters */
-		uncomp_context->ir_count = 0;
-		uncomp_context->normal_count = 0;
-
-		/* change state */
-		context->state = new_state;
+		rohc_comp_periodic_down_transition(context);
 	}
 }
 
@@ -585,44 +358,31 @@ static void uncompressed_change_state(struct rohc_comp_ctxt *const context,
  * @return                  The length of the ROHC packet if successful,
  *                         -1 otherwise
  */
-static int uncompressed_code_packet(const struct rohc_comp_ctxt *context,
+static int uncompressed_code_packet(struct rohc_comp_ctxt *const context,
                                     const struct net_pkt *const uncomp_pkt,
-                                    unsigned char *const rohc_pkt,
+                                    uint8_t *const rohc_pkt,
                                     const size_t rohc_pkt_max_len,
                                     rohc_packet_t *const packet_type,
                                     size_t *const payload_offset)
 {
 	int (*code_packet)(const struct rohc_comp_ctxt *const _context,
 	                   const struct net_pkt *const _uncomp_pkt,
-	                   unsigned char *const _rohc_pkt,
+	                   uint8_t *const _rohc_pkt,
 	                   const size_t _rohc_pkt_max_len,
 	                   size_t *const _payload_offset)
-		__attribute__((warn_unused_result, nonnull(1, 2, 3, 5)));
-	struct sc_uncompressed_context *uncomp_context =
-		(struct sc_uncompressed_context *) context->specific;
+	__attribute__((warn_unused_result, nonnull(1, 2, 3, 5)));
 	int size;
 
 	/* decide what packet to send depending on state and uncompressed packet */
 	if(context->state == ROHC_COMP_STATE_IR)
 	{
+		/* RFC3095 §5.10.3: IR state: Only IR packets can be sent */
 		*packet_type = ROHC_PACKET_IR;
 	}
 	else if(context->state == ROHC_COMP_STATE_FO)
 	{
-		/* non-IPv4/6 packets cannot be compressed with Normal packets
-		 * because the first byte could be mis-interpreted as ROHC packet
-		 * types (see note at the end of §5.10.2 in RFC 3095) */
-		if(ip_get_version(&uncomp_pkt->outer_ip) != IPV4 &&
-		   ip_get_version(&uncomp_pkt->outer_ip) != IPV6)
-		{
-			rohc_comp_debug(context, "force IR packet to avoid conflict between "
-			                "first payload byte and ROHC packet types");
-			*packet_type = ROHC_PACKET_IR;
-		}
-		else
-		{
-			*packet_type = ROHC_PACKET_NORMAL;
-		}
+		/* RFC3095 §5.10.3: Normal state: Only Normal packets can be sent */
+		*packet_type = ROHC_PACKET_NORMAL;
 	}
 	else
 	{
@@ -635,13 +395,13 @@ static int uncompressed_code_packet(const struct rohc_comp_ctxt *context,
 	if((*packet_type) == ROHC_PACKET_IR)
 	{
 		rohc_comp_debug(context, "build IR packet");
-		uncomp_context->ir_count++;
+		context->ir_count++;
 		code_packet = uncompressed_code_IR_packet;
 	}
 	else /* ROHC_PACKET_NORMAL */
 	{
 		rohc_comp_debug(context, "build normal packet");
-		uncomp_context->normal_count++;
+		context->fo_count++; /* FO is used instead of Normal */
 		code_packet = uncompressed_code_normal_packet;
 	}
 
@@ -696,7 +456,7 @@ error:
  */
 static int uncompressed_code_IR_packet(const struct rohc_comp_ctxt *context,
                                        const struct net_pkt *const uncomp_pkt __attribute__((unused)),
-                                       unsigned char *const rohc_pkt,
+                                       uint8_t *const rohc_pkt,
                                        const size_t rohc_pkt_max_len,
                                        size_t *const payload_offset)
 {
@@ -796,7 +556,7 @@ error:
  */
 static int uncompressed_code_normal_packet(const struct rohc_comp_ctxt *context,
                                            const struct net_pkt *const uncomp_pkt,
-                                           unsigned char *const rohc_pkt,
+                                           uint8_t *const rohc_pkt,
                                            const size_t rohc_pkt_max_len,
                                            size_t *const payload_offset)
 {
@@ -840,24 +600,6 @@ error:
 
 
 /**
- * @brief Whether the profile uses the given UDP port
- *
- * This function is one of the functions that must exist in one profile for the
- * framework to work.
- *
- * @param context The compression context
- * @param port    The port number to check
- * @return        Always return false because the Uncompressed profile does not
- *                use UDP port
- */
-bool c_uncompressed_use_udp_port(const struct rohc_comp_ctxt *const context __attribute__((unused)),
-                                 const unsigned int port __attribute__((unused)))
-{
-	return false;
-}
-
-
-/**
  * @brief Define the compression part of the Uncompressed profile as described
  *        in the RFC 3095.
  */
@@ -872,6 +614,5 @@ const struct rohc_comp_profile c_uncompressed_profile =
 	.encode         = c_uncompressed_encode,
 	.reinit_context = c_uncompressed_reinit_context,
 	.feedback       = uncomp_feedback,
-	.use_udp_port   = c_uncompressed_use_udp_port,
 };
 

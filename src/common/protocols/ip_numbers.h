@@ -37,13 +37,11 @@
 #define ROHC_PROTOCOLS_NUMBERS_H
 
 #ifdef __KERNEL__
-#	include <linux/types.h>
+#  include <linux/types.h>
 #else
-#	include <stdbool.h>
-#	include <stdint.h>
+#  include <stdbool.h>
+#  include <stdint.h>
 #endif
-
-#include "dllexport.h"
 
 
 /**
@@ -90,13 +88,19 @@ enum
 	ROHC_IPPROTO_RESERVED1 = 253,
 	/** The IP protocol number reserved for experimentation and testing */
 	ROHC_IPPROTO_RESERVED2 = 254,
+	/** The maximum IP protocol number */
+	ROHC_IPPROTO_MAX       = 255
 };
 
 
-bool ROHC_EXPORT rohc_is_tunneling(const uint8_t protocol)
-	__attribute((warn_unused_result, pure));
+bool rohc_is_tunneling(const uint8_t protocol)
+	__attribute__((warn_unused_result, const));
 
-bool ROHC_EXPORT rohc_is_ipv6_opt(const uint8_t protocol)
-	__attribute((warn_unused_result, pure));
+bool rohc_is_ipv6_opt(const uint8_t protocol)
+	__attribute__((warn_unused_result, const));
+
+const char * rohc_get_ip_proto_descr(const uint8_t protocol)
+	__attribute__((warn_unused_result, const));
 
 #endif
+

@@ -64,6 +64,9 @@
 #include <syslog.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <linux/if.h>
 
 /* include for the PCAP library */
 #if HAVE_PCAP_PCAP_H == 1
@@ -88,10 +91,10 @@ for ./configure ? If yes, check configure output and config.log"
 #define max(x, y)  (((x) > (y)) ? (x) : (y))
 
 /** The device MTU (TODO: should not be hardcoded) */
-#define DEV_MTU 1518U
+#define DEV_MTU  0xffffU
 
 /** The maximal size for the ROHC packets */
-#define MAX_ROHC_SIZE  (5 * 1024)
+#define MAX_ROHC_SIZE  (DEV_MTU + 100U)
 
 /** The length of the Linux Cooked Sockets header */
 #define LINUX_COOKED_HDR_LEN  16U
@@ -113,11 +116,15 @@ struct sniffer_stats_t
 	unsigned long comp_pre_nr_units;
 	/** Cumulative number of bytes before ROHC compression */
 	unsigned long comp_pre_nr_bytes;
+	/** Cumulative number of header bytes before ROHC compression */
+	unsigned long comp_pre_nr_hdr_bytes;
 
 	/** Cumulative number of units after ROHC compression */
 	unsigned long comp_post_nr_units;
 	/** Cumulative number of bytes after ROHC compression */
 	unsigned long comp_post_nr_bytes;
+	/** Cumulative number of header bytes after ROHC compression */
+	unsigned long comp_post_nr_hdr_bytes;
 
 	/** Cumulative number of packets per ROHC profile */
 	unsigned long comp_nr_pkts_per_profile[ROHC_PROFILE_UDPLITE + 1];
@@ -126,7 +133,7 @@ struct sniffer_stats_t
 	/** Cumulative number of packets per state */
 	unsigned long comp_nr_pkts_per_state[ROHC_COMP_STATE_SO + 1];
 	/** Cumulative number of packets per packet type */
-	unsigned long comp_nr_pkts_per_pkt_type[ROHC_PACKET_TCP_SEQ_8 + 1];
+	unsigned long comp_nr_pkts_per_pkt_type[ROHC_PACKET_MAX];
 	/** Cumulative number of times a context is reused (first time included) */
 	unsigned long comp_nr_reused_cid;
 
@@ -196,6 +203,12 @@ static bool rtp_detect_cb(const unsigned char *const ip,
                           void *const rtp_private)
 	__attribute__((nonnull(1, 2, 3), warn_unused_result));
 
+static bool is_path_correct(const char *const path)
+	__attribute__((warn_unused_result, nonnull(1)));
+
+static bool write_pid_file(const char *const path)
+	__attribute__((warn_unused_result, nonnull(1)));
+
 
 /** Whether the application shall stop or not */
 static bool stop_program;
@@ -208,6 +221,9 @@ static bool is_daemon;
 
 /** Whether the application runs in verbose mode or not */
 static bool is_verbose;
+
+/** Whether the application prints stats at regular interval of time or not */
+static bool do_print_stat;
 
 /** The PCAP dumpers */
 static pcap_dumper_t *sniffer_dumpers[ROHC_LARGE_CID_MAX + 1] = { 0 };
@@ -225,7 +241,7 @@ static int last_traces_first;
 static int last_traces_last;
 
 /** Whether to print traces on stderr or not */
-static bool do_print_stderr;
+static bool do_print_stderr = true;
 
 /** Print a trace in syslog and eventually on stderr */
 #define SNIFFER_LOG(prio, format, ...) \
@@ -255,6 +271,7 @@ int main(int argc, char *argv[])
 	const int do_close_fds = 1;
 	int enabled_profiles[ROHC_PROFILE_UDPLITE + 1];
 	char *pidfilename = NULL;
+	bool pidfile_created = false;
 	char *cid_type_name = NULL;
 	char *device_name = NULL;
 	int max_contexts = ROHC_SMALL_CID_MAX + 1;
@@ -272,6 +289,8 @@ int main(int argc, char *argv[])
 
 	/* set to quiet mode by default */
 	is_verbose = false;
+	/* disable stat printing by default */
+	do_print_stat = false;
 	/* disable daemon mode by default */
 	is_daemon = false;
 
@@ -325,6 +344,11 @@ int main(int argc, char *argv[])
 			/* enable verbose mode */
 			is_verbose = true;
 		}
+		else if(!strcmp(*argv, "--stat"))
+		{
+			/* enable stat mode */
+			do_print_stat = true;
+		}
 		else if(!strcmp(*argv, "--daemon") || !strcmp(*argv, "-d"))
 		{
 			/* enable daemon mode */
@@ -374,12 +398,18 @@ int main(int argc, char *argv[])
 	}
 
 	/* check CID type */
-	if(!strcmp(cid_type_name, "smallcid"))
+	if(cid_type_name == NULL)
+	{
+		SNIFFER_LOG(LOG_WARNING, "missing mandatory CID_TYPE parameter");
+		usage();
+		goto error;
+	}
+	else if(!strcmp(cid_type_name, "smallcid"))
 	{
 		cid_type = ROHC_SMALL_CID;
 
 		/* the maximum number of ROHC contexts should be valid */
-		if(max_contexts < 1 || max_contexts > (ROHC_SMALL_CID_MAX + 1))
+		if(max_contexts < 1 || (size_t) max_contexts > (ROHC_SMALL_CID_MAX + 1))
 		{
 			SNIFFER_LOG(LOG_WARNING, "the maximum number of ROHC contexts "
 			            "should be between 1 and %u", ROHC_SMALL_CID_MAX + 1);
@@ -392,7 +422,7 @@ int main(int argc, char *argv[])
 		cid_type = ROHC_LARGE_CID;
 
 		/* the maximum number of ROHC contexts should be valid */
-		if(max_contexts < 1 || max_contexts > (ROHC_LARGE_CID_MAX + 1))
+		if(max_contexts < 1 || (size_t) max_contexts > (ROHC_LARGE_CID_MAX + 1))
 		{
 			SNIFFER_LOG(LOG_WARNING, "the maximum number of ROHC contexts "
 			            "should be between 1 and %u", ROHC_LARGE_CID_MAX + 1);
@@ -400,10 +430,16 @@ int main(int argc, char *argv[])
 			goto error;
 		}
 	}
-	else
+	else if(strlen(cid_type_name) <= 100)
 	{
 		SNIFFER_LOG(LOG_WARNING, "invalid CID type '%s', only 'smallcid' and "
 		            "'largecid' expected", cid_type_name);
+		goto error;
+	}
+	else
+	{
+		SNIFFER_LOG(LOG_WARNING, "invalid CID type, only 'smallcid' and "
+		            "'largecid' expected");
 		goto error;
 	}
 
@@ -414,6 +450,12 @@ int main(int argc, char *argv[])
 		usage();
 		goto error;
 	}
+	if(strlen(device_name) >= IFNAMSIZ)
+	{
+		SNIFFER_LOG(LOG_WARNING, "DEVICE name too long, should be strictly less "
+		            "than %zu characters", (size_t) IFNAMSIZ);
+		goto error;
+	}
 
 	/* --pidfile cannot be used in foreground mode */
 	if(pidfilename != NULL && !is_daemon)
@@ -421,6 +463,11 @@ int main(int argc, char *argv[])
 		SNIFFER_LOG(LOG_WARNING, "option --pidfile cannot be used without "
 		            "option --daemon");
 		usage();
+		goto error;
+	}
+	if(pidfilename != NULL && !is_path_correct(pidfilename))
+	{
+		SNIFFER_LOG(LOG_WARNING, "PID file path is not valid");
 		goto error;
 	}
 
@@ -458,38 +505,13 @@ int main(int argc, char *argv[])
 			goto error;
 		}
 
-		if(pidfilename != NULL)
+		if(pidfilename != NULL && !write_pid_file(pidfilename))
 		{
-			FILE *pidfile;
-
-			pidfile = fopen(pidfilename, "w");
-			if(pidfile == NULL)
-			{
-				SNIFFER_LOG(LOG_WARNING, "failed to open PID file '%s': %s (%d)",
-				            pidfilename, strerror(errno), errno);
-				goto error;
-			}
-			ret = fprintf(pidfile, "%d\n", getpid());
-			if(ret <= 0)
-			{
-				SNIFFER_LOG(LOG_WARNING, "failed to write PID in file '%s': "
-				            "%s (%d)", pidfilename, strerror(errno), errno);
-				ret = fclose(pidfile);
-				if(ret != 0)
-				{
-					SNIFFER_LOG(LOG_WARNING, "failed to close PID file '%s': "
-					            "%s (%d)", pidfilename, strerror(errno), errno);
-				}
-				goto error;
-			}
-			ret = fclose(pidfile);
-			if(ret != 0)
-			{
-				SNIFFER_LOG(LOG_WARNING, "failed to close PID file '%s': %s (%d)",
-				            pidfilename, strerror(errno), errno);
-				goto error;
-			}
+			SNIFFER_LOG(LOG_WARNING, "failed to write PID into PID file '%s': "
+			            "%s (%d)", pidfilename, strerror(errno), errno);
+			goto error;
 		}
+		pidfile_created = true;
 	}
 
 	SNIFFER_LOG(LOG_INFO, "starting ROHC sniffer");
@@ -513,7 +535,7 @@ int main(int argc, char *argv[])
 		goto error;
 	}
 
-	if(pidfilename != NULL)
+	if(pidfilename != NULL && pidfile_created)
 	{
 		ret = unlink(pidfilename);
 		if(ret != 0)
@@ -527,7 +549,7 @@ int main(int argc, char *argv[])
 	return 0;
 
 error:
-	if(pidfilename != NULL)
+	if(pidfilename != NULL && pidfile_created)
 	{
 		ret = unlink(pidfilename);
 		if(ret != 0)
@@ -566,6 +588,7 @@ static void usage(void)
 	       "      --disable PROFILE   A ROHC profile to disable\n"
 	       "                          (may be specified several times)\n"
 	       "      --verbose           Make the test more verbose\n"
+	       "      --stat              Print statistics at regular interval of time\n"
 	       "\n"
 	       "Examples:\n"
 	       "  rohc_sniffer smallcid eth0          compress traffic from eth0\n"
@@ -594,6 +617,7 @@ static void sniffer_interrupt(int signum)
 	if(signum == SIGSEGV || signum == SIGABRT)
 	{
 		int i;
+		size_t j;
 
 		if(signum == SIGSEGV)
 		{
@@ -607,12 +631,12 @@ static void sniffer_interrupt(int signum)
 		}
 
 		/* close PCAP dumpers */
-		for(i = 0; i <= ROHC_LARGE_CID_MAX; i++)
+		for(j = 0; j <= ROHC_LARGE_CID_MAX; j++)
 		{
-			if(sniffer_dumpers[i] != NULL)
+			if(sniffer_dumpers[j] != NULL)
 			{
-				SNIFFER_LOG(LOG_INFO, "close dump file for context with ID %u", i);
-				pcap_dump_close(sniffer_dumpers[i]);
+				SNIFFER_LOG(LOG_INFO, "close dump file for context with ID %zu", j);
+				pcap_dump_close(sniffer_dumpers[j]);
 			}
 		}
 
@@ -621,6 +645,7 @@ static void sniffer_interrupt(int signum)
 		{
 			SNIFFER_LOG(LOG_NOTICE, "no trace to print");
 			raise(SIGKILL);
+			return;
 		}
 
 		if(last_traces_first <= last_traces_last)
@@ -653,6 +678,7 @@ static void sniffer_interrupt(int signum)
 			action.sa_handler = SIG_DFL;
 			sigaction(SIGSEGV, &action, NULL);
 			raise(signum);
+			return;
 		}
 	}
 }
@@ -723,29 +749,31 @@ static void sniffer_print_stats(int signum __attribute__((unused)))
 	SNIFFER_LOG(LOG_INFO, "compression gain:");
 	if(sniffer_stats.comp_unit_size == 1)
 	{
-		SNIFFER_LOG(LOG_INFO, "  pre-compress: %lu bytes",
-		            sniffer_stats.comp_pre_nr_bytes);
+		SNIFFER_LOG(LOG_INFO, "  pre-compress: %lu bytes (incl. %lu KB of headers)",
+		            sniffer_stats.comp_pre_nr_bytes, sniffer_stats.comp_pre_nr_hdr_bytes / 1000);
 	}
 	else
 	{
-		SNIFFER_LOG(LOG_INFO, "  pre-compress: %lu %s",
+		SNIFFER_LOG(LOG_INFO, "  pre-compress: %lu %s (incl. %lu KB of headers)",
 		            sniffer_stats.comp_pre_nr_units,
 		            sniffer_stats.comp_unit_size == 1000 ? "KB" :
 		            (sniffer_stats.comp_unit_size == 1000*1000 ? "MB" :
-		             (sniffer_stats.comp_unit_size == 1000*1000*1000 ? "GB" : "?")));
+		             (sniffer_stats.comp_unit_size == 1000*1000*1000 ? "GB" : "?")),
+		            sniffer_stats.comp_pre_nr_hdr_bytes / 1000);
 	}
 	if(sniffer_stats.comp_unit_size == 1)
 	{
-		SNIFFER_LOG(LOG_INFO, "  post-compress: %lu bytes",
-		            sniffer_stats.comp_post_nr_bytes);
+		SNIFFER_LOG(LOG_INFO, "  post-compress: %lu bytes (incl. %lu KB of headers)",
+		            sniffer_stats.comp_post_nr_bytes, sniffer_stats.comp_post_nr_hdr_bytes / 1000);
 	}
 	else
 	{
-		SNIFFER_LOG(LOG_INFO, "  post-compress: %lu %s",
+		SNIFFER_LOG(LOG_INFO, "  post-compress: %lu %s (incl. %lu KB of headers)",
 		            sniffer_stats.comp_post_nr_units,
 		            sniffer_stats.comp_unit_size == 1000 ? "KB" :
 		            (sniffer_stats.comp_unit_size == 1000*1000 ? "MB" :
-		             (sniffer_stats.comp_unit_size == 1000*1000*1000 ? "GB" : "?")));
+		             (sniffer_stats.comp_unit_size == 1000*1000*1000 ? "GB" : "?")),
+		            sniffer_stats.comp_post_nr_hdr_bytes / 1000);
 	}
 	if(sniffer_stats.comp_unit_size == 1)
 	{
@@ -756,11 +784,15 @@ static void sniffer_print_stats(int signum __attribute__((unused)))
 	}
 	else
 	{
-		SNIFFER_LOG(LOG_INFO, "  compress ratio: %llu%% of total, ie. %llu%% "
-		            "of gain",
+		SNIFFER_LOG(LOG_INFO, "  compress ratio: %llu%% of total packets, ie. %llu%% "
+		            "of gain on full packets",
 		            compute_percent(sniffer_stats.comp_post_nr_units, sniffer_stats.comp_pre_nr_units),
 		            100 - compute_percent(sniffer_stats.comp_post_nr_units, sniffer_stats.comp_pre_nr_units));
 	}
+	SNIFFER_LOG(LOG_INFO, "  compress ratio: %llu%% of total headers, ie. %llu%% "
+	            "of gain on headers alone",
+	            compute_percent(sniffer_stats.comp_post_nr_hdr_bytes, sniffer_stats.comp_pre_nr_hdr_bytes),
+	            100 - compute_percent(sniffer_stats.comp_post_nr_hdr_bytes, sniffer_stats.comp_pre_nr_hdr_bytes));
 	SNIFFER_LOG(LOG_INFO, "  used and re-used contexts: %lu",
 	            sniffer_stats.comp_nr_reused_cid);
 
@@ -775,7 +807,7 @@ static void sniffer_print_stats(int signum __attribute__((unused)))
 	SNIFFER_LOG(LOG_INFO, "  Uncompressed profile: %lu packets (%llu%%)",
 	            sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UNCOMPRESSED],
 	            compute_percent(sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_UNCOMPRESSED],
-	                    total));
+	                            total));
 	SNIFFER_LOG(LOG_INFO, "  IP/UDP/RTP profile: %lu packets (%llu%%)",
 	            sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_RTP],
 	            compute_percent(sniffer_stats.comp_nr_pkts_per_profile[ROHC_PROFILE_RTP], total));
@@ -825,14 +857,14 @@ static void sniffer_print_stats(int signum __attribute__((unused)))
 	/* packets per packet type */
 	SNIFFER_LOG(LOG_INFO, "packets per packet type:");
 	total = 0;
-	for(i = ROHC_PACKET_IR; i <= ROHC_PACKET_TCP_SEQ_8; i++)
+	for(i = ROHC_PACKET_IR; i < ROHC_PACKET_MAX; i++)
 	{
 		total += sniffer_stats.comp_nr_pkts_per_pkt_type[i];
 	}
-	for(i = ROHC_PACKET_IR; i <= ROHC_PACKET_TCP_SEQ_8; i++)
+	for(i = ROHC_PACKET_IR; i < ROHC_PACKET_MAX; i++)
 	{
 		if(i != ROHC_PACKET_UNKNOWN &&
-		   strcmp(rohc_get_packet_descr(i), "no description") != 0)
+		   strcmp(rohc_get_packet_descr(i), "unknown ROHC packet") != 0)
 		{
 			SNIFFER_LOG(LOG_INFO, "  packet type %s: %lu packets (%llu%%)",
 			            rohc_get_packet_descr(i),
@@ -1031,6 +1063,16 @@ static bool sniff(const rohc_cid_type_t cid_type,
 			}
 			printf("packet #%lu", sniffer_stats.total_packets);
 			fflush(stdout);
+
+			if(do_print_stat && (sniffer_stats.total_packets % 1000) == 0)
+			{
+				printf("\n\n");
+				fprintf(stderr, "================================================\n");
+				sniffer_print_stats(SIGUSR1);
+				fprintf(stderr, "================================================\n");
+				fprintf(stderr, "\n");
+				fflush(stderr);
+			}
 		}
 
 		/* compress & decompress from compressor to decompressor */
@@ -1164,11 +1206,8 @@ static int compress_decompress(struct rohc_comp *comp,
 	/* check Ethernet frame length */
 	if(header.len <= link_len_src || header.len != header.caplen)
 	{
-		if(is_verbose)
-		{
-			SNIFFER_LOG(LOG_WARNING, "bad PCAP packet (full len = %d, capture "
-			            "len = %d)", header.len, header.caplen);
-		}
+		SNIFFER_LOG(LOG_WARNING, "bad PCAP packet (full len = %u, capture "
+		            "len = %u)", header.len, header.caplen);
 		ret = -3;
 		goto error;
 	}
@@ -1199,12 +1238,9 @@ static int compress_decompress(struct rohc_comp *comp,
 
 		if(tot_len < ip_packet.len)
 		{
-			if(is_verbose)
-			{
-				SNIFFER_LOG(LOG_INFO, "the Ethernet frame has %zd bytes of "
-				            "padding after the %u byte IP packet!",
-				            ip_packet.len - tot_len, tot_len);
-			}
+			SNIFFER_LOG(LOG_INFO, "the Ethernet frame has %zu bytes of "
+			            "padding after the %u byte IP packet!",
+			            ip_packet.len - tot_len, tot_len);
 			ip_packet.len = tot_len;
 		}
 	}
@@ -1266,7 +1302,9 @@ static int compress_decompress(struct rohc_comp *comp,
 		goto error;
 	}
 	stats->comp_pre_nr_bytes += ip_packet.len;
+	stats->comp_pre_nr_hdr_bytes += comp_last_packet_info.header_last_uncomp_size;
 	stats->comp_post_nr_bytes += rohc_packet.len;
+	stats->comp_post_nr_hdr_bytes += comp_last_packet_info.header_last_comp_size;
 	possible_unit = stats->comp_unit_size;
 	if(stats->comp_unit_size == 1)
 	{
@@ -1300,10 +1338,10 @@ static int compress_decompress(struct rohc_comp *comp,
 			unsigned long rest;
 			rest = stats->comp_pre_nr_units % 1000;
 			stats->comp_pre_nr_units /= 1000;
-			stats->comp_pre_nr_bytes += rest * possible_unit;
+			stats->comp_pre_nr_bytes += rest * stats->comp_unit_size;
 			rest = stats->comp_post_nr_units % 1000;
 			stats->comp_post_nr_units /= 1000;
-			stats->comp_post_nr_bytes += rest * possible_unit;
+			stats->comp_post_nr_bytes += rest * stats->comp_unit_size;
 		}
 		stats->comp_unit_size = possible_unit;
 	}
@@ -1488,8 +1526,8 @@ static int compare_packets(const struct rohc_buf pkt1,
 
 	if(pkt1.len != pkt2.len)
 	{
-		SNIFFER_LOG(LOG_WARNING, "packets have different sizes (%zd != %zd), "
-		            "compare only the %zd first bytes",
+		SNIFFER_LOG(LOG_WARNING, "packets have different sizes (%zu != %zu), "
+		            "compare only the %zu first bytes",
 		            pkt1.len, pkt2.len, min_size);
 	}
 
@@ -1667,25 +1705,24 @@ static void print_rohc_traces(void *const priv_ctxt __attribute__((unused)),
                               const int profile __attribute__((unused)),
                               const char *format, ...)
 {
-	const char *level_descrs[] =
-	{
-		[ROHC_TRACE_DEBUG]   = "DEBUG",
-		[ROHC_TRACE_INFO]    = "INFO",
-		[ROHC_TRACE_WARNING] = "WARNING",
-		[ROHC_TRACE_ERROR]   = "ERROR"
-	};
-
 	if(level >= ROHC_TRACE_WARNING || is_verbose)
 	{
 		va_list args;
-		if(do_print_stderr)
+		if(!is_daemon)
 		{
+			const char *level_descrs[] =
+			{
+				[ROHC_TRACE_DEBUG]   = "DEBUG",
+				[ROHC_TRACE_INFO]    = "INFO",
+				[ROHC_TRACE_WARNING] = "WARNING",
+				[ROHC_TRACE_ERROR]   = "ERROR"
+			};
 			fprintf(stdout, "[%s] ", level_descrs[level]);
 			va_start(args, format);
 			vfprintf(stdout, format, args);
 			va_end(args);
 		}
-		if(is_daemon)
+		else
 		{
 			va_start(args, format);
 			vsyslog(LOG_DEBUG, format, args);
@@ -1705,9 +1742,15 @@ static void print_rohc_traces(void *const priv_ctxt __attribute__((unused)),
 		va_list args;
 		va_start(args, format);
 		vsnprintf(last_traces[last_traces_last], MAX_TRACE_LEN + 1, format, args);
-		/* TODO: check return code */
 		last_traces[last_traces_last][MAX_TRACE_LEN] = '\0';
+		/* TODO: check return code */
 		va_end(args);
+		/* remove the final \n if present */
+		if(strlen(last_traces[last_traces_last]) >= 1 &&
+		   last_traces[last_traces_last][strlen(last_traces[last_traces_last]) - 1] == '\n')
+		{
+			last_traces[last_traces_last][strlen(last_traces[last_traces_last]) - 1] = '\0';
+		}
 	}
 	if(last_traces_first == -1)
 	{
@@ -1784,7 +1827,7 @@ static bool rtp_detect_cb(const unsigned char *const ip,
 
 	/* the UDP destination port of RTP packet is even (the RTCP destination
 	 * port are RTP destination port + 1, so it is odd) */
-	if((ntohs(udp_sport) % 2) != 0 || (ntohs(udp_dport) % 2) != 0)
+	if((ntohs(udp_dport) % 2) != 0)
 	{
 		goto not_rtp;
 	}
@@ -1812,9 +1855,8 @@ static bool rtp_detect_cb(const unsigned char *const ip,
 	 * telephony-event (0x65), Speex (0x72),
 	 * or dynamic RTP type 125 (0x7d) */
 	rtp_pt = payload[1] & 0x7f;
-	if (rtp_pt != 0x03 && rtp_pt != 0x04 && rtp_pt != 0x12 &&
-	    rtp_pt != 0x61 && rtp_pt != 0x65 && rtp_pt != 0x72 &&
-	    rtp_pt != 0x7d)
+	if(rtp_pt != 0x03 && rtp_pt != 0x04 && rtp_pt != 0x12 && rtp_pt != 0x61 &&
+	   rtp_pt != 0x65 && rtp_pt != 0x72 && rtp_pt != 0x7d)
 	{
 		goto not_rtp;
 	}
@@ -1824,5 +1866,129 @@ static bool rtp_detect_cb(const unsigned char *const ip,
 
 not_rtp:
 	return is_rtp;
+}
+
+
+/**
+ * @brief Check path against max full path length and max filename length
+ *
+ * @param path  The path to check
+ * @return      true if the path is correct, false if it is not
+ */
+static bool is_path_correct(const char *const path)
+{
+	const char *filename;
+
+	if(strlen(path) == 0)
+	{
+		SNIFFER_LOG(LOG_WARNING, "file path too short, should be at least 1 "
+		            "characters");
+		return false;
+	}
+	else if(strlen(path) >= PATH_MAX)
+	{
+		SNIFFER_LOG(LOG_WARNING, "file path too long, should be strictly "
+		            "less than %zu characters but it is %zu", (size_t) PATH_MAX,
+		            strlen(path));
+		return false;
+	}
+
+	filename = strrchr(path, '/');
+	if(filename == NULL)
+	{
+		filename = path;
+	}
+	else
+	{
+		filename++;
+	}
+
+	if(strlen(filename) == 0)
+	{
+		SNIFFER_LOG(LOG_WARNING, "file name too short, should be at least 1 "
+		            "characters");
+		return false;
+	}
+	else if(strlen(filename) >= NAME_MAX)
+	{
+		SNIFFER_LOG(LOG_WARNING, "file name too long, should be strictly "
+		            "less than %zu characters but it is %zu", (size_t) NAME_MAX,
+		            strlen(filename));
+		return false;
+	}
+
+	return true;
+}
+
+
+/**
+ * @brief Write the daemon PID into the given PID file
+ *
+ * @param path  The PID file path
+ * @return      true if the PID was successfully written down,
+ *              false if it was not
+ */
+static bool write_pid_file(const char *const path)
+{
+	const size_t pid_max_size = 64;
+	char pid[pid_max_size];
+	int pidfile;
+	bool is_success = false;
+	int ret;
+
+	/* create file, fails if file already exists */
+	pidfile = open(path, O_CREAT | O_EXCL | O_NOFOLLOW | O_SYNC, S_IRUSR | S_IWUSR);
+	if(pidfile < 0)
+	{
+		SNIFFER_LOG(LOG_WARNING, "failed to create PID file '%s': %s (%d)",
+		            path, strerror(errno), errno);
+		goto error;
+	}
+
+	/* convert PID from integer to string */
+	ret = snprintf(pid, pid_max_size, "%d\n", getpid());
+	if(ret < 0 || ((size_t) ret) >= pid_max_size)
+	{
+		SNIFFER_LOG(LOG_WARNING, "failed to write PID in file '%s': failed to "
+		            "convert PID %d from integer to string", path, getpid());
+		goto close_pidfile;
+	}
+
+	/* write down the PID to the file */
+	ret = write(pidfile, pid, strlen(pid));
+	if(ret < 0)
+	{
+		SNIFFER_LOG(LOG_WARNING, "failed to write PID in file '%s': %s (%d)",
+		            path, strerror(errno), errno);
+		goto close_pidfile;
+	}
+	else if(((size_t) ret) != strlen(pid))
+	{
+		SNIFFER_LOG(LOG_WARNING, "failed to write PID in file '%s': only %d "
+		            "of %zu characters written", path, ret, strlen(pid));
+		goto close_pidfile;
+	}
+
+	is_success = true;
+
+close_pidfile:
+	ret = close(pidfile);
+	if(ret != 0)
+	{
+		SNIFFER_LOG(LOG_WARNING, "failed to close PID file '%s': %s (%d)",
+		            path, strerror(errno), errno);
+		is_success = false;
+	}
+	else if(!is_success)
+	{
+		ret = unlink(path);
+		if(ret != 0)
+		{
+			SNIFFER_LOG(LOG_WARNING, "failed to remove PID file '%s': %s (%d)",
+			            path, strerror(errno), errno);
+		}
+	}
+error:
+	return is_success;
 }
 

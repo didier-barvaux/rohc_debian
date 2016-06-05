@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Didier Barvaux
+ * Copyright 2013,2016 Didier Barvaux
  * Copyright 2013,2014 Mikhail Gruzdev
  * Copyright 2009,2010 Thales Communications
  * Copyright 2013,2014 Viveris Technologies
@@ -16,14 +16,15 @@
  *
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
 /**
- * @file   linux/include/assert.h
+ * @file   kmod.c
  * @brief  Export the ROHC library to the Linux kernel
  * @author Mikhail Gruzdev <michail.gruzdev@gmail.com>
  * @author Didier Barvaux <didier.barvaux@toulouse.viveris.com>
+ * @author Didier Barvaux <didier@barvaux.org>
  */
 
 #include <linux/module.h>
@@ -34,10 +35,11 @@
 #include "rohc_decomp.h"
 
 
-MODULE_VERSION(PACKAGE_VERSION);
+MODULE_VERSION(PACKAGE_VERSION PACKAGE_REVNO);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Didier Barvaux, Mikhail Gruzdev, Thales Communications, Viveris Technologies");
-MODULE_DESCRIPTION(PACKAGE_NAME ", version " PACKAGE_VERSION " (" PACKAGE_URL ")");
+MODULE_DESCRIPTION(PACKAGE_NAME
+	", version " PACKAGE_VERSION PACKAGE_REVNO " (" PACKAGE_URL ")");
 
 
 /*
@@ -49,6 +51,19 @@ EXPORT_SYMBOL_GPL(rohc_get_mode_descr);
 EXPORT_SYMBOL_GPL(rohc_get_profile_descr);
 EXPORT_SYMBOL_GPL(rohc_get_packet_descr);
 EXPORT_SYMBOL_GPL(rohc_get_ext_descr);
+EXPORT_SYMBOL_GPL(rohc_get_packet_type);
+
+EXPORT_SYMBOL_GPL(rohc_buf_is_malformed);
+EXPORT_SYMBOL_GPL(rohc_buf_is_empty);
+EXPORT_SYMBOL_GPL(rohc_buf_push);
+EXPORT_SYMBOL_GPL(rohc_buf_pull);
+EXPORT_SYMBOL_GPL(rohc_buf_avail_len);
+EXPORT_SYMBOL_GPL(rohc_buf_data_at);
+EXPORT_SYMBOL_GPL(rohc_buf_data);
+EXPORT_SYMBOL_GPL(rohc_buf_prepend);
+EXPORT_SYMBOL_GPL(rohc_buf_append);
+EXPORT_SYMBOL_GPL(rohc_buf_append_buf);
+EXPORT_SYMBOL_GPL(rohc_buf_reset);
 
 
 /*
@@ -115,6 +130,10 @@ EXPORT_SYMBOL_GPL(rohc_decomp_get_cid_type);
 EXPORT_SYMBOL_GPL(rohc_decomp_get_max_cid);
 EXPORT_SYMBOL_GPL(rohc_decomp_set_mrru);
 EXPORT_SYMBOL_GPL(rohc_decomp_get_mrru);
+EXPORT_SYMBOL_GPL(rohc_decomp_set_rate_limits);
+EXPORT_SYMBOL_GPL(rohc_decomp_get_rate_limits);
+EXPORT_SYMBOL_GPL(rohc_decomp_set_prtt);
+EXPORT_SYMBOL_GPL(rohc_decomp_get_prtt);
 EXPORT_SYMBOL_GPL(rohc_decomp_set_traces_cb2);
 EXPORT_SYMBOL_GPL(rohc_decomp_set_features);
 

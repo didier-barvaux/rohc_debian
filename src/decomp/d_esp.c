@@ -25,18 +25,18 @@
  * @author Didier Barvaux <didier@barvaux.org>
  */
 
-#include "d_generic.h"
+#include "rohc_decomp_rfc3095.h"
 #include "d_ip.h"
 #include "rohc_traces_internal.h"
 #include "rohc_debug.h"
 #include "rohc_utils.h"
 #include "crc.h"
 #include "protocols/esp.h"
-#include "schemes/wlsb.h"
+#include "schemes/decomp_wlsb.h"
 
 #include <stdint.h>
 #ifndef __KERNEL__
-#	include <string.h>
+#  include <string.h>
 #endif
 #include <assert.h>
 
@@ -45,9 +45,9 @@
  * @brief Define the ESP part of the decompression profile context.
  *
  * This object must be used with the generic part of the decompression
- * context d_generic_context.
+ * context rohc_decomp_rfc3095_ctxt.
  *
- * @see d_generic_context
+ * @see rohc_decomp_rfc3095_ctxt
  */
 struct d_esp_context
 {
@@ -61,12 +61,17 @@ struct d_esp_context
  * Private function prototypes.
  */
 
-static void * d_esp_create(const struct rohc_decomp_ctxt *const context);
-static void d_esp_destroy(void *const context)
-	__attribute__((nonnull(1)));
+static bool d_esp_create(const struct rohc_decomp_ctxt *const context,
+                         struct rohc_decomp_rfc3095_ctxt **const persist_ctxt,
+                         struct rohc_decomp_volat_ctxt *const volat_ctxt)
+	__attribute__((warn_unused_result, nonnull(1, 2, 3)));
+
+static void d_esp_destroy(struct rohc_decomp_rfc3095_ctxt *const rfc3095_ctxt,
+                          const struct rohc_decomp_volat_ctxt *const volat_ctxt)
+	__attribute__((nonnull(1, 2)));
 
 static int esp_parse_static_esp(const struct rohc_decomp_ctxt *const context,
-                                const unsigned char *packet,
+                                const uint8_t *packet,
                                 size_t length,
                                 struct rohc_extr_bits *const bits)
 	__attribute__((warn_unused_result, nonnull(1, 2, 4)));
@@ -77,17 +82,18 @@ static int esp_parse_dynamic_esp(const struct rohc_decomp_ctxt *const context,
                                  struct rohc_extr_bits *const bits);
 
 static bool esp_decode_values_from_bits(const struct rohc_decomp_ctxt *context,
-                                        const struct rohc_extr_bits bits,
-                                        struct rohc_decoded_values *const decoded);
+                                        const struct rohc_extr_bits *const bits,
+                                        struct rohc_decoded_values *const decoded)
+	__attribute__((warn_unused_result, nonnull(1, 2, 3)));
 
 static int esp_build_uncomp_esp(const struct rohc_decomp_ctxt *const context,
-                                const struct rohc_decoded_values decoded,
-                                unsigned char *dest,
+                                const struct rohc_decoded_values *const decoded,
+                                uint8_t *const dest,
                                 const unsigned int payload_len);
 
-static void esp_update_context(const struct rohc_decomp_ctxt *context,
-                               const struct rohc_decoded_values decoded)
-	__attribute__((nonnull(1)));
+static void esp_update_context(struct rohc_decomp_ctxt *const context,
+                               const struct rohc_decoded_values *const decoded)
+	__attribute__((nonnull(1, 2)));
 
 
 /*
@@ -100,12 +106,17 @@ static void esp_update_context(const struct rohc_decomp_ctxt *context,
  * This function is one of the functions that must exist in one profile for the
  * framework to work.
  *
- * @param context  The decompression context
- * @return         The newly-created ESP decompression context
+ * @param context            The decompression context
+ * @param[out] persist_ctxt  The persistent part of the decompression context
+ * @param[out] volat_ctxt    The volatile part of the decompression context
+ * @return                   true if the ESP context was successfully created,
+ *                           false if a problem occurred
  */
-static void * d_esp_create(const struct rohc_decomp_ctxt *const context)
+static bool d_esp_create(const struct rohc_decomp_ctxt *const context,
+                         struct rohc_decomp_rfc3095_ctxt **const persist_ctxt,
+                         struct rohc_decomp_volat_ctxt *const volat_ctxt)
 {
-	struct d_generic_context *g_context;
+	struct rohc_decomp_rfc3095_ctxt *rfc3095_ctxt;
 	struct d_esp_context *esp_context;
 
 	assert(context != NULL);
@@ -113,20 +124,16 @@ static void * d_esp_create(const struct rohc_decomp_ctxt *const context)
 	assert(context->profile != NULL);
 
 	/* create the generic context */
-	g_context = d_generic_create(context,
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-	                             context->decompressor->trace_callback,
-#endif
-	                             context->decompressor->trace_callback2,
-	                             context->decompressor->trace_callback_priv,
-	                             context->profile->id);
-	if(g_context == NULL)
+	if(!rohc_decomp_rfc3095_create(context, persist_ctxt, volat_ctxt,
+	                               context->decompressor->trace_callback,
+	                               context->decompressor->trace_callback_priv,
+	                               context->profile->id))
 	{
 		rohc_error(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
 		           "failed to create the generic decompression context");
 		goto quit;
 	}
-	g_context->specific = NULL;
+	rfc3095_ctxt = *persist_ctxt;
 
 	/* create the ESP-specific part of the context */
 	esp_context = malloc(sizeof(struct d_esp_context));
@@ -137,11 +144,12 @@ static void * d_esp_create(const struct rohc_decomp_ctxt *const context)
 		goto destroy_context;
 	}
 	memset(esp_context, 0, sizeof(struct d_esp_context));
-	g_context->specific = esp_context;
+	rfc3095_ctxt->specific = esp_context;
 
 	/* create the LSB decoding context for SN (same shift value as RTP) */
-	g_context->sn_lsb_ctxt = rohc_lsb_new(ROHC_LSB_SHIFT_ESP_SN, 32);
-	if(g_context->sn_lsb_ctxt == NULL)
+	rfc3095_ctxt->sn_lsb_p = ROHC_LSB_SHIFT_ESP_SN;
+	rfc3095_ctxt->sn_lsb_ctxt = rohc_lsb_new(32);
+	if(rfc3095_ctxt->sn_lsb_ctxt == NULL)
 	{
 		rohc_error(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
 		           "failed to create the LSB decoding context for SN");
@@ -149,55 +157,55 @@ static void * d_esp_create(const struct rohc_decomp_ctxt *const context)
 	}
 
 	/* some ESP-specific values and functions */
-	g_context->next_header_len = sizeof(struct esphdr);
-	g_context->parse_static_next_hdr = esp_parse_static_esp;
-	g_context->parse_dyn_next_hdr = esp_parse_dynamic_esp;
-	g_context->parse_ext3 = ip_parse_ext3;
-	g_context->parse_uo_remainder = NULL;
-	g_context->decode_values_from_bits = esp_decode_values_from_bits;
-	g_context->build_next_header = esp_build_uncomp_esp;
-	g_context->compute_crc_static = esp_compute_crc_static;
-	g_context->compute_crc_dynamic = esp_compute_crc_dynamic;
-	g_context->update_context = esp_update_context;
+	rfc3095_ctxt->next_header_len = sizeof(struct esphdr);
+	rfc3095_ctxt->parse_static_next_hdr = esp_parse_static_esp;
+	rfc3095_ctxt->parse_dyn_next_hdr = esp_parse_dynamic_esp;
+	rfc3095_ctxt->parse_ext3 = ip_parse_ext3;
+	rfc3095_ctxt->parse_uo_remainder = NULL;
+	rfc3095_ctxt->decode_values_from_bits = esp_decode_values_from_bits;
+	rfc3095_ctxt->build_next_header = esp_build_uncomp_esp;
+	rfc3095_ctxt->compute_crc_static = esp_compute_crc_static;
+	rfc3095_ctxt->compute_crc_dynamic = esp_compute_crc_dynamic;
+	rfc3095_ctxt->update_context = esp_update_context;
 
 	/* create the ESP-specific part of the header changes */
-	g_context->outer_ip_changes->next_header_len = sizeof(struct esphdr);
-	g_context->outer_ip_changes->next_header = malloc(sizeof(struct esphdr));
-	if(g_context->outer_ip_changes->next_header == NULL)
+	rfc3095_ctxt->outer_ip_changes->next_header_len = sizeof(struct esphdr);
+	rfc3095_ctxt->outer_ip_changes->next_header = malloc(sizeof(struct esphdr));
+	if(rfc3095_ctxt->outer_ip_changes->next_header == NULL)
 	{
 		rohc_error(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
 		           "cannot allocate memory for the ESP-specific part of the "
 		           "outer IP header changes");
 		goto free_lsb_sn;
 	}
-	memset(g_context->outer_ip_changes->next_header, 0, sizeof(struct esphdr));
+	memset(rfc3095_ctxt->outer_ip_changes->next_header, 0, sizeof(struct esphdr));
 
-	g_context->inner_ip_changes->next_header_len = sizeof(struct esphdr);
-	g_context->inner_ip_changes->next_header = malloc(sizeof(struct esphdr));
-	if(g_context->inner_ip_changes->next_header == NULL)
+	rfc3095_ctxt->inner_ip_changes->next_header_len = sizeof(struct esphdr);
+	rfc3095_ctxt->inner_ip_changes->next_header = malloc(sizeof(struct esphdr));
+	if(rfc3095_ctxt->inner_ip_changes->next_header == NULL)
 	{
 		rohc_error(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
 		           "cannot allocate memory for the ESP-specific part of the "
 		           "inner IP header changes");
 		goto free_outer_ip_changes_next_header;
 	}
-	memset(g_context->inner_ip_changes->next_header, 0, sizeof(struct esphdr));
+	memset(rfc3095_ctxt->inner_ip_changes->next_header, 0, sizeof(struct esphdr));
 
 	/* set next header to ESP */
-	g_context->next_header_proto = ROHC_IPPROTO_ESP;
+	rfc3095_ctxt->next_header_proto = ROHC_IPPROTO_ESP;
 
-	return g_context;
+	return true;
 
 free_outer_ip_changes_next_header:
-	zfree(g_context->outer_ip_changes->next_header);
+	zfree(rfc3095_ctxt->outer_ip_changes->next_header);
 free_lsb_sn:
-	rohc_lsb_free(g_context->sn_lsb_ctxt);
+	rohc_lsb_free(rfc3095_ctxt->sn_lsb_ctxt);
 free_esp_context:
 	zfree(esp_context);
 destroy_context:
-	d_generic_destroy(g_context);
+	rohc_decomp_rfc3095_destroy(rfc3095_ctxt, volat_ctxt);
 quit:
-	return NULL;
+	return false;
 }
 
 
@@ -207,28 +215,23 @@ quit:
  * This function is one of the functions that must exist in one profile for the
  * framework to work.
  *
- * @param context The compression context
+ * @param rfc3095_ctxt  The persistent decompression context for the RFC3095 profiles
+ * @param volat_ctxt    The volatile decompression context
  */
-static void d_esp_destroy(void *const context)
+static void d_esp_destroy(struct rohc_decomp_rfc3095_ctxt *const rfc3095_ctxt,
+                          const struct rohc_decomp_volat_ctxt *const volat_ctxt)
 {
-	struct d_generic_context *g_context;
-
-	assert(context != NULL);
-	g_context = (struct d_generic_context *) context;
-
 	/* clean ESP-specific memory */
-	assert(g_context->outer_ip_changes != NULL);
-	assert(g_context->outer_ip_changes->next_header != NULL);
-	zfree(g_context->outer_ip_changes->next_header);
-	assert(g_context->inner_ip_changes != NULL);
-	assert(g_context->inner_ip_changes->next_header != NULL);
-	zfree(g_context->inner_ip_changes->next_header);
+	assert(rfc3095_ctxt->outer_ip_changes != NULL);
+	zfree(rfc3095_ctxt->outer_ip_changes->next_header);
+	assert(rfc3095_ctxt->inner_ip_changes != NULL);
+	zfree(rfc3095_ctxt->inner_ip_changes->next_header);
 
 	/* destroy the LSB decoding context for SN */
-	rohc_lsb_free(g_context->sn_lsb_ctxt);
+	rohc_lsb_free(rfc3095_ctxt->sn_lsb_ctxt);
 
 	/* destroy the resources of the generic context */
-	d_generic_destroy(context);
+	rohc_decomp_rfc3095_destroy(rfc3095_ctxt, volat_ctxt);
 }
 
 
@@ -243,20 +246,13 @@ static void d_esp_destroy(void *const context)
  *                -1 in case of failure
  */
 static int esp_parse_static_esp(const struct rohc_decomp_ctxt *const context,
-                                const unsigned char *packet,
+                                const uint8_t *packet,
                                 size_t length,
                                 struct rohc_extr_bits *const bits)
 {
 	const size_t spi_length = sizeof(uint32_t);
-	struct d_generic_context *g_context;
-	struct d_esp_context *esp_context;
 	size_t read = 0; /* number of bytes read from the packet */
 
-	assert(context != NULL);
-	assert(context->specific != NULL);
-	g_context = context->specific;
-	assert(g_context->specific != NULL);
-	esp_context = g_context->specific;
 	assert(packet != NULL);
 	assert(bits != NULL);
 
@@ -276,8 +272,9 @@ static int esp_parse_static_esp(const struct rohc_decomp_ctxt *const context,
 #endif
 	read += spi_length;
 
-	/* is context re-used? */
-	if(context->num_recv_packets > 1 &&
+#if 0 /* TODO */
+	   /* is context re-used? */
+	if(context->num_recv_packets >= 1 &&
 	   memcmp(&bits->esp_spi, &esp_context->spi, spi_length) != 0)
 	{
 		rohc_decomp_debug(context, "ESP SPI mismatch (packet = 0x%08x, "
@@ -286,6 +283,7 @@ static int esp_parse_static_esp(const struct rohc_decomp_ctxt *const context,
 		bits->is_context_reused = true;
 	}
 	memcpy(&esp_context->spi, &bits->esp_spi, spi_length);
+#endif
 
 	return read;
 
@@ -354,26 +352,23 @@ error:
  * @return         true if decoding is successful, false otherwise
  */
 static bool esp_decode_values_from_bits(const struct rohc_decomp_ctxt *context,
-                                        const struct rohc_extr_bits bits,
+                                        const struct rohc_extr_bits *const bits,
                                         struct rohc_decoded_values *const decoded)
 {
+	const struct rohc_decomp_rfc3095_ctxt *const rfc3095_ctxt = context->persist_ctxt;
 	const size_t spi_length = sizeof(uint32_t);
-	struct d_generic_context *g_context;
 	struct esphdr *esp;
 
-	assert(context != NULL);
-	assert(context->specific != NULL);
-	g_context = context->specific;
 	assert(decoded != NULL);
 
-	esp = (struct esphdr *) g_context->outer_ip_changes->next_header;
+	esp = (struct esphdr *) rfc3095_ctxt->outer_ip_changes->next_header;
 
 	/* decode ESP SPI */
-	if(bits.esp_spi_nr > 0)
+	if(bits->esp_spi_nr > 0)
 	{
 		/* take packet value */
-		assert(bits.esp_spi_nr == (spi_length * 8));
-		memcpy(&decoded->esp_spi, &bits.esp_spi, spi_length);
+		assert(bits->esp_spi_nr == (spi_length * 8));
+		memcpy(&decoded->esp_spi, &bits->esp_spi, spi_length);
 	}
 	else
 	{
@@ -399,19 +394,19 @@ static bool esp_decode_values_from_bits(const struct rohc_decomp_ctxt *context,
  *                     -1 in case of error
  */
 static int esp_build_uncomp_esp(const struct rohc_decomp_ctxt *const context,
-                                const struct rohc_decoded_values decoded,
-                                unsigned char *dest,
+                                const struct rohc_decoded_values *const decoded,
+                                uint8_t *const dest,
                                 const unsigned int payload_len __attribute__((unused)))
 {
 	const size_t spi_length = sizeof(uint32_t);
 	struct esphdr *const esp = (struct esphdr *) dest;
 
 	/* static SPI field */
-	memcpy(&esp->spi, &decoded.esp_spi, spi_length);
+	memcpy(&esp->spi, &decoded->esp_spi, spi_length);
 	rohc_decomp_debug(context, "SPI = 0x%08x", rohc_ntoh32(esp->spi));
 
 	/* dynamic SN field */
-	esp->sn = rohc_hton32(decoded.sn);
+	esp->sn = rohc_hton32(decoded->sn);
 	rohc_decomp_debug(context, "SN = 0x%08x", rohc_ntoh32(esp->sn));
 
 	return sizeof(struct esphdr);
@@ -427,18 +422,14 @@ static int esp_build_uncomp_esp(const struct rohc_decomp_ctxt *const context,
  * @param context  The decompression context
  * @param decoded  The decoded values to update in the context
  */
-static void esp_update_context(const struct rohc_decomp_ctxt *context,
-                               const struct rohc_decoded_values decoded)
+static void esp_update_context(struct rohc_decomp_ctxt *const context,
+                               const struct rohc_decoded_values *const decoded)
 {
-	struct d_generic_context *g_context;
-	struct esphdr *esp;
+	struct rohc_decomp_rfc3095_ctxt *const rfc3095_ctxt = context->persist_ctxt;
+	struct esphdr *const esp =
+		(struct esphdr *) rfc3095_ctxt->outer_ip_changes->next_header;
 
-	assert(context != NULL);
-	assert(context->specific != NULL);
-	g_context = context->specific;
-
-	esp = (struct esphdr *) g_context->outer_ip_changes->next_header;
-	memcpy(&esp->spi, &decoded.esp_spi, sizeof(uint32_t));
+	memcpy(&esp->spi, &decoded->esp_spi, sizeof(uint32_t));
 }
 
 
@@ -449,10 +440,15 @@ static void esp_update_context(const struct rohc_decomp_ctxt *context,
 const struct rohc_decomp_profile d_esp_profile =
 {
 	.id              = ROHC_PROFILE_ESP, /* profile ID (RFC 3095, §8) */
-	.new_context     = d_esp_create,
-	.free_context    = d_esp_destroy,
-	.decode          = d_generic_decode,
+	.msn_max_bits    = 32,
+	.new_context     = (rohc_decomp_new_context_t) d_esp_create,
+	.free_context    = (rohc_decomp_free_context_t) d_esp_destroy,
 	.detect_pkt_type = ip_detect_packet_type,
-	.get_sn          = d_generic_get_sn,
+	.parse_pkt       = (rohc_decomp_parse_pkt_t) rfc3095_decomp_parse_pkt,
+	.decode_bits     = (rohc_decomp_decode_bits_t) rfc3095_decomp_decode_bits,
+	.build_hdrs      = (rohc_decomp_build_hdrs_t) rfc3095_decomp_build_hdrs,
+	.update_ctxt     = (rohc_decomp_update_ctxt_t) rfc3095_decomp_update_ctxt,
+	.attempt_repair  = (rohc_decomp_attempt_repair_t) rfc3095_decomp_attempt_repair,
+	.get_sn          = rohc_decomp_rfc3095_get_sn,
 };
 

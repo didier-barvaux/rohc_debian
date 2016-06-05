@@ -27,15 +27,10 @@ test_segment_CPPFLAGS = \
 	-I$(top_srcdir)/src/decomp
 
 test_segment_LDFLAGS = \
-	$(configure_ldflags) \
-	-L$(top_builddir)/src/common/.libs \
-	-L$(top_builddir)/src/comp/.libs \
-	-L$(top_builddir)/src/decomp/.libs
+	$(configure_ldflags)
 
 test_segment_LDADD = \
-	-lrohc_comp \
-	-lrohc_decomp \
-	-lrohc_common \
+	$(top_builddir)/src/librohc.la \
 	$(additional_platform_libs)
 
 

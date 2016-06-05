@@ -7,9 +7,7 @@
 sbin_PROGRAMS = \
 	rohc_sniffer
 
-if BUILD_DOC_MAN
 man_MANS = rohc_sniffer.1
-endif
 
 
 rohc_sniffer_CFLAGS = \
@@ -23,25 +21,26 @@ rohc_sniffer_CPPFLAGS = \
 	$(libpcap_includes)
 
 rohc_sniffer_LDFLAGS = \
-	$(configure_ldflags) \
-	-L$(top_builddir)/src/common/.libs \
-	-L$(top_builddir)/src/comp/.libs \
-	-L$(top_builddir)/src/decomp/.libs
+	$(configure_ldflags)
 
 rohc_sniffer_SOURCES = \
 	sniffer.c
 
 rohc_sniffer_LDADD = \
 	-l$(pcap_lib_name) \
-	-lrohc_comp \
-	-lrohc_decomp \
-	-lrohc_common \
+	$(top_builddir)/src/librohc.la \
 	$(additional_platform_libs)
 
 
+if BUILD_DOC_MAN
 rohc_sniffer.1: $(rohc_sniffer_SOURCES) $(builddir)/rohc_sniffer
 	$(AM_V_GEN)help2man --output=$@ -s 1 --no-info \
 		-m "$(PACKAGE_NAME)'s tools" -S "$(PACKAGE_NAME)" \
 		-n "The ROHC sniffer" \
 		$(builddir)/rohc_sniffer
+endif
+
+# extra files for releases
+EXTRA_DIST = \
+	$(man_MANS)
 

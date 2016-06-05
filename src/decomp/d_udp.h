@@ -28,17 +28,13 @@
 #ifndef ROHC_DECOMP_UDP_H
 #define ROHC_DECOMP_UDP_H
 
-#include "d_generic.h"
+#include "rohc_decomp_rfc3095.h"
 
 int udp_parse_static_udp(const struct rohc_decomp_ctxt *const context,
-                         const unsigned char *packet,
+                         const uint8_t *packet,
                          size_t length,
                          struct rohc_extr_bits *const bits)
 	__attribute__((warn_unused_result, nonnull(1, 2, 4)));
-
-void udp_update_context(const struct rohc_decomp_ctxt *context,
-                        const struct rohc_decoded_values decoded)
-	__attribute__((nonnull(1)));
 
 #endif
 

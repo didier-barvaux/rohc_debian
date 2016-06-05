@@ -21,9 +21,12 @@ librohc_la_LIBADD = \
 	$(additional_platform_libs)
 librohc_la_LDFLAGS = \
 	$(configure_ldflags) \
+	-export-symbols $(srcdir)/librohc.symbols \
 	-no-undefined \
 	-version-info $(ROHC_API_CURRENT):$(ROHC_API_REVISION):$(ROHC_API_AGE)
-librohc_la_CFLAGS =
+librohc_la_CFLAGS = \
+	$(configure_cflags) \
+	$(configure_cflags_for_lib)
 librohc_la_CPPFLAGS =
 librohc_la_DEPENDENCIES = \
 	$(builddir)/common/librohc_common.la \
@@ -31,5 +34,5 @@ librohc_la_DEPENDENCIES = \
 	$(builddir)/decomp/librohc_decomp.la
 
 EXTRA_DIST = \
-	dllexport.h
+	librohc.symbols
 

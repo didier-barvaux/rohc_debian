@@ -31,14 +31,14 @@
 #include "rohc_traces_internal.h"
 #include "rohc_packets.h"
 #include "rohc_comp.h"
-#include "schemes/wlsb.h"
+#include "schemes/comp_wlsb.h"
 #include "net_pkt.h"
-#include "rohc_stats.h"
+#include "feedback.h"
 
 #ifdef __KERNEL__
-#	include <linux/types.h>
+#  include <linux/types.h>
 #else
-#	include <stdbool.h>
+#  include <stdbool.h>
 #endif
 
 
@@ -48,9 +48,6 @@
 
 /** The number of ROHC profiles ready to be used */
 #define C_NUM_PROFILES 7U
-
-/** The maximal number of outgoing feedbacks that can be queued */
-#define FEEDBACK_RING_SIZE 1000U
 
 /** The default maximal number of packets sent in > IR states (= FO and SO
  *  states) before changing back the state to IR (periodic refreshes) */
@@ -62,11 +59,11 @@
 
 /** The minimal number of packets that must be sent while in IR state before
  *  being able to switch to the FO state */
-#define MAX_IR_COUNT  3
+#define MAX_IR_COUNT  3U
 
 /** The minimal number of packets that must be sent while in FO state before
  *  being able to switch to the SO state */
-#define MAX_FO_COUNT  3
+#define MAX_FO_COUNT  3U
 
 /** The minimal number of packets that must be sent while in INIT_STRIDE
  *  state before being able to switch to the SEND_SCALED state */
@@ -93,13 +90,23 @@
 	           (context)->profile->id, \
 	           format, ##__VA_ARGS__)
 
+/** Dump a buffer for the given compression context */
+#define rohc_comp_dump_buf(context, descr, buf, buf_len) \
+	do { \
+		if(((context)->compressor->features & ROHC_COMP_FEATURE_DUMP_PACKETS) != 0) { \
+			rohc_dump_buf((context)->compressor->trace_callback, \
+			              (context)->compressor->trace_callback_priv, \
+			              ROHC_TRACE_COMP, ROHC_TRACE_DEBUG, \
+			              descr, buf, buf_len); \
+		} \
+	} while(0)
+
 
 /*
  * Declare ROHC compression structures that are defined at the end of this
  * file but used by other structures at the beginning of the file.
  */
 
-struct c_feedback;
 struct rohc_comp_ctxt;
 
 
@@ -108,36 +115,11 @@ struct rohc_comp_ctxt;
  */
 
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-/**
- * @brief Information on ROHC feedback data
- */
-struct rohc_feedback
-{
-	/** The feedback data */
-	unsigned char *data;
-	/** The length (in bytes) of the feedback data */
-	size_t length;
-	/** Whether the feedback data was locked during packet build? */
-	bool is_locked;
-};
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
-
-
 /**
  * @brief The ROHC compressor
  */
 struct rohc_comp
 {
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-	/**
-	 * @brief Whether the compressor is enabled or not
-	 *
-	 * The compressor is enabled by default and may be disabled by user.
-	 */
-	int enabled;
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
-
 	/** The medium associated with the decompressor */
 	struct rohc_medium medium;
 
@@ -156,25 +138,11 @@ struct rohc_comp
 	/* CRC-related variables: */
 
 	/** The table to enable fast CRC-3 computation */
-	unsigned char crc_table_3[256];
+	uint8_t crc_table_3[256];
 	/** The table to enable fast CRC-7 computation */
-	unsigned char crc_table_7[256];
+	uint8_t crc_table_7[256];
 	/** The table to enable fast CRC-8 computation */
-	unsigned char crc_table_8[256];
-
-
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-	/* feedback-related variables: */
-
-	/** The ring of outgoing feedbacks */
-	struct rohc_feedback feedbacks[FEEDBACK_RING_SIZE];
-	/** The index of the oldest feedback in the feedback ring */
-	size_t feedbacks_first;
-	/** The index of the oldest unlocked feedback in the feedback ring */
-	size_t feedbacks_first_unlocked;
-	/** @brief The index of the next empty location in the feedback ring */
-	size_t feedbacks_next;
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
+	uint8_t crc_table_8[256];
 
 
 	/* segment-related variables */
@@ -183,7 +151,7 @@ struct rohc_comp
 #define ROHC_MAX_MRRU 65535
 	/** The remaining bytes of the Reconstructed Reception Unit (RRU) waiting
 	 *  to be split into segments */
-	unsigned char rru[ROHC_MAX_MRRU];
+	uint8_t rru[ROHC_MAX_MRRU];
 	/** The offset of the remaining bytes in the RRU buffer */
 	size_t rru_off;
 	/** The number of the remaining bytes in the RRU buffer */
@@ -191,13 +159,6 @@ struct rohc_comp
 
 
 	/* variables related to RTP detection */
-
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-/** The maximal number of RTP ports (shall be > 2) */
-#define MAX_RTP_PORTS 15U
-	/** The RTP ports table */
-	unsigned int rtp_ports[MAX_RTP_PORTS];
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
 
 	/** The callback function used to detect RTP packet */
 	rohc_rtp_detection_callback_t rtp_callback;
@@ -243,12 +204,8 @@ struct rohc_comp
 	/** The number of uncompressed transmissions for list compression (L) */
 	size_t list_trans_nr;
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-	/** The old callback function used to manage traces */
-	rohc_trace_callback_t trace_callback;
-#endif
-	/** The new callback function used to manage traces */
-	rohc_trace_callback2_t trace_callback2;
+	/** The callback function used to manage traces */
+	rohc_trace_callback2_t trace_callback;
 	/** The private context of the callback function used to manage traces */
 	void *trace_callback_priv;
 };
@@ -317,7 +274,7 @@ struct rohc_comp_profile
 	 */
 	int (*encode)(struct rohc_comp_ctxt *const context,
 	              const struct net_pkt *const uncomp_pkt,
-	              unsigned char *const rohc_pkt,
+	              uint8_t *const rohc_pkt,
 	              const size_t rohc_pkt_max_len,
 	              rohc_packet_t *const packet_type,
 	              size_t *const payload_offset)
@@ -334,14 +291,12 @@ struct rohc_comp_profile
 	 *        context about the arrival of feedback data
 	 */
 	bool (*feedback)(struct rohc_comp_ctxt *const context,
-	                 const struct c_feedback *const feedback)
-		__attribute__((warn_unused_result, nonnull(1, 2)));
-
-	/**
-	 * @brief The handler used to detect if a UDP port is used by the profile
-	 */
-	bool (*use_udp_port)(const struct rohc_comp_ctxt *const context,
-	                     const unsigned int port);
+	                 const enum rohc_feedback_type feedback_type,
+	                 const uint8_t *const packet,
+	                 const size_t packet_len,
+	                 const uint8_t *const feedback_data,
+	                 const size_t feedback_data_len)
+		__attribute__((warn_unused_result, nonnull(1, 3, 5)));
 };
 
 
@@ -382,6 +337,26 @@ struct rohc_comp_ctxt
 	/* The type of ROHC packet created for the last compressed packet */
 	rohc_packet_t packet_type;
 
+	/** The number of packets sent while in Initialization & Refresh (IR) state */
+	size_t ir_count;
+	/** The number of packets sent while in First Order (FO) state */
+	size_t fo_count;
+	/** The number of packets sent while in Second Order (SO) state */
+	size_t so_count;
+
+	/**
+	 * @brief The number of packet sent while in SO state, used for the periodic
+	 *        refreshes of the context
+	 * @see rohc_comp_periodic_down_transition
+	 */
+	size_t go_back_fo_count;
+	/**
+	 * @brief The number of packet sent while in FO or SO state, used for the
+	 *        periodic refreshes of the context
+	 * @see rohc_comp_periodic_down_transition
+	 */
+	size_t go_back_ir_count;
+
 	/** The average size of the uncompressed packets */
 	int total_uncompressed_size;
 	/** The average size of the compressed packets */
@@ -402,69 +377,34 @@ struct rohc_comp_ctxt
 
 	/** The number of sent packets */
 	int num_sent_packets;
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-	/** The number of sent IR packets */
-	int num_sent_ir;
-	/** The number of sent IR-DYN packets */
-	int num_sent_ir_dyn;
-	/** The number of received feedbacks */
-	int num_recv_feedbacks;
-#endif
-
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-	/** The size of the last 16 uncompressed packets */
-	struct rohc_stats total_16_uncompressed;
-	/** The size of the last 16 compressed packets */
-	struct rohc_stats total_16_compressed;
-	/** The size of the last 16 uncompressed headers */
-	struct rohc_stats header_16_uncompressed;
-	/** The size of the last 16 compressed headers */
-	struct rohc_stats header_16_compressed;
-#endif
 };
 
 
-/**
- * @brief The feedback packet
- */
-struct c_feedback
-{
-	/** The Context ID to which the feedback packet is related */
-	rohc_cid_t cid;
+void rohc_comp_change_mode(struct rohc_comp_ctxt *const context,
+                           const rohc_mode_t new_mode)
+	__attribute__((nonnull(1)));
 
-	/**
-	 * @brief The type of feedback packet
-	 *
-	 * A value of 1 means FEEDBACK-1, value 2 means FEEDBACK-2.
-	 */
-	int type;
+void rohc_comp_change_state(struct rohc_comp_ctxt *const context,
+                            const rohc_comp_state_t new_state)
+	__attribute__((nonnull(1)));
 
-	/** The feedback data (ie. the packet excluding the first type octet) */
-	unsigned char *data;
-	/** The size of the feedback data */
-	size_t size;
+void rohc_comp_periodic_down_transition(struct rohc_comp_ctxt *const context)
+	__attribute__((nonnull(1)));
 
-	/**
-	 * @brief The offset that indicates the beginning of the profile-specific
-	 *        data in the feedback data
-	 */
-	int specific_offset;
-	/** The size of the profile-specific data */
-	int specific_size;
+bool rohc_comp_reinit_context(struct rohc_comp_ctxt *const context)
+	__attribute__((warn_unused_result, nonnull(1)));
 
-	/** The type of acknowledgement (FEEDBACK-2 only) */
-	enum
-	{
-		/** The classical ACKnowledgement */
-		ACK,
-		/** The Negative ACKnowledgement */
-		NACK,
-		/** The Negative STATIC ACKnowledgement */
-		STATIC_NACK,
-		/** Currently unused acknowledgement type */
-		RESERVED
-	} acktype;
-};
+bool rohc_comp_feedback_parse_opts(const struct rohc_comp_ctxt *const context,
+                                   const uint8_t *const packet,
+                                   const size_t packet_len,
+                                   const uint8_t *const feedback_data,
+                                   const size_t feedback_data_len,
+                                   size_t opts_present[ROHC_FEEDBACK_OPT_MAX],
+                                   uint32_t *const sn_bits,
+                                   size_t *const sn_bits_nr,
+                                   uint8_t crc_in_packet,
+                                   size_t crc_pos_from_end)
+	__attribute__((warn_unused_result, nonnull(1, 2, 4, 6, 7, 8)));
 
 #endif
 

@@ -1,0 +1,167 @@
+[ ]	* put back buildbot (ROHC x86/ARM/PPC/MinGW) on tracks
+[ ]	* fix IP/ROHC (reported pbs + new API)
+[ ]	* new return codes: ROHC_MALFORMED_PACKET, ROHC_PROFILE_NOT_FOUND
+
+[X]	* -Wsuggest-attribute=[pure|const|noreturn|format]
+[ ]	* -Wconversion(|-null|-extra) ?
+[ ]	* -fsanitize=signed-integer-overflow,unsigned-integer-overflow
+
+[ ]	* test_non_regression: small+large CID mixed
+[ ]	* test_non_regression with unidirectional mode
+[ ]	* run non-regression tests with output buffer smaller than needed until OK
+
+   	* TCP profile:
+[ ]		* GRE/AH/MINE
+[ ]		* Context Replication (CR)
+[ ]		* handle NACK and STATIC-NACK + FO state
+   	* RFC 3095
+[ ]		* test all exts with all UO packets
+   	* UDP-Lite
+[ ]		* test checksum coverage
+   	* all profiles:
+[ ]		* test context re-init
+[ ]		* handle NACK and STATIC-NACK + FO state
+[ ]		* feedback option SN
+
+   	* misc:
+   		* tools:
+[ ]			* pcapdiff
+[ ]			* rtp_jitter
+[ ]		* [PATCH] enhance RTP detector (see email in ROHC/TODO dir)
+[ ]		* [MERGE] IPv6 header compression: handle only extensions specified by RFC
+[ ]		* [PATCH] Simplify the rtp_parse_ext3() function
+[ ]		* add package for Debian/Ubuntu
+[ ]		* gource
+[ ]		* clang tags (???)
+   		* checks:
+[ ]			* codechecker https://github.com/Ericsson/codechecker
+[ ]			* Oclint
+[ ]			* use smatch
+[ ]			* use stack: http://css.csail.mit.edu/stack/
+[ ]			* libabigail: https://sourceware.org/libabigail/
+[ ]			* dev-util/checkbashisms
+[ ]			* shellcheck: http://www.shellcheck.net/about.html
+[ ]			* bashate
+[ ]			* codespell
+[X]			* cppcheck
+[X]			* GNU complexity
+   		* infos:
+[ ]			* graphs with sloccount
+[ ]			* graphs with GNU complexity
+
+[ ]	* new error code: unexpected packet type
+
+[ ]	PAGAI http://pagai.forge.imag.fr/
+[ ]	https://bitbucket.org/jwilk/spellintian
+[ ]	http://gcovr.com/guide.html
+[ ]	https://github.com/OpenRCE/sulley
+[ ]	https://github.com/mozilla/rr
+
+   	* security:
+   	* fuzzing:
+   		* AFL:
+[ ]			* AFL on non-regression (in progress)
+[ ]			* AFL on decompressor (in progress)
+[ ]			* disable IP checksums on non-reg
+[ ]		* bunny the fuzzer: http://code.google.com/p/bunny-the-fuzzer/
+[ ]	* signed integer overflow: http://lwn.net/Articles/511259/
+   	* compiler flags:
+[ ]		* -Wconversion(|-null|-extra) ?
+[ ]		* -fsanitize=signed-integer-overflow,unsigned-integer-overflow
+[ ]		* -fsanitize=bounds-strict
+[ ]		* -fsanitize=integer
+[ ]		* -fsanitize=undefined
+[ ]		* -fstack-reuse=[all|named_vars|none] http://nickclifton.livejournal.com/11019.html
+[ ]		* -fstack-protector(|-strong|-all)
+   	* unit testing:
+[ ]		* http://www.novaprova.org/
+   	* memory:
+[ ]		* memory leak with ROHC sniffer? 17T of RSS!
+
+   	* performances:
+[ ]		* define use cases
+[ ]		* graphs of perfs
+[ ]		* -O3
+[ ]		* Avoid multiple memory allocations
+[ ]		* make g(), f() and get_k() const/pure
+[ ]		* partial IP/UDP checksum
+[ ]		* partial CRC
+[ ]		* CRC ASM
+[ ]		* CRC +0/-0
+[ ]		* LTO
+[ ]		* see TODO.perfs
+
+   	* portability:
+   		* re-checks:
+   			* Windows:
+[ ]				* mingw
+[ ]				* XXX
+[ ]			* kernel
+[ ]			* ARM
+[ ]			* PPC
+[ ]			* FreeBSD
+[ ]		* new checks:
+[ ]			* Debian
+[ ]				* stable
+[ ]				* unstable
+[ ]			* CentOS
+[ ]				* 5.x
+[ ]				* 6.x
+[ ]				* 7.x
+[ ]			* Fedora
+[ ]			* Ubuntu
+[ ]				* LTS
+[ ]				* latest
+[ ]			* Arch Linux
+[ ]			* OpenBSD
+[ ]			* Debian GNU Hurd
+[ ]		* musl libc
+
+   	* documentation:
+[ ]		* update README
+[ ]		* website:
+[ ]			* man pages on web site
+[ ]			* website in DVCS
+[ ]			* suivre conseils du chapitre documentation (quel livre?)
+[ ]		* wiki:
+[ ]			* add coding style page + uncrustify
+
+   	* features:
+[ ]		* see wiki RFC compliance
+[ ]		* see wiki TODO list
+[ ]		* see below
+
+[ ]	* Test printf extensions :
+   	  https://www.gnu.org/software/libc/manual/html_node/Printf-Extension-Example.html#Printf-Extension-Example
+
+[ ]	* split uo1/2/0 and ir(dyn) in separate files ?
+
+[ ]	* IR without dynamic part (new packet type?)
+
+[ ]	* To avoid ambiguity at the compressor, the decompressor MUST use the
+   	  feedback format whose SN field length is equal to or larger than the
+   	  one in the compressed packet that triggered the feedback.
+
+[ ]	* The secure reference principle is enforced in both compression and
+   	  decompression logic.  The principle means that only a packet carrying
+   	  a 7- or 8-bit CRC can update the decompression context and be used as
+   	  a reference for subsequent decompression.  Consequently, only field
+   	  values of update packets need to be added to the encoding sliding
+   	  windows (see 4.5) maintained by the compressor.
+
+   	* compressed list:
+[ ]		* always gen_id++, then use LSB for ref_id (RFC 3095 §5.8.2.1)
+[ ]		* RFC 3095 §5.8.2.1:
+   		    b) When not in the IR state, the compressor moves to the FO state
+   		       when it observes a difference between curr_list and the previous
+   		       list.
+[ ]		* RFC 3095 §5.8.2.1: points c) and f) let me think that one shall not re-use an
+   		  older gen_id
+[ ]		* RFC 3095 §5.8.2.1:
+   		      d) In U/O-mode, the compressor may choose to not send a generation
+   		         identifier with a compressed list. [...] They do not update the
+   		         context.
+
+[ ]	* similar pb as 280614ca0890d3866d7b0c88e71c4aaf827e4d4c for UDP profile?
+[ ]	* test test/non_regression/inputs/ipv4/udp/source.pcap with Uncompressed
+

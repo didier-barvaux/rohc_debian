@@ -14,51 +14,42 @@ endif
 SUBDIRS = schemes . $(DECOMP_TESTS_DIR)
 
 
-lib_LTLIBRARIES = librohc_decomp.la
+noinst_LTLIBRARIES = librohc_decomp.la
 
 librohc_decomp_la_SOURCES = \
 	rohc_decomp_detect_packet.c \
 	rohc_decomp.c \
 	feedback_create.c \
 	d_uncompressed.c \
-	d_generic.c \
+	rohc_decomp_rfc3095.c \
 	d_ip.c \
 	d_udp.c \
 	d_udp_lite.c \
 	d_esp.c \
 	d_rtp.c \
+	d_tcp_opts_list.c \
+	d_tcp_static.c \
+	d_tcp_dynamic.c \
+	d_tcp_irregular.c \
 	d_tcp.c
 
 librohc_decomp_la_LIBADD = \
-	-lrohc_common \
-	-lrohc_comp \
 	$(builddir)/schemes/librohc_decomp_schemes.la \
 	$(additional_platform_libs)
 
 librohc_decomp_la_LDFLAGS = \
-	$(configure_ldflags) \
-	-export-symbols $(srcdir)/librohc_decomp.symbols \
-	-no-undefined \
-	-version-info $(ROHC_API_CURRENT):$(ROHC_API_REVISION):$(ROHC_API_AGE) \
-	-L$(top_builddir)/src/common/.libs \
-	-L$(top_builddir)/src/comp/.libs
+	$(configure_ldflags)
 
 librohc_decomp_la_CFLAGS = \
-	$(configure_cflags)
+	$(configure_cflags) \
+	$(configure_cflags_for_lib)
 
 librohc_decomp_la_CPPFLAGS = \
-	-I$(top_srcdir)/src \
-	-I$(top_srcdir)/src/common \
-	-I$(top_srcdir)/src/comp
+	-I$(top_srcdir)/src/common
 
 librohc_decomp_la_DEPENDENCIES = \
-	$(builddir)/schemes/librohc_decomp_schemes.la \
-	$(srcdir)/librohc_decomp.symbols
-
-# fake public headers installed in $includedir to point
-# to the real public headers in $includedir/$packagename
-include_HEADERS = \
-	compat_headers/rohc_decomp.h
+	$(top_builddir)/src/common/librohc_common.la \
+	$(builddir)/schemes/librohc_decomp_schemes.la
 
 pkginclude_HEADERS = rohc_decomp.h
 
@@ -66,12 +57,16 @@ noinst_HEADERS = \
 	rohc_decomp_internals.h \
 	rohc_decomp_detect_packet.h \
 	feedback_create.h \
-	d_generic.h \
+	rohc_decomp_rfc3095.h \
 	d_ip.h \
-	d_udp.h
+	d_udp.h \
+	d_tcp_defines.h \
+	d_tcp_opts_list.h \
+	d_tcp_static.h \
+	d_tcp_dynamic.h \
+	d_tcp_irregular.h
 
 # extra files for releases
 EXTRA_DIST = \
-	librohc_decomp.symbols \
 	rohc
 

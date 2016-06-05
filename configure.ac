@@ -21,27 +21,27 @@
 #          Mikhail Gruzdev <michail.gruzdev@gmail.com>
 #
 
-AC_INIT([ROHC library], 1.7.0, [http://rohc-lib.org/],
+AC_INIT([ROHC library], 2.0.0, [http://rohc-lib.org/],
         [rohc], [http://rohc-lib.org/])
 AC_CONFIG_SRCDIR([src])
 AM_CONFIG_HEADER([config.h])
 
-# Retrieve the Bazaar revision number
-if test -d "$srcdir/.bzr" ; then
-	bzr="`which bzr`"
+# Retrieve the git revision number
+if test -d "$srcdir/.git/" ; then
+	git_bin="`which git`"
 	if test $? -ne 0 ; then
 		PACKAGE_REVNO="~unknown"
 	else
-		PACKAGE_REVNO="~`${bzr} revno`"
+		PACKAGE_REVNO="~`${git_bin} rev-parse --short @{0}`"
 	fi
-elif test -f "$srcdir/bzr_revno" ; then
-	PACKAGE_REVNO="`cat $srcdir/bzr_revno`"
+elif test -f "$srcdir/git_ref" ; then
+	PACKAGE_REVNO="`cat $srcdir/git_ref`"
 else
 	PACKAGE_REVNO=""
 fi
 AC_SUBST(PACKAGE_REVNO)
 AC_DEFINE_UNQUOTED([PACKAGE_REVNO], ["$PACKAGE_REVNO"],
-                   [Bazaar revision number])
+                   [VCS revision number])
 
 # Define library versioning:
 #
@@ -60,9 +60,9 @@ AC_DEFINE_UNQUOTED([PACKAGE_REVNO], ["$PACKAGE_REVNO"],
 #  - interfaces added:                             AGE++
 #  - interfaces removed:                           AGE=0
 #
-AC_SUBST([ROHC_API_CURRENT], 2)
+AC_SUBST([ROHC_API_CURRENT], 3)
 AC_SUBST([ROHC_API_REVISION], 0)
-AC_SUBST([ROHC_API_AGE], 2)
+AC_SUBST([ROHC_API_AGE], 0)
 
 # Define a package homepage in a way compatible with autoconf < 2.64
 m4_ifndef([AC_PACKAGE_URL],
@@ -92,6 +92,9 @@ LT_INIT([disable-static win32-dll])
 configure_cflags="-g -Wall -Wstrict-prototypes -Wextra -Wunreachable-code"
 configure_cflags="${configure_cflags} -Wunused-function -Wunused-variable"
 configure_cflags="${configure_cflags} -Wshadow"
+# -Wframe-larger-than is not praticable without -O1 or greater
+# (may be overloaded with CFLAGS environment variable)
+configure_cflags_for_lib="-O2 -Wframe-larger-than=1024"
 configure_ldflags=""
 
 # Checks for programs.
@@ -99,13 +102,142 @@ AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_LIBTOOL
 
+
+# check some newer CFLAGS
+
+#### -Wunknown-warning-option
+AC_MSG_CHECKING([whether compiler understands -Wunknown-warning-option])
+old_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -Werror -Wunknown-warning-option"
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
+                  [unknown_warning_option=-Wunknown-warning-option],
+                  [unknown_warning_option=""])
+if test "x${unknown_warning_option}" != "x" ; then
+	AC_MSG_RESULT(yes)
+else
+	AC_MSG_RESULT(no)
+fi
+CFLAGS="$old_CFLAGS"
+
+#### -Wmisleading-indentation
+AC_MSG_CHECKING([whether compiler understands -Wmisleading-indentation])
+old_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -Werror $unknown_warning_option -Wmisleading-indentation"
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
+                  [misleading_indentation=yes], [misleading_indentation=no])
+if test "x${misleading_indentation}" = "xyes" ; then
+	AC_MSG_RESULT(yes)
+	configure_cflags="${configure_cflags} -Wmisleading-indentation"
+else
+	AC_MSG_RESULT(no)
+fi
+CFLAGS="$old_CFLAGS"
+
+#### -Wshift-overflow=2
+AC_MSG_CHECKING([whether compiler understands -Wshift-overflow=2])
+old_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -Werror $unknown_warning_option -Wshift-overflow=2"
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
+                  [shift_overflow_2=yes], [shift_overflow_2=no])
+if test "x${shift_overflow_2}" = "xyes" ; then
+	AC_MSG_RESULT(yes)
+	configure_cflags="${configure_cflags} -Wshift-overflow=2"
+else
+	AC_MSG_RESULT(no)
+fi
+CFLAGS="$old_CFLAGS"
+
+#### -Wswitch-default
+AC_MSG_CHECKING([whether compiler understands -Wswitch-default])
+old_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -Werror $unknown_warning_option -Wswitch-default"
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])], [switch_default=yes], [switch_default=no])
+if test "x${switch_default}" = "xyes" ; then
+	AC_MSG_RESULT(yes)
+	configure_cflags="${configure_cflags} -Wswitch-default"
+else
+	AC_MSG_RESULT(no)
+fi
+CFLAGS="$old_CFLAGS"
+
+#### -Wswitch-enum
+#### disabled because of too many warnings with packet types
+#AC_MSG_CHECKING([whether compiler understands -Wswitch-enum])
+#old_CFLAGS="$CFLAGS"
+#CFLAGS="$CFLAGS -Werror $unknown_warning_option -Wswitch-enum"
+#AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])], [switch_enum=yes], [switch_enum=no])
+#if test "x${switch_enum}" = "xyes" ; then
+#	AC_MSG_RESULT(yes)
+#	configure_cflags="${configure_cflags} -Wswitch-enum -Wno-error=switch-enum"
+#else
+#	AC_MSG_RESULT(no)
+#fi
+#CFLAGS="$old_CFLAGS"
+
+#### -Wswitch-bool
+AC_MSG_CHECKING([whether compiler understands -Wswitch-bool])
+old_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -Werror $unknown_warning_option -Wswitch-bool"
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])], [switch_bool=yes], [switch_bool=no])
+if test "x${switch_bool}" = "xyes" ; then
+	AC_MSG_RESULT(yes)
+	configure_cflags="${configure_cflags} -Wswitch-bool"
+else
+	AC_MSG_RESULT(no)
+fi
+CFLAGS="$old_CFLAGS"
+
+#### -Wc99-c11-compat
+#### disabled because of too many warnings with unnamed structs/unions and
+#### _Static_assert
+#AC_MSG_CHECKING([whether compiler understands -Wc99-c11-compat])
+#old_CFLAGS="$CFLAGS"
+#CFLAGS="$CFLAGS -Werror $unknown_warning_option -Wc99-c11-compat"
+#AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])], [c99_c11_compat=yes], [c99_c11_compat=no])
+#if test "x${c99_c11_compat}" = "xyes" ; then
+#	AC_MSG_RESULT(yes)
+#	configure_cflags="${configure_cflags} -Wc99-c11-compat -Wno-error=c99-c11-compat"
+#else
+#	AC_MSG_RESULT(no)
+#fi
+#CFLAGS="$old_CFLAGS"
+
+#### -Wsuggest-attribute=const
+AC_MSG_CHECKING([whether compiler understands -Wsuggest-attribute=const])
+old_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -Werror $unknown_warning_option -Wsuggest-attribute=const"
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[int a;]], [[ a = 1;]])],
+                  [suggest_attribute_const=yes], [suggest_attribute_const=no])
+if test "x${suggest_attribute_const}" = "xyes" ; then
+	AC_MSG_RESULT(yes)
+	configure_cflags="${configure_cflags} -Wsuggest-attribute=const"
+else
+	AC_MSG_RESULT(no)
+fi
+CFLAGS="$old_CFLAGS"
+
+#### -Wsuggest-attribute=pure
+#### disabled because some suggestions cannot be applied because of assertions
+#AC_MSG_CHECKING([whether compiler understands -Wsuggest-attribute=pure])
+#old_CFLAGS="$CFLAGS"
+#CFLAGS="$CFLAGS -Werror $unknown_warning_option -Wsuggest-attribute=pure"
+#AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[int a;]], [[ a = 1;]])],
+#                  [suggest_attribute_pure=yes], [suggest_attribute_pure=no])
+#if test "x${suggest_attribute_pure}" = "xyes" ; then
+#	AC_MSG_RESULT(yes)
+#	configure_cflags="${configure_cflags} -Wsuggest-attribute=pure -Wno-error=suggest-attribute=pure"
+#else
+#	AC_MSG_RESULT(no)
+#fi
+#CFLAGS="$old_CFLAGS"
+
+
 # Checks for header files.
 AC_CHECK_HEADERS([stdio.h stdlib.h string.h strings.h])
 AC_CHECK_HEADERS([time.h sys/time.h])
 AC_CHECK_HEADERS([arpa/inet.h]) # ntohl, htonl, ntohs, htons on Linux
 AC_CHECK_HEADERS([winsock2.h])  # ntohl, htonl, ntohs, htons on Windows
 AC_CHECK_HEADERS([sys/types.h]) # ntohl, htonl, ntohs, htons on OpenBSD
-AC_CHECK_HEADERS([linux/if_tun.h]) # TUN/TAP support on Linux
 
 # Handle library flags according to the platform
 if test "x$ac_cv_header_winsock2_h" = "xyes" ; then
@@ -203,54 +335,32 @@ AC_ARG_ENABLE(code_coverage,
               code_coverage=no)
 if test "x$code_coverage" != "xno"; then
 	configure_cflags="${configure_cflags} -fprofile-arcs -ftest-coverage"
+	configure_ldflags="${configure_ldflags} --coverage"
 
 	# check for the zcov-scan and zcov-genhtml binaries
 	# and abort if they are not found
-	AC_CHECK_PROG(is_zcov_scan_found, zcov-scan, "yes", "no")
-	AC_CHECK_PROG(is_zcov_genhtml_found, zcov-genthml, "yes", "no")
-	if test "x$is_zcov_scan_found" != "xyes" || \
-	   test "x$is_zcov_scan_found" != "xyes" ; then
+	AC_CHECK_PROG(is_lcov_found, lcov, "yes", "no")
+	AC_CHECK_PROG(is_lcov_genhtml_found, genhtml, "yes", "no")
+	if test "x$is_lcov_found" != "xyes" || \
+	   test "x$is_lcov_genhtml_found" != "xyes" ; then
 		echo
-		if test "x$is_zcov_scan_found" != "xyes" ; then
-			echo "ERROR: zcov-scan binary not found"
+		if test "x$is_lcov_found" != "xyes" ; then
+			echo "ERROR: lcov binary not found"
 		fi
-		if test "x$is_zcov_genhtml_found" != "xyes" ; then
-			echo "ERROR: zcov-genhtml binary not found"
+		if test "x$is_lcov_genhtml_found" != "xyes" ; then
+			echo "ERROR: genhtml binary not found"
 		fi
 		echo
-		echo "zcov is required in order to report code coverage."
+		echo "lcov is required in order to report code coverage."
 		echo
 		echo "Either disable the feature with the --disable-code-coverage option, "
-		echo "or install zcov to solve the problem. You may get Zcov from "
-		echo "http://minormatter.com/zcov/ or use your package manager to install "
-		echo "it on your system."
+		echo "or install lcov to solve the problem. You may get Zcov from "
+		echo "http://ltp.sourceforge.net/coverage/lcov.php or use your package "
+		echo "manager to install it on your system."
 		exit 1
 	fi
 fi
 AM_CONDITIONAL([CODE_COVERAGE], [test x$code_coverage = xyes])
-
-
-# check if deprecated code shall be enabled
-AC_ARG_ENABLE(deprecated_api,
-              AS_HELP_STRING([--disable-deprecated-api],
-                             [build deprecated API if enabled [[default=yes]]]),
-              enable_deprecated_api=$enableval,
-              enable_deprecated_api=yes)
-if test "x$enable_deprecated_api" != "xyes"; then
-	echo
-	echo "WARNING: you disabled the deprecated API, it means that the API/ABI"
-	echo "         compatibility of the ROHC library is broken; are you sure "
-	echo "         to do so?"
-	echo
-	sleep 5
-	deprecated_api=0
-	configure_cflags="${configure_cflags} -DROHC_ENABLE_DEPRECATED_API=0"
-else
-	configure_cflags="${configure_cflags} -DROHC_ENABLE_DEPRECATED_API=1"
-	deprecated_api=1
-fi
-AC_DEFINE_UNQUOTED([ROHC_ENABLE_DEPRECATED_API], [$deprecated_api],
-                   [Whether deprecated API is enabled or not.])
 
 
 # allow users to specify a special location for libpcap includes
@@ -271,7 +381,7 @@ AC_ARG_WITH(libpcap_libraries,
             [with_libpcap_libraries="$withval"],
             [with_libpcap_libraries="no"])
 if test "x$with_libpcap_libraries" != "xno"; then
-	configure_ldflags="${configure_ldflags}  -L${with_libpcap_libraries}"
+	configure_ldflags="${configure_ldflags} -L${with_libpcap_libraries}"
 fi
 
 
@@ -294,53 +404,6 @@ AC_ARG_ENABLE(rohc_tests_valgrind,
 AM_CONDITIONAL([ROHC_TESTS_VALGRIND], [test x$enable_rohc_tests_valgrind = xyes])
 
 
-# abort is --enable-rohc-stats is used as it is deprecated
-AC_ARG_ENABLE(rohc_stats,
-              AS_HELP_STRING([--enable-rohc-stats],
-                             [enable ROHC statistics application [[default=no]]]),
-              enable_rohc_stats=$enableval,
-              enable_rohc_stats="undefined")
-if test "x$enable_rohc_stats" != "xundefined" ; then
-	echo
-	echo "ERROR: --enable-rohc-stats and --disable-rohc-stats are "
-	echo "       deprecated, do not use them any more."
-	echo
-	echo "Please use option --enable-app-stats or --disable-app-stats instead."
-	echo
-	exit 1
-fi
-
-# abort is --enable-rohc-apps is used as it is deprecated
-AC_ARG_ENABLE(rohc_apps,
-              AS_HELP_STRING([--enable-rohc-apps],
-                             [enable ROHC applications found in the app/ subdir [[default=no]]]),
-                             enable_rohc_apps=$enableval,
-                             enable_rohc_apps="undefined")
-if test "x$enable_rohc_apps" != "xundefined" ; then
-	echo
-	echo "ERROR: --enable-rohc-apps and --disable-rohc-apps are "
-	echo "       deprecated, do not use them any more."
-	echo
-	echo "Please use a combination of the following options instead:"
-	echo "  --enable-app-fuzzer / --disable-app-fuzzer"
-	echo "  --enable-app-performance / --disable-app-performance"
-	echo "  --enable-app-sniffer / --disable-app-sniffer"
-	echo "  --enable-app-tunnel / --disable-app-tunnel"
-	echo "  --enable-app-stats / --disable-app-stats"
-	echo
-	exit 1
-fi
-
-
-# check if ROHC fuzzer (located in the app/fuzzer/ subdir) is enabled
-AC_ARG_ENABLE(app_fuzzer,
-              AS_HELP_STRING([--enable-app-fuzzer],
-                             [enable ROHC fuzzer tool [default=no]]),
-              enable_app_fuzzer=$enableval,
-              enable_app_fuzzer=no)
-AM_CONDITIONAL([APP_FUZZER], [test x$enable_app_fuzzer = xyes])
-
-
 # check if ROHC performance tool (located in the app/performance/ subdir)
 # is enabled
 AC_ARG_ENABLE(app_performance,
@@ -359,42 +422,6 @@ AC_ARG_ENABLE(app_sniffer,
               enable_app_sniffer=$enableval,
               enable_app_sniffer=no)
 AM_CONDITIONAL([APP_SNIFFER], [test x$enable_app_sniffer = xyes])
-
-
-# check if ROHC over UDP tunnel (located in the app/tunnel/ subdir) is enabled
-AC_ARG_ENABLE(app_tunnel,
-              AS_HELP_STRING([--enable-app-tunnel],
-                             [enable ROHC over UDP tunnel [default=no]]),
-              enable_app_tunnel=$enableval,
-              enable_app_tunnel=no)
-AM_CONDITIONAL([APP_TUNNEL], [test x$enable_app_tunnel = xyes])
-
-# ROHC over UDP tunnel is now deprecated
-if test "x$enable_app_tunnel" = "xyes" ; then
-	echo
-	echo "WARNING: --enable-app-tunnel is now deprecated"
-	echo
-	echo "The ROHC over UDP tunnel is deprecated. This program was created"
-	echo "for testing purposes. The sniffer and fuzzer tools replace it for"
-	echo "testing. The IP/ROHC tunnel replaces it as tunneling solution"
-	echo "(better efficiency, designed for production)."
-	echo
-	echo "The ROHC over UDP tunnel will be removed in version 2.0.0."
-	echo
-fi
-
-# TUN interfaces are not supported on non-Linux platforms yet, so the ROHC
-# over UDP tunnel application cannot be enabled there
-if test "x$enable_app_tunnel" = "xyes" && \
-   test "x$ac_cv_header_linux_if_tun_h" != "xyes" ; then
-	echo
-	echo "ERROR: --enable-app-tunnel cannot be enabled on non Linux "
-	echo "       platforms yet"
-	echo
-	echo "Please use --disable-app-tunnel and try again."
-	echo
-	exit 1
-fi
 
 
 # check if ROHC stats tool (located in the app/stats/ subdir)
@@ -461,15 +488,13 @@ if test "x$enable_rohc_tests" = "xyes" ; then
 
 		if test "x$cross_compiling_emulator_cmd" = "x" ; then
 			echo
-			echo "WARNING: --enable-rohc-tests and/or --enable-rohc-stats are enabled "
-			echo "         and you are cross-compiling, binaries will be built but none "
-			echo "         will be run."
+			echo "WARNING: --enable-rohc-tests is enabled and you are cross-compiling, "
+			echo "         binaries will be built but none will be run."
 			echo
 		else
 			echo
-			echo "WARNING: --enable-rohc-tests and/or --enable-rohc-stats are enabled "
-			echo "         and you are cross-compiling, binaries will be built and run "
-			echo "         with the '$cross_compiling_emulator_name' emulator."
+			echo "WARNING: --enable-rohc-tests is enabled and you are cross-compiling, "
+			echo "         binaries will be built and run with the '$cross_compiling_emulator_name' emulator."
 			echo
 		fi
 
@@ -527,6 +552,11 @@ if test "x$enable_rohc_tests" = "xyes" || \
 		pcap_lib_url="http://www.tcpdump.org/"
 	fi
 
+	old_CFLAGS="$CFLAGS"
+	CFLAGS="$CFLAGS ${libpcap_includes}"
+	old_LDFLAGS="$LDFLAGS"
+	LDFLAGS="${LDFLAGS} -L${with_libpcap_libraries}"
+
 	# check for libpcap header presence
 	AC_CHECK_HEADERS([pcap.h pcap/pcap.h])
 	if test "x$ac_cv_header_pcap_h" != "xyes" &&
@@ -579,6 +609,10 @@ if test "x$enable_rohc_tests" = "xyes" || \
 		AC_DEFINE([DLT_LINUX_SLL], [113],
 		          [Define DLT_LINUX_SLL if not defined by the system])
 	fi
+
+	CFLAGS="${old_CFLAGS}"
+	LDFLAGS="${old_LDFLAGS}"
+
 fi
 
 
@@ -597,6 +631,20 @@ if test "x$enable_rohc_tests" = "xyes" ; then
 		echo "unusual place."
 		exit 1
 	fi
+
+	# check if the _run_tests symbol is provided by cmocka
+	LIBS_SAVED=$LIBS
+	AC_SEARCH_LIBS([_run_tests], [cmocka],
+	               [AC_DEFINE([HAVE_CMOCKA_RUN_TESTS], [1],
+	                          [Whether _run_tests() is provided by the cmocka library])])
+	LIBS=$LIBS_SAVED
+
+	# check if the _cmocka_run_group_tests symbol is provided by cmocka
+	LIBS_SAVED=$LIBS
+	AC_SEARCH_LIBS([_cmocka_run_group_tests], [cmocka],
+	               [AC_DEFINE([HAVE_CMOCKA_RUN_GROUP_TESTS], [1],
+	                          [Whether _cmocka_run_group_tests() is provided by the cmocka library])])
+	LIBS=$LIBS_SAVED
 fi
 
 
@@ -796,26 +844,6 @@ else
 fi
 
 
-# check if RTP bit type is enabled
-AC_ARG_ENABLE(rtp_bit_type,
-              AS_HELP_STRING([--enable-rtp-bit-type],
-                             [enable RTP bit type (use an additionnal bit \
-                              to distinguish UOR-2-TS and UOR-2-ID packets) \
-                              [deprecated]]),
-              enable_rtp_bit_type=$enableval,
-              enable_rtp_bit_type=no)
-if test "$enable_rtp_bit_type" = "yes"; then
-	echo
-	echo "The RTP bit type was not part of any RFC standard. It was also a "
-	echo "maintenance burden. It was therefore removed from the ROHC library. "
-	echo
-	echo "Please remove the --enable-rtp-bit-type option from the ./autogen.sh "
-	echo "or ./configure command to continue."
-	echo
-	exit 1
-fi
-
-
 # check if API documentation should be generated (HTML format with doxygen)
 AC_ARG_ENABLE(doc,
               AS_HELP_STRING([--enable-doc],
@@ -834,7 +862,7 @@ AC_ARG_ENABLE(doc-man,
 AM_CONDITIONAL([BUILD_DOC_MAN], [test "x$build_doc_man" = "xyes"])
 
 
-# doxygen and latex are mandatory if API documentation generation is enabled
+# doxygen and dot are mandatory if API documentation generation is enabled
 if test "x$build_doc" = "xyes" ; then
 	# check for the doxygen binary and abort if it is not found
 	AC_CHECK_PROG(is_doxygen_found, doxygen, "yes", "no")
@@ -846,19 +874,6 @@ if test "x$build_doc" = "xyes" ; then
 		echo
 		echo "Go get it from http://www.doxygen.org/ or use your package manager "
 		echo "to install it on your system."
-		exit 1
-	fi
-
-	# check for the latex binary and abort if it is not found
-	AC_CHECK_PROG(is_latex_found, latex, "yes", "no")
-	if test "x$is_latex_found" != "xyes"; then
-		echo
-		echo "ERROR: latex binary not found"
-		echo
-		echo "latex is required by doxygen in order to generate the library documentation."
-		echo
-		echo "Install your favorite latex distribution on your system either manually or "
-		echo "using your package manager."
 		exit 1
 	fi
 
@@ -893,22 +908,26 @@ if test "x$build_doc_man" = "xyes" ; then
 	AC_CHECK_PROG(is_doxy2man_found, doxy2man, "yes", "no")
 	if test "x$is_doxy2man_found" != "xyes"; then
 		echo
-		echo "ERROR: doxy2man binary not found"
+		echo "INFO: doxy2man binary not found"
 		echo
 		echo "doxy2man is required in order to generate the man pages for the"
-		echo "library documentation."
-		exit 1
+		echo "library documentation. The tool was not found on the system, so"
+		echo "pre-generated man pages will be installed instead."
+		echo
+		# don't fail, just warn user
 	fi
 
 	# check for the help2man binary and abort if it is not found
 	AC_CHECK_PROG(is_help2man_found, help2man, "yes", "no")
 	if test "x$is_help2man_found" != "xyes"; then
 		echo
-		echo "ERROR: help2man binary not found"
+		echo "INFO: help2man binary not found"
 		echo
 		echo "help2man is required in order to generate the man pages for the "
-		echo "documentation of library's tools."
-		exit 1
+		echo "documentation of library's tools. The tool was not found on the "
+		echo "system, so pre-generated man pages will be installed instead."
+		echo
+		# don't fail, just warn user
 	fi
 fi
 
@@ -926,17 +945,19 @@ AM_CONDITIONAL([BUILD_EXAMPLES], [test "x$build_examples" = "xyes"])
 AC_SUBST([TESTS_ENVIRONMENT], [$tests_environment])
 AC_SUBST([libpcap_includes], [$libpcap_includes])
 AC_SUBST([configure_cflags], [$configure_cflags])
+AC_SUBST([configure_cflags_for_lib], [$configure_cflags_for_lib])
 AC_SUBST([configure_ldflags], [$configure_ldflags])
 
 AM_DEP_TRACK
 
 AC_CONFIG_FILES([ \
 	Makefile \
-	bzr_revno \
+	git_ref \
 	src/Makefile \
 	src/test/Makefile \
 	src/common/Makefile \
 	src/common/protocols/Makefile \
+	src/common/test/Makefile \
 	src/comp/Makefile \
 	src/comp/test/Makefile \
 	src/comp/schemes/Makefile \
@@ -951,24 +972,25 @@ AC_CONFIG_FILES([ \
 	test/functional/decompress_padding/Makefile \
 	test/functional/decompress_feedback_only/Makefile \
 	test/functional/context_reuse/Makefile \
-	test/functional/rtp_uo_disambiguation/Makefile \
+	test/functional/packet_types/Makefile \
 	test/functional/rtp_detection/Makefile \
 	test/functional/segment/Makefile \
 	test/robustness/Makefile \
 	test/robustness/empty_payload/Makefile \
 	test/robustness/damaged_packet/Makefile \
 	test/robustness/lost_packet/Makefile \
+	test/robustness/reordered_packet/Makefile \
 	test/robustness/piggybacking_feedback/Makefile \
 	test/robustness/malformed_rohc_packets/Makefile \
 	test/non_regression/Makefile \
+	test/non_regression/rfc3095/Makefile \
+	test/non_regression/rfc6846/Makefile \
 	test/interop/Makefile \
 	examples/Makefile \
 	linux/Makefile \
 	app/Makefile \
 	app/performance/Makefile \
-	app/tunnel/Makefile \
 	app/sniffer/Makefile \
-	app/fuzzer/Makefile \
 	app/stats/Makefile \
 	doc/Makefile \
 	doc/doxygen.conf \

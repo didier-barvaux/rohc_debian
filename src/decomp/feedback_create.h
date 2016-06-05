@@ -29,40 +29,11 @@
 
 #include <rohc/rohc.h>
 #include <rohc/rohc_buf.h>
+#include <feedback.h>
 
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
-
-#include "dllexport.h"
-
-
-/**
- * @brief The different feedback options
- */
-typedef enum
-{
-	ROHC_FEEDBACK_OPT_CRC          = 1, /**< FEEDBACK-2 CRC option */
-	ROHC_FEEDBACK_OPT_REJECT       = 2, /**< FEEDBACK-2 Reject option */
-	ROHC_FEEDBACK_OPT_SN_NOT_VALID = 3, /**< FEEDBACK-2 SN-not-valid option */
-	ROHC_FEEDBACK_OPT_SN           = 4, /**< FEEDBACK-2 SN option */
-	ROHC_FEEDBACK_OPT_CLOCK        = 5, /**< FEEDBACK-2 Clock option */
-	ROHC_FEEDBACK_OPT_JITTER       = 6, /**< FEEDBACK-2 Jitter option */
-	ROHC_FEEDBACK_OPT_LOSS         = 7, /**< FEEDBACK-2 Loss option */
-
-} rohc_feedback_opt_t;
-
-
-/**
- * @brief The different types of feedback acknowledgements
- */
-typedef enum
-{
-	ROHC_ACK_TYPE_ACK         = 0, /**< positive ACKnowledgement (ACK) */
-	ROHC_ACK_TYPE_NACK        = 1, /**< Negative ACKnowledgement (NACK) */
-	ROHC_ACK_TYPE_STATIC_NACK = 2, /**< static Negative ACK (STATIC-NACK) */
-
-} rohc_ack_type_t;
 
 
 /**
@@ -70,8 +41,9 @@ typedef enum
  */
 typedef enum
 {
-	ROHC_FEEDBACK_NO_CRC   = false, /**< No CRC option protects the feedback */
-	ROHC_FEEDBACK_WITH_CRC = true,  /**< A CRC option protects the feedback */
+	ROHC_FEEDBACK_WITH_NO_CRC   = 0,  /**< No CRC protects the feedback */
+	ROHC_FEEDBACK_WITH_CRC_OPT  = 1,  /**< A CRC option protects the feedback */
+	ROHC_FEEDBACK_WITH_CRC_BASE = 2,  /**< A base header CRC protects the feedback */
 
 } rohc_feedback_crc_t;
 
@@ -86,7 +58,7 @@ typedef enum
 struct d_feedback
 {
 	/// The type of feedback (1 for FEEDBACK-1 and 2 for FEEDBACK-2)
-	int type;
+	enum rohc_feedback_ack_type type;
 	/// The feedback data
 	uint8_t data[FEEDBACK_DATA_MAX_LEN];
 	/// The size of feedback data
@@ -98,23 +70,25 @@ struct d_feedback
  * Prototypes of public functions.
  */
 
-bool ROHC_EXPORT rohc_decomp_feedback_size(const struct rohc_buf rohc_data,
-                                           size_t *const feedback_hdr_len,
-                                           size_t *const feedback_data_len)
+bool rohc_decomp_feedback_size(const struct rohc_buf rohc_data,
+                               size_t *const feedback_hdr_len,
+                               size_t *const feedback_data_len)
 	__attribute__((warn_unused_result, nonnull(2, 3)));
 
-void f_feedback1(const uint32_t sn, struct d_feedback *const feedback)
+void f_feedback1(const uint32_t sn_bits, struct d_feedback *const feedback)
 	__attribute__((nonnull(2)));
 
-bool f_feedback2(const rohc_ack_type_t ack_type,
+bool f_feedback2(const rohc_profile_t profile_id,
+                 const enum rohc_feedback_ack_type ack_type,
                  const rohc_mode_t mode,
-                 const uint32_t sn,
+                 const uint32_t sn_bits,
+                 const size_t sn_bits_nr,
                  struct d_feedback *const feedback)
-	__attribute__((warn_unused_result, nonnull(4)));
+	__attribute__((warn_unused_result, nonnull(6)));
 
 bool f_add_option(struct d_feedback *const feedback,
-                  const rohc_feedback_opt_t opt_type,
-                  const unsigned char *const data,
+                  const enum rohc_feedback_opt opt_type,
+                  const uint8_t *const data,
                   const size_t data_len)
 	__attribute__((warn_unused_result, nonnull(1)));
 

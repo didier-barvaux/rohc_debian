@@ -100,12 +100,14 @@ LTLIBRARIES = $(noinst_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 librohc_decomp_schemes_la_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_librohc_decomp_schemes_la_OBJECTS =  \
-	librohc_decomp_schemes_la-wlsb.lo \
+	librohc_decomp_schemes_la-decomp_wlsb.lo \
 	librohc_decomp_schemes_la-ip_id_offset.lo \
-	librohc_decomp_schemes_la-scaled_rtp_ts.lo \
-	librohc_decomp_schemes_la-list.lo \
-	librohc_decomp_schemes_la-list_ipv6.lo \
-	librohc_decomp_schemes_la-rfc4996.lo
+	librohc_decomp_schemes_la-decomp_scaled_rtp_ts.lo \
+	librohc_decomp_schemes_la-decomp_list.lo \
+	librohc_decomp_schemes_la-decomp_list_ipv6.lo \
+	librohc_decomp_schemes_la-rfc4996.lo \
+	librohc_decomp_schemes_la-tcp_sack.lo \
+	librohc_decomp_schemes_la-tcp_ts.lo
 librohc_decomp_schemes_la_OBJECTS =  \
 	$(am_librohc_decomp_schemes_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -262,6 +264,7 @@ LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
@@ -314,6 +317,7 @@ build_os = @build_os@
 build_vendor = @build_vendor@
 builddir = @builddir@
 configure_cflags = @configure_cflags@
+configure_cflags_for_lib = @configure_cflags_for_lib@
 configure_ldflags = @configure_ldflags@
 datadir = @datadir@
 datarootdir = @datarootdir@
@@ -334,15 +338,14 @@ is_doxy2man_found = @is_doxy2man_found@
 is_doxygen_found = @is_doxygen_found@
 is_gnuplot_found = @is_gnuplot_found@
 is_help2man_found = @is_help2man_found@
-is_latex_found = @is_latex_found@
+is_lcov_found = @is_lcov_found@
+is_lcov_genhtml_found = @is_lcov_genhtml_found@
 is_qemu_found = @is_qemu_found@
 is_sort_found = @is_sort_found@
 is_tr_found = @is_tr_found@
 is_valgrind_found = @is_valgrind_found@
 is_wine_found = @is_wine_found@
 is_xsltproc_found = @is_xsltproc_found@
-is_zcov_genhtml_found = @is_zcov_genhtml_found@
-is_zcov_scan_found = @is_zcov_scan_found@
 libdir = @libdir@
 libexecdir = @libexecdir@
 libpcap_includes = @libpcap_includes@
@@ -370,12 +373,14 @@ top_srcdir = @top_srcdir@
 SUBDIRS = . $(DECOMP_SCHEMES_TESTS_DIR)
 noinst_LTLIBRARIES = librohc_decomp_schemes.la
 librohc_decomp_schemes_la_SOURCES = \
-	wlsb.c \
+	decomp_wlsb.c \
 	ip_id_offset.c \
-	scaled_rtp_ts.c \
-	list.c \
-	list_ipv6.c \
-	rfc4996.c
+	decomp_scaled_rtp_ts.c \
+	decomp_list.c \
+	decomp_list_ipv6.c \
+	rfc4996.c \
+	tcp_sack.c \
+	tcp_ts.c
 
 librohc_decomp_schemes_la_LIBADD = \
 	$(additional_platform_libs)
@@ -385,21 +390,22 @@ librohc_decomp_schemes_la_LDFLAGS = \
 	-no-undefined
 
 librohc_decomp_schemes_la_CFLAGS = \
-	$(configure_cflags)
+	$(configure_cflags) \
+	$(configure_cflags_for_lib)
 
 librohc_decomp_schemes_la_CPPFLAGS = \
-	-I$(top_srcdir)/src \
 	-I$(top_srcdir)/src/common \
-	-I$(top_srcdir)/src/comp \
 	-I$(srcdir)/..
 
 noinst_HEADERS = \
-	wlsb.h \
+	decomp_wlsb.h \
 	ip_id_offset.h \
-	scaled_rtp_ts.h \
-	list.h \
-	list_ipv6.h \
-	rfc4996.h
+	decomp_scaled_rtp_ts.h \
+	decomp_list.h \
+	decomp_list_ipv6.h \
+	rfc4996.h \
+	tcp_sack.h \
+	tcp_ts.h
 
 all: all-recursive
 
@@ -456,12 +462,14 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_decomp_schemes_la-decomp_list.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_decomp_schemes_la-decomp_list_ipv6.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_decomp_schemes_la-decomp_scaled_rtp_ts.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_decomp_schemes_la-decomp_wlsb.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_decomp_schemes_la-ip_id_offset.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_decomp_schemes_la-list.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_decomp_schemes_la-list_ipv6.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_decomp_schemes_la-rfc4996.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_decomp_schemes_la-scaled_rtp_ts.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_decomp_schemes_la-wlsb.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_decomp_schemes_la-tcp_sack.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_decomp_schemes_la-tcp_ts.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
@@ -484,12 +492,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
 
-librohc_decomp_schemes_la-wlsb.lo: wlsb.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -MT librohc_decomp_schemes_la-wlsb.lo -MD -MP -MF $(DEPDIR)/librohc_decomp_schemes_la-wlsb.Tpo -c -o librohc_decomp_schemes_la-wlsb.lo `test -f 'wlsb.c' || echo '$(srcdir)/'`wlsb.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_decomp_schemes_la-wlsb.Tpo $(DEPDIR)/librohc_decomp_schemes_la-wlsb.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='wlsb.c' object='librohc_decomp_schemes_la-wlsb.lo' libtool=yes @AMDEPBACKSLASH@
+librohc_decomp_schemes_la-decomp_wlsb.lo: decomp_wlsb.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -MT librohc_decomp_schemes_la-decomp_wlsb.lo -MD -MP -MF $(DEPDIR)/librohc_decomp_schemes_la-decomp_wlsb.Tpo -c -o librohc_decomp_schemes_la-decomp_wlsb.lo `test -f 'decomp_wlsb.c' || echo '$(srcdir)/'`decomp_wlsb.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_decomp_schemes_la-decomp_wlsb.Tpo $(DEPDIR)/librohc_decomp_schemes_la-decomp_wlsb.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='decomp_wlsb.c' object='librohc_decomp_schemes_la-decomp_wlsb.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -c -o librohc_decomp_schemes_la-wlsb.lo `test -f 'wlsb.c' || echo '$(srcdir)/'`wlsb.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -c -o librohc_decomp_schemes_la-decomp_wlsb.lo `test -f 'decomp_wlsb.c' || echo '$(srcdir)/'`decomp_wlsb.c
 
 librohc_decomp_schemes_la-ip_id_offset.lo: ip_id_offset.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -MT librohc_decomp_schemes_la-ip_id_offset.lo -MD -MP -MF $(DEPDIR)/librohc_decomp_schemes_la-ip_id_offset.Tpo -c -o librohc_decomp_schemes_la-ip_id_offset.lo `test -f 'ip_id_offset.c' || echo '$(srcdir)/'`ip_id_offset.c
@@ -498,26 +506,26 @@ librohc_decomp_schemes_la-ip_id_offset.lo: ip_id_offset.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -c -o librohc_decomp_schemes_la-ip_id_offset.lo `test -f 'ip_id_offset.c' || echo '$(srcdir)/'`ip_id_offset.c
 
-librohc_decomp_schemes_la-scaled_rtp_ts.lo: scaled_rtp_ts.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -MT librohc_decomp_schemes_la-scaled_rtp_ts.lo -MD -MP -MF $(DEPDIR)/librohc_decomp_schemes_la-scaled_rtp_ts.Tpo -c -o librohc_decomp_schemes_la-scaled_rtp_ts.lo `test -f 'scaled_rtp_ts.c' || echo '$(srcdir)/'`scaled_rtp_ts.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_decomp_schemes_la-scaled_rtp_ts.Tpo $(DEPDIR)/librohc_decomp_schemes_la-scaled_rtp_ts.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='scaled_rtp_ts.c' object='librohc_decomp_schemes_la-scaled_rtp_ts.lo' libtool=yes @AMDEPBACKSLASH@
+librohc_decomp_schemes_la-decomp_scaled_rtp_ts.lo: decomp_scaled_rtp_ts.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -MT librohc_decomp_schemes_la-decomp_scaled_rtp_ts.lo -MD -MP -MF $(DEPDIR)/librohc_decomp_schemes_la-decomp_scaled_rtp_ts.Tpo -c -o librohc_decomp_schemes_la-decomp_scaled_rtp_ts.lo `test -f 'decomp_scaled_rtp_ts.c' || echo '$(srcdir)/'`decomp_scaled_rtp_ts.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_decomp_schemes_la-decomp_scaled_rtp_ts.Tpo $(DEPDIR)/librohc_decomp_schemes_la-decomp_scaled_rtp_ts.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='decomp_scaled_rtp_ts.c' object='librohc_decomp_schemes_la-decomp_scaled_rtp_ts.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -c -o librohc_decomp_schemes_la-scaled_rtp_ts.lo `test -f 'scaled_rtp_ts.c' || echo '$(srcdir)/'`scaled_rtp_ts.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -c -o librohc_decomp_schemes_la-decomp_scaled_rtp_ts.lo `test -f 'decomp_scaled_rtp_ts.c' || echo '$(srcdir)/'`decomp_scaled_rtp_ts.c
 
-librohc_decomp_schemes_la-list.lo: list.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -MT librohc_decomp_schemes_la-list.lo -MD -MP -MF $(DEPDIR)/librohc_decomp_schemes_la-list.Tpo -c -o librohc_decomp_schemes_la-list.lo `test -f 'list.c' || echo '$(srcdir)/'`list.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_decomp_schemes_la-list.Tpo $(DEPDIR)/librohc_decomp_schemes_la-list.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='list.c' object='librohc_decomp_schemes_la-list.lo' libtool=yes @AMDEPBACKSLASH@
+librohc_decomp_schemes_la-decomp_list.lo: decomp_list.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -MT librohc_decomp_schemes_la-decomp_list.lo -MD -MP -MF $(DEPDIR)/librohc_decomp_schemes_la-decomp_list.Tpo -c -o librohc_decomp_schemes_la-decomp_list.lo `test -f 'decomp_list.c' || echo '$(srcdir)/'`decomp_list.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_decomp_schemes_la-decomp_list.Tpo $(DEPDIR)/librohc_decomp_schemes_la-decomp_list.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='decomp_list.c' object='librohc_decomp_schemes_la-decomp_list.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -c -o librohc_decomp_schemes_la-list.lo `test -f 'list.c' || echo '$(srcdir)/'`list.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -c -o librohc_decomp_schemes_la-decomp_list.lo `test -f 'decomp_list.c' || echo '$(srcdir)/'`decomp_list.c
 
-librohc_decomp_schemes_la-list_ipv6.lo: list_ipv6.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -MT librohc_decomp_schemes_la-list_ipv6.lo -MD -MP -MF $(DEPDIR)/librohc_decomp_schemes_la-list_ipv6.Tpo -c -o librohc_decomp_schemes_la-list_ipv6.lo `test -f 'list_ipv6.c' || echo '$(srcdir)/'`list_ipv6.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_decomp_schemes_la-list_ipv6.Tpo $(DEPDIR)/librohc_decomp_schemes_la-list_ipv6.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='list_ipv6.c' object='librohc_decomp_schemes_la-list_ipv6.lo' libtool=yes @AMDEPBACKSLASH@
+librohc_decomp_schemes_la-decomp_list_ipv6.lo: decomp_list_ipv6.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -MT librohc_decomp_schemes_la-decomp_list_ipv6.lo -MD -MP -MF $(DEPDIR)/librohc_decomp_schemes_la-decomp_list_ipv6.Tpo -c -o librohc_decomp_schemes_la-decomp_list_ipv6.lo `test -f 'decomp_list_ipv6.c' || echo '$(srcdir)/'`decomp_list_ipv6.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_decomp_schemes_la-decomp_list_ipv6.Tpo $(DEPDIR)/librohc_decomp_schemes_la-decomp_list_ipv6.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='decomp_list_ipv6.c' object='librohc_decomp_schemes_la-decomp_list_ipv6.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -c -o librohc_decomp_schemes_la-list_ipv6.lo `test -f 'list_ipv6.c' || echo '$(srcdir)/'`list_ipv6.c
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -c -o librohc_decomp_schemes_la-decomp_list_ipv6.lo `test -f 'decomp_list_ipv6.c' || echo '$(srcdir)/'`decomp_list_ipv6.c
 
 librohc_decomp_schemes_la-rfc4996.lo: rfc4996.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -MT librohc_decomp_schemes_la-rfc4996.lo -MD -MP -MF $(DEPDIR)/librohc_decomp_schemes_la-rfc4996.Tpo -c -o librohc_decomp_schemes_la-rfc4996.lo `test -f 'rfc4996.c' || echo '$(srcdir)/'`rfc4996.c
@@ -525,6 +533,20 @@ librohc_decomp_schemes_la-rfc4996.lo: rfc4996.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rfc4996.c' object='librohc_decomp_schemes_la-rfc4996.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -c -o librohc_decomp_schemes_la-rfc4996.lo `test -f 'rfc4996.c' || echo '$(srcdir)/'`rfc4996.c
+
+librohc_decomp_schemes_la-tcp_sack.lo: tcp_sack.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -MT librohc_decomp_schemes_la-tcp_sack.lo -MD -MP -MF $(DEPDIR)/librohc_decomp_schemes_la-tcp_sack.Tpo -c -o librohc_decomp_schemes_la-tcp_sack.lo `test -f 'tcp_sack.c' || echo '$(srcdir)/'`tcp_sack.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_decomp_schemes_la-tcp_sack.Tpo $(DEPDIR)/librohc_decomp_schemes_la-tcp_sack.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tcp_sack.c' object='librohc_decomp_schemes_la-tcp_sack.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -c -o librohc_decomp_schemes_la-tcp_sack.lo `test -f 'tcp_sack.c' || echo '$(srcdir)/'`tcp_sack.c
+
+librohc_decomp_schemes_la-tcp_ts.lo: tcp_ts.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -MT librohc_decomp_schemes_la-tcp_ts.lo -MD -MP -MF $(DEPDIR)/librohc_decomp_schemes_la-tcp_ts.Tpo -c -o librohc_decomp_schemes_la-tcp_ts.lo `test -f 'tcp_ts.c' || echo '$(srcdir)/'`tcp_ts.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_decomp_schemes_la-tcp_ts.Tpo $(DEPDIR)/librohc_decomp_schemes_la-tcp_ts.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='tcp_ts.c' object='librohc_decomp_schemes_la-tcp_ts.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_decomp_schemes_la_CPPFLAGS) $(CPPFLAGS) $(librohc_decomp_schemes_la_CFLAGS) $(CFLAGS) -c -o librohc_decomp_schemes_la-tcp_ts.lo `test -f 'tcp_ts.c' || echo '$(srcdir)/'`tcp_ts.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

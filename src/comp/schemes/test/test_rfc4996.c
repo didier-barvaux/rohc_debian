@@ -26,6 +26,7 @@
 #include <stdint.h>
 
 #include "rfc4996.h"
+#include "comp_wlsb.h"
 
 #include "config.h"
 
@@ -113,7 +114,8 @@ error:
  */
 static bool run_test_variable_length_32_enc(const bool be_verbose)
 {
-	uint8_t compressed_data[sizeof(uint32_t)];
+	const size_t comp_max_len = sizeof(uint32_t);
+	uint8_t comp_data[comp_max_len];
 	struct c_wlsb *wlsb;
 	uint32_t old_value;
 	bool is_success = false;
@@ -157,10 +159,10 @@ static bool run_test_variable_length_32_enc(const bool be_verbose)
 		{ 0xfffffff + 3,  4, 3 },
 		{ 0xfffffff + 4,  1, 1 },
 		{ 0xffffffff,     4, 3 },
-		{ 0xffffffff + 1, 4, 3 },
-		{ 0xffffffff + 2, 4, 3 },
-		{ 0xffffffff + 3, 4, 3 },
-		{ 0xffffffff + 4, 1, 1 },
+		{ 0,              4, 3 }, /* 0xffffffff + 1 */
+		{ 1,              4, 3 }, /* 0xffffffff + 2 */
+		{ 2,              4, 3 }, /* 0xffffffff + 3 */
+		{ 3,              1, 1 }, /* 0xffffffff + 4 */
 		{ 0,              0, 4 }  /* stopper */
 	};
 
@@ -187,29 +189,15 @@ static bool run_test_variable_length_32_enc(const bool be_verbose)
 		size_t nr_bits_63;
 
 		/* detect how many bits are required for the value */
-		if(!wlsb_get_kp_32bits(wlsb, inputs[i].uncomp_value, 16383,
-		                       &nr_bits_16383))
-		{
-			trace(be_verbose, "failed to find the minimal number of bits "
-			      "required for value 0x%08x and p = 16383\n",
-			      inputs[i].uncomp_value);
-			goto free_wlsb;
-		}
-		if(!wlsb_get_kp_32bits(wlsb, inputs[i].uncomp_value, 63,
-		                       &nr_bits_63))
-		{
-			trace(be_verbose, "failed to find the minimal number of bits "
-			      "required for value 0x%08x and p = 63\n",
-			      inputs[i].uncomp_value);
-			goto free_wlsb;
-		}
+		nr_bits_16383 = wlsb_get_kp_32bits(wlsb, inputs[i].uncomp_value, 16383);
+		nr_bits_63 = wlsb_get_kp_32bits(wlsb, inputs[i].uncomp_value, 63);
 
 		/* compress the value */
 		trace(be_verbose, "\tvariable_length_32_enc(value = 0x%08x)\n",
 		      inputs[i].uncomp_value);
 		comp_len = variable_length_32_enc(old_value, inputs[i].uncomp_value,
 		                                  nr_bits_63, nr_bits_16383,
-		                                  compressed_data, &indicator);
+		                                  comp_data, comp_max_len, &indicator);
 		printf("\t\tindicator %d\n", indicator);
 		printf("\t\tencoded length %zu\n", comp_len);
 
@@ -226,7 +214,7 @@ static bool run_test_variable_length_32_enc(const bool be_verbose)
 		if(comp_len != inputs[i].expected_len)
 		{
 			fprintf(stderr, "variable_length_32_enc(value = 0x%08x) wrote one "
-			        "%zd-byte compressed value while one %zd-byte value was "
+			        "%zu-byte compressed value while one %zu-byte value was "
 			        "expected\n", inputs[i].uncomp_value, comp_len,
 			        inputs[i].expected_len);
 			goto free_wlsb;

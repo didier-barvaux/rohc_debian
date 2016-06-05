@@ -14,59 +14,50 @@ endif
 SUBDIRS = schemes . $(COMP_TESTS_DIR)
 
 
-lib_LTLIBRARIES = librohc_comp.la
+noinst_LTLIBRARIES = librohc_comp.la
 
 librohc_comp_la_SOURCES = \
 	rohc_comp.c \
 	c_uncompressed.c \
-	c_generic.c \
+	rohc_comp_rfc3095.c \
 	c_ip.c \
 	c_udp.c \
 	c_udp_lite.c \
 	c_esp.c \
 	c_rtp.c \
+	c_tcp_opts_list.c \
 	c_tcp.c
 
 librohc_comp_la_LIBADD = \
-	-lrohc_common \
 	$(builddir)/schemes/librohc_comp_schemes.la \
 	$(additional_platform_libs)
 
 librohc_comp_la_LDFLAGS = \
-	$(configure_ldflags) \
-	-export-symbols $(srcdir)/librohc_comp.symbols \
-	-no-undefined \
-	-version-info $(ROHC_API_CURRENT):$(ROHC_API_REVISION):$(ROHC_API_AGE) \
-	-L$(top_builddir)/src/common/.libs
+	$(configure_ldflags)
 
 librohc_comp_la_CFLAGS = \
-	$(configure_cflags)
+	$(configure_cflags) \
+	$(configure_cflags_for_lib)
 
 librohc_comp_la_CPPFLAGS = \
-	-I$(top_srcdir)/src \
 	-I$(top_srcdir)/src/common
 
 librohc_comp_la_DEPENDENCIES = \
-	$(builddir)/schemes/librohc_comp_schemes.la \
-	$(srcdir)/librohc_comp.symbols
-
-# fake public headers installed in $includedir to point
-# to the real public headers in $includedir/$packagename
-include_HEADERS = \
-	compat_headers/rohc_comp.h
+	$(top_builddir)/src/common/librohc_common.la \
+	$(builddir)/schemes/librohc_comp_schemes.la
 
 pkginclude_HEADERS = \
 	rohc_comp.h
 
 noinst_HEADERS = \
 	rohc_comp_internals.h \
-	c_generic.h \
+	rohc_comp_rfc3095.h \
 	c_ip.h \
 	c_udp.h \
-	c_rtp.h
+	c_rtp.h \
+	c_tcp_opts_list.h
 
 # extra files for releases
 EXTRA_DIST = \
-	librohc_comp.symbols \
 	rohc
 

@@ -104,7 +104,8 @@ am_example_rohc_decomp_OBJECTS =  \
 	example_rohc_decomp-example_rohc_decomp.$(OBJEXT)
 example_rohc_decomp_OBJECTS = $(am_example_rohc_decomp_OBJECTS)
 am__DEPENDENCIES_1 =
-example_rohc_decomp_DEPENDENCIES = $(am__DEPENDENCIES_1)
+example_rohc_decomp_DEPENDENCIES = $(top_builddir)/src/librohc.la \
+	$(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -116,21 +117,24 @@ example_rohc_decomp_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 am_print_rohc_version_OBJECTS =  \
 	print_rohc_version-print_rohc_version.$(OBJEXT)
 print_rohc_version_OBJECTS = $(am_print_rohc_version_OBJECTS)
-print_rohc_version_DEPENDENCIES = $(am__DEPENDENCIES_1)
+print_rohc_version_DEPENDENCIES = $(top_builddir)/src/librohc.la \
+	$(am__DEPENDENCIES_1)
 print_rohc_version_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
 	$(print_rohc_version_CFLAGS) $(CFLAGS) \
 	$(print_rohc_version_LDFLAGS) $(LDFLAGS) -o $@
 am_rtp_detection_OBJECTS = rtp_detection-rtp_detection.$(OBJEXT)
 rtp_detection_OBJECTS = $(am_rtp_detection_OBJECTS)
-rtp_detection_DEPENDENCIES = $(am__DEPENDENCIES_1)
+rtp_detection_DEPENDENCIES = $(top_builddir)/src/librohc.la \
+	$(am__DEPENDENCIES_1)
 rtp_detection_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(rtp_detection_CFLAGS) \
 	$(CFLAGS) $(rtp_detection_LDFLAGS) $(LDFLAGS) -o $@
 am_simple_rohc_program_OBJECTS =  \
 	simple_rohc_program-simple_rohc_program.$(OBJEXT)
 simple_rohc_program_OBJECTS = $(am_simple_rohc_program_OBJECTS)
-simple_rohc_program_DEPENDENCIES = $(am__DEPENDENCIES_1)
+simple_rohc_program_DEPENDENCIES = $(top_builddir)/src/librohc.la \
+	$(am__DEPENDENCIES_1)
 simple_rohc_program_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 	$(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CCLD) \
 	$(simple_rohc_program_CFLAGS) $(CFLAGS) \
@@ -270,6 +274,7 @@ LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
@@ -322,6 +327,7 @@ build_os = @build_os@
 build_vendor = @build_vendor@
 builddir = @builddir@
 configure_cflags = @configure_cflags@
+configure_cflags_for_lib = @configure_cflags_for_lib@
 configure_ldflags = @configure_ldflags@
 datadir = @datadir@
 datarootdir = @datarootdir@
@@ -342,15 +348,14 @@ is_doxy2man_found = @is_doxy2man_found@
 is_doxygen_found = @is_doxygen_found@
 is_gnuplot_found = @is_gnuplot_found@
 is_help2man_found = @is_help2man_found@
-is_latex_found = @is_latex_found@
+is_lcov_found = @is_lcov_found@
+is_lcov_genhtml_found = @is_lcov_genhtml_found@
 is_qemu_found = @is_qemu_found@
 is_sort_found = @is_sort_found@
 is_tr_found = @is_tr_found@
 is_valgrind_found = @is_valgrind_found@
 is_wine_found = @is_wine_found@
 is_xsltproc_found = @is_xsltproc_found@
-is_zcov_genhtml_found = @is_zcov_genhtml_found@
-is_zcov_scan_found = @is_zcov_scan_found@
 libdir = @libdir@
 libexecdir = @libexecdir@
 libpcap_includes = @libpcap_includes@
@@ -389,16 +394,13 @@ simple_rohc_program_CPPFLAGS = \
 	-I$(top_srcdir)/src/comp
 
 simple_rohc_program_LDFLAGS = \
-	$(configure_ldflags) \
-	-L$(top_builddir)/src/common/.libs \
-	-L$(top_builddir)/src/comp/.libs
+	$(configure_ldflags)
 
 simple_rohc_program_SOURCES = \
 	simple_rohc_program.c
 
 simple_rohc_program_LDADD = \
-	-lrohc_comp \
-	-lrohc_common \
+	$(top_builddir)/src/librohc.la \
 	$(additional_platform_libs)
 
 print_rohc_version_CFLAGS = \
@@ -409,14 +411,13 @@ print_rohc_version_CPPFLAGS = \
 	-I$(top_srcdir)/src/common
 
 print_rohc_version_LDFLAGS = \
-	$(configure_ldflags) \
-	-L$(top_builddir)/src/common/.libs
+	$(configure_ldflags)
 
 print_rohc_version_SOURCES = \
 	print_rohc_version.c
 
 print_rohc_version_LDADD = \
-	-lrohc_common \
+	$(top_builddir)/src/librohc.la \
 	$(additional_platform_libs)
 
 example_rohc_decomp_CFLAGS = \
@@ -429,18 +430,13 @@ example_rohc_decomp_CPPFLAGS = \
 	-I$(top_srcdir)/src/decomp
 
 example_rohc_decomp_LDFLAGS = \
-	$(configure_ldflags) \
-	-L$(top_builddir)/src/common/.libs \
-	-L$(top_builddir)/src/comp/.libs \
-	-L$(top_builddir)/src/decomp/.libs
+	$(configure_ldflags)
 
 example_rohc_decomp_SOURCES = \
 	example_rohc_decomp.c
 
 example_rohc_decomp_LDADD = \
-	-lrohc_decomp \
-	-lrohc_comp \
-	-lrohc_common \
+	$(top_builddir)/src/librohc.la \
 	$(additional_platform_libs)
 
 rtp_detection_CFLAGS = \
@@ -452,16 +448,13 @@ rtp_detection_CPPFLAGS = \
 	-I$(top_srcdir)/src/comp
 
 rtp_detection_LDFLAGS = \
-	$(configure_ldflags) \
-	-L$(top_builddir)/src/common/.libs \
-	-L$(top_builddir)/src/comp/.libs
+	$(configure_ldflags)
 
 rtp_detection_SOURCES = \
 	rtp_detection.c
 
 rtp_detection_LDADD = \
-	-lrohc_comp \
-	-lrohc_common \
+	$(top_builddir)/src/librohc.la \
 	$(additional_platform_libs)
 
 all: all-am

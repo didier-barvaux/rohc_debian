@@ -116,7 +116,7 @@ static int test_compression_perfs(const bool is_verbose,
                                   char *filename,
                                   const rohc_cid_type_t cid_type,
                                   const size_t wlsb_width,
-                                  const unsigned int max_contexts,
+                                  const size_t max_contexts,
                                   unsigned long *packet_count);
 static int time_compress_packet(struct rohc_comp *comp,
                                 unsigned long num_packet,
@@ -127,7 +127,7 @@ static int time_compress_packet(struct rohc_comp *comp,
 static int test_decompression_perfs(const bool is_verbose,
                                     char *filename,
                                     const rohc_cid_type_t cid_type,
-                                    const unsigned int max_contexts,
+                                    const size_t max_contexts,
                                     unsigned long *packet_count);
 static int time_decompress_packet(struct rohc_decomp *decomp,
                                   unsigned long num_packet,
@@ -263,7 +263,7 @@ int main(int argc, char *argv[])
 		cid_type = ROHC_SMALL_CID;
 
 		/* the maximum number of ROHC contexts should be valid */
-		if(max_contexts < 1 || max_contexts > (ROHC_SMALL_CID_MAX + 1))
+		if(max_contexts < 1 || (size_t) max_contexts > (ROHC_SMALL_CID_MAX + 1))
 		{
 			fprintf(stderr, "the maximum number of ROHC contexts should be "
 			        "between 1 and %u\n\n", ROHC_SMALL_CID_MAX + 1);
@@ -276,7 +276,7 @@ int main(int argc, char *argv[])
 		cid_type = ROHC_LARGE_CID;
 
 		/* the maximum number of ROHC contexts should be valid */
-		if(max_contexts < 1 || max_contexts > (ROHC_LARGE_CID_MAX + 1))
+		if(max_contexts < 1 || (size_t) max_contexts > (ROHC_LARGE_CID_MAX + 1))
 		{
 			fprintf(stderr, "the maximum number of ROHC contexts should be "
 			        "between 1 and %u\n\n", ROHC_LARGE_CID_MAX + 1);
@@ -382,7 +382,7 @@ static int test_compression_perfs(const bool is_verbose,
                                   char *filename,
                                   const rohc_cid_type_t cid_type,
                                   const size_t wlsb_width,
-                                  const unsigned int max_contexts,
+                                  const size_t max_contexts,
                                   unsigned long *packet_count)
 {
 	pcap_t *handle;
@@ -539,8 +539,7 @@ static int time_compress_packet(struct rohc_comp *comp,
 	/* check Ethernet frame length */
 	if(header.len <= link_len || header.len != header.caplen)
 	{
-		fprintf(stderr, "packet %lu: bad PCAP packet "
-		        "(len = %d, caplen = %d)\n",
+		fprintf(stderr, "packet %lu: bad PCAP packet (len = %u, caplen = %u)\n",
 		        num_packet, header.len, header.caplen);
 		goto error;
 	}
@@ -568,7 +567,7 @@ static int time_compress_packet(struct rohc_comp *comp,
 			struct ipv6_hdr *ip;
 
 			ip = (struct ipv6_hdr *) rohc_buf_data(ip_packet);
-			tot_len = sizeof(struct ipv6_hdr) + ntohs(ip->ip6_plen);
+			tot_len = sizeof(struct ipv6_hdr) + ntohs(ip->plen);
 		}
 		else /* unknown IP version */
 		{
@@ -580,7 +579,7 @@ static int time_compress_packet(struct rohc_comp *comp,
 		/* update the length of the IP packet if padding is present */
 		if(tot_len < ip_packet.len)
 		{
-			fprintf(stderr, "packet %lu: the Ethernet frame has %zd "
+			fprintf(stderr, "packet %lu: the Ethernet frame has %zu "
 			        "bytes of padding after the %u-byte IP packet!\n",
 			        num_packet, ip_packet.len - tot_len, tot_len);
 			ip_packet.len = tot_len;
@@ -618,7 +617,7 @@ error:
 static int test_decompression_perfs(const bool is_verbose,
                                     char *filename,
                                     const rohc_cid_type_t cid_type,
-                                    const unsigned int max_contexts,
+                                    const size_t max_contexts,
                                     unsigned long *packet_count)
 {
 	const struct rohc_ts arrival_time = { .sec = 0, .nsec = 0 };
@@ -761,8 +760,7 @@ static int time_decompress_packet(struct rohc_decomp *decomp,
 	/* check Ethernet frame length */
 	if(header.len <= link_len || header.len != header.caplen)
 	{
-		fprintf(stderr, "packet %lu: bad PCAP packet "
-		        "(len = %d, caplen = %d)\n",
+		fprintf(stderr, "packet %lu: bad PCAP packet (len = %u, caplen = %u)\n",
 		        num_packet, header.len, header.caplen);
 		goto error;
 	}
@@ -806,10 +804,10 @@ static void print_rohc_traces(void *const is_verbose__,
                               ...)
 {
 	const bool *const is_verbose = (bool *) is_verbose__;
-	va_list args;
 
 	if(*is_verbose)
 	{
+		va_list args;
 		va_start(args, format);
 		vprintf(format, args);
 		va_end(args);

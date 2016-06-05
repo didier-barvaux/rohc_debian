@@ -28,9 +28,12 @@
 #include "ip.h"
 #include "rohc_utils.h"
 #include "protocols/ip_numbers.h"
+#include "protocols/ip.h"
+#include "protocols/ipv4.h"
+#include "protocols/ipv6.h"
 
 #ifndef __KERNEL__
-#	include <string.h>
+#  include <string.h>
 #endif
 #include <assert.h>
 
@@ -44,7 +47,7 @@ static bool ext_get_next_layer(const struct net_hdr *const nh,
                                struct net_hdr *const nl)
 	__attribute__((warn_unused_result, nonnull(1, 2)));
 
-static bool ext_get_next_header(const unsigned char *const ext,
+static bool ext_get_next_header(const uint8_t *const ext,
                                 const size_t ext_len,
                                 struct net_hdr *const nh)
 	__attribute__((warn_unused_result, nonnull(1, 3)));
@@ -65,22 +68,23 @@ static bool ext_get_next_header(const unsigned char *const ext,
  * @return       Whether the IP packet was successfully created or not
  */
 bool ip_create(struct ip_packet *const ip,
-               const unsigned char *const packet,
+               const uint8_t *const packet,
                const size_t size)
 {
-	ip_version version;
+	const struct ip_hdr *const ip_hdr = (struct ip_hdr *) packet;
 
-	/* get the version of the IP packet
-	 * (may be IP_UNKNOWN if packet is not IP) */
-	if(!get_ip_version(packet, size, &version))
+	/* get the version of the IP packet */
+	if(size >= sizeof(struct ip_hdr))
 	{
-		goto error;
+		ip->version = ip_hdr->version;
+	}
+	else
+	{
+		ip->version = IP_UNKNOWN;
 	}
 
-	ip->version = version;
-
 	/* check packet's validity according to IP version */
-	if(version == IPV4)
+	if(ip->version == IPV4)
 	{
 		/* IPv4: packet must be at least 20-byte long (= min header length)
 		 *       packet must be large enough for options if any (= 20 bytes)
@@ -109,7 +113,7 @@ bool ip_create(struct ip_packet *const ip,
 		ip->data = packet;
 		ip->size = size;
 	}
-	else if(version == IPV6)
+	else if(ip->version == IPV6)
 	{
 		/* IPv6: packet must be at least 40-byte long (= header length)
 		 *       packet length == header length + Payload Length field */
@@ -196,7 +200,7 @@ error:
  * @param ip The IP packet to analyze
  * @return   The IP raw data (header + payload)
  */
-const unsigned char * ip_get_raw_data(const struct ip_packet *const ip)
+const uint8_t * ip_get_raw_data(const struct ip_packet *const ip)
 {
 	return ip->data;
 }
@@ -215,18 +219,8 @@ const unsigned char * ip_get_raw_data(const struct ip_packet *const ip)
 bool ip_get_inner_packet(const struct ip_packet *const outer,
                          struct ip_packet *const inner)
 {
-	unsigned char *next_header;
-
-	/* get the next header data in the IP packet (skip IP extensions) */
-	next_header = ip_get_next_layer(outer);
-	if(next_header == NULL)
-	{
-		/* no next header, or malformed packet */
-		return false;
-	}
-
 	/* create an IP packet with the next header data */
-	return ip_create(inner, next_header, ip_get_plen(outer));
+	return ip_create(inner, outer->nl.data, outer->nl.len);
 }
 
 
@@ -240,8 +234,8 @@ bool ip_get_inner_packet(const struct ip_packet *const outer,
  * @param type OUT: The type of the next header
  * @return     The next header if successful, NULL otherwise
  */
-unsigned char * ip_get_next_header(const struct ip_packet *const ip,
-                                   uint8_t *const type)
+uint8_t * ip_get_next_header(const struct ip_packet *const ip,
+                             uint8_t *const type)
 {
 	/* function does not handle non-IPv4/IPv6 packets */
 	assert(ip->version != IP_UNKNOWN);
@@ -261,10 +255,10 @@ unsigned char * ip_get_next_header(const struct ip_packet *const ip,
  * @return     The next header that is not an IP extension if there is one,
  *             NULL if there is none
  */
-unsigned char * ip_get_next_layer(const struct ip_packet *const ip)
+uint8_t * ip_get_next_layer(const struct ip_packet *const ip)
 {
 	/* function does not handle non-IPv4/IPv6 packets */
-	assert(ip->version != IP_UNKNOWN);
+	assert(ip->version == IPV4 || ip->version == IPV6);
 
 	return ip->nl.data;
 }
@@ -283,10 +277,10 @@ unsigned char * ip_get_next_layer(const struct ip_packet *const ip)
  * @return     The next extension header,
  *             NULL if there is no extension
  */
-unsigned char * ip_get_next_ext_from_ip(const struct ip_packet *const ip,
-                                        uint8_t *const type)
+uint8_t * ip_get_next_ext_from_ip(const struct ip_packet *const ip,
+                                  uint8_t *const type)
 {
-	unsigned char *next_header;
+	uint8_t *next_header;
 
 	/* function does not handle non-IPv4/IPv6 packets */
 	assert(ip->version != IP_UNKNOWN);
@@ -321,19 +315,18 @@ unsigned char * ip_get_next_ext_from_ip(const struct ip_packet *const ip,
  * @return     The next extension header,
  *             NULL if there is no more extension
  */
-unsigned char * ip_get_next_ext_from_ext(const unsigned char *const ext,
-                                         uint8_t *const type)
+uint8_t * ip_get_next_ext_from_ext(const uint8_t *const ext,
+                                   uint8_t *const type)
 {
-	unsigned char *next_header;
-	uint8_t length;
+	uint8_t *next_header;
 
 	*type = ext[0];
 
 	if(rohc_is_ipv6_opt(*type))
 	{
 		/* known extension headers */
-		length = ext[1];
-		next_header = (unsigned char *)(ext + (length + 1) * 8);
+		const uint8_t length = ext[1];
+		next_header = (uint8_t *)(ext + (length + 1) * 8);
 	}
 	else
 	{
@@ -350,7 +343,7 @@ unsigned char * ip_get_next_ext_from_ext(const unsigned char *const ext,
  * @param ext The extension
  * @return    The size of the extension
  */
-unsigned short ip_get_extension_size(const unsigned char *const ext)
+unsigned short ip_get_extension_size(const uint8_t *const ext)
 {
 	const uint8_t ext_length = ext[1];
 
@@ -369,7 +362,7 @@ unsigned short ip_get_extension_size(const unsigned char *const ext)
  */
 unsigned short ip_get_total_extension_size(const struct ip_packet *const ip)
 {
-	unsigned char *ext;
+	uint8_t *ext;
 	uint8_t next_hdr_type;
 	unsigned short total_ext_size = 0;
 
@@ -403,7 +396,7 @@ bool ip_is_fragment(const struct ip_packet *const ip)
 
 	if(ip->version == IPV4)
 	{
-		is_fragment = ((rohc_ntoh16(ip->header.v4.frag_off) & (~IP_DF)) != 0);
+		is_fragment = ipv4_is_fragment(&ip->header.v4);
 	}
 	else if(ip->version == IPV6)
 	{
@@ -441,7 +434,7 @@ unsigned int ip_get_totlen(const struct ip_packet *const ip)
 	}
 	else if(ip->version == IPV6)
 	{
-		len = sizeof(struct ipv6_hdr) + rohc_ntoh16(ip->header.v6.ip6_plen);
+		len = sizeof(struct ipv6_hdr) + rohc_ntoh16(ip->header.v6.plen);
 	}
 	else /* IP_UNKNOWN */
 	{
@@ -472,40 +465,6 @@ unsigned int ip_get_hdrlen(const struct ip_packet *const ip)
 	else if(ip->version == IPV6)
 	{
 		len = sizeof(struct ipv6_hdr);
-	}
-	else
-	{
-		/* function does not handle non-IPv4/IPv6 packets */
-#if defined(NDEBUG) || defined(__KERNEL__) || defined(ENABLE_DEAD_CODE)
-		len = 0;
-#endif
-		assert(0);
-	}
-
-	return len;
-}
-
-
-/**
- * @brief Get the length of an IPv4/IPv6 payload
- *
- * The function does not handle \ref ip_packet whose \ref ip_packet::version
- * is \ref IP_UNKNOWN.
- *
- * @param ip The IPv4/IPv6 packet to analyze
- * @return   The length of the IPv4/IPv6 payload if successful, 0 otherwise
- */
-unsigned int ip_get_plen(const struct ip_packet *const ip)
-{
-	unsigned int len;
-
-	if(ip->version == IPV4)
-	{
-		len = rohc_ntoh16(ip->header.v4.tot_len) - ip->header.v4.ihl * 4;
-	}
-	else if(ip->version == IPV6)
-	{
-		len = ip->nl.len;
 	}
 	else
 	{
@@ -584,7 +543,7 @@ void ip_set_protocol(struct ip_packet *const ip, const uint8_t value)
 	}
 	else if(ip->version == IPV6)
 	{
-		ip->header.v6.ip6_nxt = value & 0xff;
+		ip->header.v6.nh = value & 0xff;
 		ip->nl.proto = value & 0xff;
 	}
 	else
@@ -615,7 +574,7 @@ unsigned int ip_get_tos(const struct ip_packet *const ip)
 	}
 	else if(ip->version == IPV6)
 	{
-		tos = IPV6_GET_TC(ip->header.v6);
+		tos = ipv6_get_tc(&ip->header.v6);
 	}
 	else
 	{
@@ -648,7 +607,7 @@ void ip_set_tos(struct ip_packet *const ip, const uint8_t value)
 	}
 	else if(ip->version == IPV6)
 	{
-		IPV6_SET_TC(&ip->header.v6, value);
+		ipv6_set_tc(&ip->header.v6, value);
 	}
 	else
 	{
@@ -678,7 +637,7 @@ unsigned int ip_get_ttl(const struct ip_packet *const ip)
 	}
 	else if(ip->version == IPV6)
 	{
-		ttl = ip->header.v6.ip6_hlim;
+		ttl = ip->header.v6.hl;
 	}
 	else
 	{
@@ -711,7 +670,7 @@ void ip_set_ttl(struct ip_packet *const ip, const uint8_t value)
 	}
 	else if(ip->version == IPV6)
 	{
-		ip->header.v6.ip6_hlim = value & 0xff;
+		ip->header.v6.hl = value & 0xff;
 	}
 	else
 	{
@@ -730,7 +689,7 @@ void ip_set_ttl(struct ip_packet *const ip, const uint8_t value)
  * @param ip     The IP packet to modify
  * @param value  The IP address value
  */
-void ip_set_saddr(struct ip_packet *const ip, const unsigned char *value)
+void ip_set_saddr(struct ip_packet *const ip, const uint8_t *value)
 {
 	if(ip->version == IPV4)
 	{
@@ -738,7 +697,7 @@ void ip_set_saddr(struct ip_packet *const ip, const unsigned char *value)
 	}
 	else if(ip->version == IPV6)
 	{
-		memcpy(&ip->header.v6.ip6_src, value, sizeof(struct ipv6_addr));
+		memcpy(&ip->header.v6.saddr, value, sizeof(struct ipv6_addr));
 	}
 	else
 	{
@@ -757,7 +716,7 @@ void ip_set_saddr(struct ip_packet *const ip, const unsigned char *value)
  * @param ip     The IP packet to modify
  * @param value  The IP address value
  */
-void ip_set_daddr(struct ip_packet *const ip, const unsigned char *value)
+void ip_set_daddr(struct ip_packet *const ip, const uint8_t *value)
 {
 	if(ip->version == IPV4)
 	{
@@ -765,7 +724,7 @@ void ip_set_daddr(struct ip_packet *const ip, const unsigned char *value)
 	}
 	else if(ip->version == IPV6)
 	{
-		memcpy(&ip->header.v6.ip6_dst, value, sizeof(struct ipv6_addr));
+		memcpy(&ip->header.v6.daddr, value, sizeof(struct ipv6_addr));
 	}
 	else
 	{
@@ -875,7 +834,7 @@ void ipv4_set_id(struct ip_packet *const ip, const int value)
 int ipv4_get_df(const struct ip_packet *const ip)
 {
 	assert(ip->version == IPV4);
-	return IPV4_GET_DF(ip->header.v4);
+	return ip->header.v4.df;
 }
 
 
@@ -891,7 +850,7 @@ int ipv4_get_df(const struct ip_packet *const ip)
 void ipv4_set_df(struct ip_packet *const ip, const int value)
 {
 	assert(ip->version == IPV4);
-	IPV4_SET_DF(&ip->header.v4, value);
+	ip->header.v4.df = value;
 }
 
 
@@ -957,10 +916,10 @@ const struct ipv6_hdr * ipv6_get_header(const struct ip_packet *const ip)
  * @param ip The IPv6 packet to analyze
  * @return   The flow label of the given IPv6 packet
  */
-uint32_t ipv6_get_flow_label(const struct ip_packet *const ip)
+uint32_t ip_get_flow_label(const struct ip_packet *const ip)
 {
 	assert(ip->version == IPV6);
-	return IPV6_GET_FLOW_LABEL(ip->header.v6);
+	return ipv6_get_flow_label(&ip->header.v6);
 }
 
 
@@ -973,10 +932,10 @@ uint32_t ipv6_get_flow_label(const struct ip_packet *const ip)
  * @param ip     The IPv6 packet to modify
  * @param value  The flow label value
  */
-void ipv6_set_flow_label(struct ip_packet *const ip, const uint32_t value)
+void ip_set_flow_label(struct ip_packet *const ip, const uint32_t value)
 {
 	assert(ip->version == IPV6);
-	IPV6_SET_FLOW_LABEL(&ip->header.v6, value);
+	ipv6_set_flow_label(&ip->header.v6, value);
 }
 
 
@@ -992,7 +951,7 @@ void ipv6_set_flow_label(struct ip_packet *const ip, const uint32_t value)
 const struct ipv6_addr * ipv6_get_saddr(const struct ip_packet *const ip)
 {
 	assert(ip->version == IPV6);
-	return &(ip->header.v6.ip6_src);
+	return &(ip->header.v6.saddr);
 }
 
 
@@ -1008,7 +967,7 @@ const struct ipv6_addr * ipv6_get_saddr(const struct ip_packet *const ip)
 const struct ipv6_addr * ipv6_get_daddr(const struct ip_packet *const ip)
 {
 	assert(ip->version == IPV6);
-	return &(ip->header.v6.ip6_dst);
+	return &(ip->header.v6.daddr);
 }
 
 
@@ -1016,48 +975,6 @@ const struct ipv6_addr * ipv6_get_daddr(const struct ip_packet *const ip)
  * Private functions used by the IP module:
  * (please do not use directly)
  */
-
-/*
- * @brief Get the version of an IP packet
- *
- * If the function returns an error (packet too short for example), the value
- * of 'version' is unchanged.
- *
- * @param packet  The IP data
- * @param size    The length of the IP data
- * @param version OUT: the version of the IP packet: IPV4, IPV6 or IP_UNKNOWN
- * @return        Whether the given packet was successfully parsed or not
- */
-bool get_ip_version(const unsigned char *const packet,
-                    const size_t size,
-                    ip_version *const version)
-{
-	/* check the length of the packet */
-	if(size <= 0)
-	{
-		goto error;
-	}
-
-	/* check the version field */
-	switch((packet[0] >> 4) & 0x0f)
-	{
-		case 4:
-			*version = IPV4;
-			break;
-		case 6:
-			*version = IPV6;
-			break;
-		default:
-			*version = IP_UNKNOWN;
-			break;
-	}
-
-	return true;
-
-error:
-	return false;
-}
-
 
 /**
  * @brief Find the next header and next layer transported by an IP packet
@@ -1074,6 +991,8 @@ static bool ip_find_next_layer(const struct ip_packet *const ip,
 {
 	if(ip->version == IPV4)
 	{
+		size_t ip_hdr_len;
+
 		/* find next header after IPv4 header */
 		nh->proto = ip->header.v4.protocol;
 
@@ -1081,16 +1000,10 @@ static bool ip_find_next_layer(const struct ip_packet *const ip,
 		{
 			goto error;
 		}
-		else if(ip->size == sizeof(struct ipv4_hdr))
-		{
-			nh->data = NULL;
-			nh->len = 0;
-		}
-		else
-		{
-			nh->data = ((unsigned char *) ip->data) + sizeof(struct ipv4_hdr);
-			nh->len = ip->size - sizeof(struct ipv4_hdr);
-		}
+		ip_hdr_len = ip_get_hdrlen(ip);
+
+		nh->data = ((uint8_t *) ip->data) + ip_hdr_len;
+		nh->len = ip->size - ip_hdr_len;
 
 		/* no support for IPv4 extension headers, so next layer is next header */
 		nl->proto = nh->proto;
@@ -1100,13 +1013,13 @@ static bool ip_find_next_layer(const struct ip_packet *const ip,
 	else if(ip->version == IPV6)
 	{
 		/* find next header after IPv6 header */
-		nh->proto = ip->header.v6.ip6_nxt;
+		nh->proto = ip->header.v6.nh;
 
 		if(ip->size < sizeof(struct ipv6_hdr))
 		{
 			goto error;
 		}
-		nh->data = ((unsigned char *) ip->data) + sizeof(struct ipv6_hdr);
+		nh->data = ((uint8_t *) ip->data) + sizeof(struct ipv6_hdr);
 		nh->len = ip->size - sizeof(struct ipv6_hdr);
 
 		/* find next layer after IPv6 extension headers */
@@ -1138,14 +1051,34 @@ error:
 static bool ext_get_next_layer(const struct net_hdr *const nh,
                                struct net_hdr *const nl)
 {
+	uint8_t ext_types_count[ROHC_IPPROTO_MAX + 1] = { 0 };
+	unsigned int ext_type;
 	size_t remain_len = nh->len;
+	size_t ext_nr = 0;
 
 	nl->proto = nh->proto;
 	nl->data = nh->data;
 	nl->len = nh->len;
 
+	/* parse packet until all extension headers are parsed */
 	while(rohc_is_ipv6_opt(nl->proto))
 	{
+		if(ext_types_count[nl->proto] >= 255)
+		{
+			return false;
+		}
+		ext_types_count[nl->proto]++;
+		ext_nr++;
+
+		/* RFC 2460 §4 reads:
+		 *   The Hop-by-Hop Options header, when present, must immediately follow
+		 *   the IPv6 header. */
+		if(nl->proto == ROHC_IPPROTO_HOPOPTS && ext_nr != 1)
+		{
+			return false;
+		}
+
+		/* parse extension header */
 		if(!ext_get_next_header(nl->data, remain_len, nl))
 		{
 			return false;
@@ -1153,6 +1086,19 @@ static bool ext_get_next_layer(const struct net_hdr *const nh,
 		remain_len -= nl->len;
 	}
 	nl->len = remain_len;
+
+	/* RFC 2460 §4.1 reads:
+	 *   Each extension header should occur at most once, except for the Destination
+	 *   Options header which should occur at most twice (once before a Routing
+	 *   header and once before the upper-layer header). */
+	for(ext_type = 0; ext_type <= ROHC_IPPROTO_MAX; ext_type++)
+	{
+		if((ext_type == ROHC_IPPROTO_DSTOPTS && ext_types_count[ext_type] > 2) ||
+		   (ext_type != ROHC_IPPROTO_DSTOPTS && ext_types_count[ext_type] > 1))
+		{
+			return false;
+		}
+	}
 
 	return true;
 }
@@ -1167,7 +1113,7 @@ static bool ext_get_next_layer(const struct net_hdr *const nh,
  * @return         true if the extension is well-formed,
  *                 false otherwise
  */
-static bool ext_get_next_header(const unsigned char *const ext,
+static bool ext_get_next_header(const uint8_t *const ext,
                                 const size_t ext_len,
                                 struct net_hdr *const nh)
 {

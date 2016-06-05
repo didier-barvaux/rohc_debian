@@ -63,7 +63,7 @@ for ./configure ? If yes, check configure output and config.log"
 
 
 /** The maximal size for the ROHC packets */
-#define MAX_ROHC_SIZE  (5 * 1024)
+#define MAX_ROHC_SIZE  0xffffU
 
 /** The length of the Linux Cooked Sockets header */
 #define LINUX_COOKED_HDR_LEN  16U
@@ -73,6 +73,10 @@ for ./configure ? If yes, check configure output and config.log"
 
 /** The minimum Ethernet length (in bytes) */
 #define ETHER_FRAME_MIN_LEN  60U
+
+
+/** Whether to run the tool in verbose mode or not */
+static bool is_verbose = false;
 
 
 /* prototypes of private functions */
@@ -119,8 +123,8 @@ int main(int argc, char *argv[])
 	char *source_filename = NULL;
 	int status = 1;
 	int max_contexts = ROHC_SMALL_CID_MAX + 1;
-	size_t max_possible_contexts;
-	rohc_cid_type_t cid_type;
+	size_t max_possible_contexts = ROHC_SMALL_CID_MAX + 1;
+	rohc_cid_type_t cid_type = ROHC_SMALL_CID;
 	int args_used;
 
 	/* parse program arguments, print the help message in case of failure */
@@ -145,6 +149,11 @@ int main(int argc, char *argv[])
 			/* print version */
 			printf("rohc_stats version %s\n", rohc_version());
 			goto error;
+		}
+		else if(!strcmp(*argv, "--verbose"))
+		{
+			/* be more verbose */
+			is_verbose = true;
 		}
 		else if(!strcmp(*argv, "--max-contexts"))
 		{
@@ -251,6 +260,7 @@ static void usage(void)
 	       "Options:\n"
 	       "  -v, --version           Print version information and exit\n"
 	       "  -h, --help              Print this usage and exit\n"
+	       "      --verbose           Be more verbose\n"
 	       "      --max-contexts NUM  The maximum number of ROHC contexts to\n"
 	       "                          simultaneously use during the test\n"
 	       "\n"
@@ -438,7 +448,7 @@ static int generate_comp_stats_one(struct rohc_comp *comp,
 	/* check frame length */
 	if(header.len <= link_len || header.len != header.caplen)
 	{
-		fprintf(stderr, "packet #%lu: bad PCAP packet (len = %d, caplen = %d)\n",
+		fprintf(stderr, "packet #%lu: bad PCAP packet (len = %u, caplen = %u)\n",
 		        num_packet, header.len, header.caplen);
 		goto error;
 	}
@@ -463,7 +473,7 @@ static int generate_comp_stats_one(struct rohc_comp *comp,
 		{
 			const struct ipv6_hdr *const ip =
 				(struct ipv6_hdr *) rohc_buf_data(ip_packet);
-			tot_len = sizeof(struct ipv6_hdr) + ntohs(ip->ip6_plen);
+			tot_len = sizeof(struct ipv6_hdr) + ntohs(ip->plen);
 		}
 
 		if(tot_len < ip_packet.len)
@@ -532,11 +542,13 @@ static void print_rohc_traces(void *const priv_ctxt __attribute__((unused)),
                               const char *const format,
                               ...)
 {
-	va_list args;
-
-	va_start(args, format);
-	vfprintf(stderr, format, args);
-	va_end(args);
+	if(is_verbose)
+	{
+		va_list args;
+		va_start(args, format);
+		vfprintf(stderr, format, args);
+		va_end(args);
+	}
 }
 
 

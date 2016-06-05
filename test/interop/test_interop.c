@@ -450,7 +450,7 @@ static int test_decomp_one(struct rohc_decomp *const decomp,
 	/* check Ethernet frame length */
 	if(header.len <= link_len_src || header.len != header.caplen)
 	{
-		fprintf(stderr, "bad PCAP packet (len = %d, caplen = %d)\n",
+		fprintf(stderr, "bad PCAP packet (len = %u, caplen = %u)\n",
 		        header.len, header.caplen);
 		goto error_fmt;
 	}
@@ -619,7 +619,7 @@ static int test_decomp_all(const rohc_cid_type_t cid_type,
 		   link_layer_type_cmp != DLT_RAW &&
 		   link_layer_type_cmp != DLT_NULL)
 		{
-			printf("link layer type %d not supported in comparision dump "
+			printf("link layer type %d not supported in comparison dump "
 			       "(supported = %d, %d, %d, %d)\n", link_layer_type_cmp,
 			       DLT_EN10MB, DLT_LINUX_SLL, DLT_RAW, DLT_NULL);
 			status = 77; /* skip test */
@@ -801,18 +801,10 @@ static void print_rohc_traces(void *const priv_ctxt,
                               const char *const format,
                               ...)
 {
-	const char *level_descrs[] =
-	{
-		[ROHC_TRACE_DEBUG]   = "DEBUG",
-		[ROHC_TRACE_INFO]    = "INFO",
-		[ROHC_TRACE_WARNING] = "WARNING",
-		[ROHC_TRACE_ERROR]   = "ERROR"
-	};
-
 	if(level >= ROHC_TRACE_WARNING || is_verbose)
 	{
 		va_list args;
-		fprintf(stdout, "[%s] ", level_descrs[level]);
+		fprintf(stdout, "[%s] ", trace_level_descrs[level]);
 		va_start(args, format);
 		vfprintf(stdout, format, args);
 		va_end(args);

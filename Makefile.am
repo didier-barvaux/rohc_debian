@@ -39,9 +39,12 @@ SUBDIRS = \
 
 dist_doc_DATA = \
 	README \
+	README.md \
 	INSTALL \
+	INSTALL.md \
 	COPYING \
 	AUTHORS \
+	AUTHORS.md \
 	ChangeLog
 
 pkgconfigdir = $(libdir)/pkgconfig
@@ -54,10 +57,8 @@ distdir = $(PACKAGE)-$(VERSION)$(PACKAGE_REVNO)
 DISTCHECK_CONFIGURE_FLAGS = \
 	--enable-fail-on-warning \
 	--enable-fortify-sources \
-	--enable-app-fuzzer \
 	--enable-app-performance \
 	--enable-app-sniffer \
-	--enable-app-tunnel \
 	--enable-rohc-tests \
 	--disable-doc \
 	--disable-examples
@@ -65,12 +66,13 @@ DISTCHECK_CONFIGURE_FLAGS = \
 # extra files for releases
 EXTRA_DIST = \
 	autogen.sh \
-	bzr_revno \
+	git_ref \
 	test/report_code_coverage.sh
 
 # other extra files for releases
 dist-hook:
-	find $(distdir)/test/non_regression/inputs \
+	find $(distdir)/test/non_regression/rfc3095/inputs \
+	     $(distdir)/test/non_regression/rfc6846/inputs \
 		-type f -and \
 		-not -name source.pcap -and \
 		-not -name rohc_maxcontexts0_wlsb4_smallcid.pcap -and \
@@ -102,4 +104,57 @@ TESTS = $(TESTS_CODE_COVERAGE)
 distclean-local:
 	$(RM) output.zcov
 	$(RM) -r coverage-report/
+
+# run cppcheck on all sources, apps and tests
+cppcheck:
+	 $(AM_V_GEN)cppcheck \
+		 --quiet --enable=all \
+		 --error-exitcode=2 \
+		 --std=c89 --std=c99 --std=c11 \
+		 -I src/common/protocols/ -I src/common/ \
+		 -I src/comp/schemes/ -I src/comp/ \
+		 -I src/decomp/schemes/ -I src/decomp/ \
+		 -I src/ \
+		 -I test/ \
+		 -I /usr/include/ \
+		 -i linux/ \
+		 -D__clang_analyzer__ \
+		 --suppress=*:contrib/python/rohc_wrap.c \
+		 --suppress=unusedStructMember:src/comp/c_tcp.c:184 \
+		 --suppress=unusedStructMember:src/comp/c_tcp.c:206 \
+		 --suppress=unusedStructMember:src/comp/c_tcp.c:241 \
+		 --suppress=unusedStructMember:src/comp/c_tcp_opts_list.c:46 \
+		 --suppress=unusedStructMember:src/comp/c_tcp_opts_list.c:47 \
+		 --suppress=unusedStructMember:src/comp/c_tcp_opts_list.c:48 \
+		 --suppress=useClosedFile:test/non_regression/test_non_regression_kernel.c:589 \
+		 --suppress=useClosedFile:test/non_regression/test_non_regression_kernel.c:590 \
+		 --suppress=useClosedFile:test/non_regression/test_non_regression_kernel.c:591 \
+		 --suppress=useClosedFile:test/non_regression/test_non_regression_kernel.c:592 \
+		 --suppress=unusedFunction:src/decomp/schemes/test/test_wlsb.c:40 \
+		 .
+
+# run GNU complexity on all sources and apps, but not tests
+complexity:
+	$(AM_V_GEN)complexity --threshold=20 --horrid-threshold=30 \
+		`find src/ app/ -name \*.c -or -name \*.h`
+
+# run Linux checkpatch.pl script on kernel modules, but ignore warnings about
+# EXPORT_SYMBOL(foo) not following the function declaration because I don't
+# want to duplicate function declarations in lib and kmod.
+checkpatch:
+	$(AM_V_GEN)/usr/src/linux/scripts/checkpatch.pl \
+		--ignore EXPORT_SYMBOL \
+		--file `find linux/ -name \*.h -or -name \*.c`
+
+# check spelling mistakes with codespell in source files, but also in Markdown
+# files and man pages
+# https://github.com/lucasdemarchi/codespell
+codespell:
+	$(AM_V_GEN)codespell.py \
+		`find . -name \*.md -or -name \*.7.in -or -name ChangeLog -or -name README` \
+		`find . -name configure.ac -or -name Makefile.am` \
+		`find . -name \*.c -or -name \*.h`
+
+# run all Q&A tests
+qa: cppcheck complexity checkpatch codespell
 

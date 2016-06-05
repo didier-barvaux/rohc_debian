@@ -26,8 +26,17 @@
 #define ROHC_UTILS_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
-#include "dllexport.h"
+
+/** TODO */
+typedef enum
+{
+	ROHC_TRISTATE_NONE = 0,
+	ROHC_TRISTATE_YES  = 1,
+	ROHC_TRISTATE_NO   = 2,
+} rohc_tristate_t;
+
 
 /** Get the max value of the 2 given */
 #define rohc_max(value1, value2) \
@@ -37,14 +46,32 @@
 #define rohc_min(value1, value2) \
 	( ((value1) <= (value2)) ? (value1) : (value2) )
 
-uint32_t ROHC_EXPORT rohc_ntoh32(const uint32_t net32)
+
+static inline unsigned int rohc_b2u(const bool boolean)
 	__attribute__((warn_unused_result, const));
-uint16_t ROHC_EXPORT rohc_ntoh16(const uint16_t net16)
+
+uint32_t rohc_ntoh32(const uint32_t net32)
 	__attribute__((warn_unused_result, const));
-uint32_t ROHC_EXPORT rohc_hton32(const uint32_t host32)
+uint16_t rohc_ntoh16(const uint16_t net16)
 	__attribute__((warn_unused_result, const));
-uint16_t ROHC_EXPORT rohc_hton16(const uint16_t host16)
+uint32_t rohc_hton32(const uint32_t host32)
 	__attribute__((warn_unused_result, const));
+uint16_t rohc_hton16(const uint16_t host16)
+	__attribute__((warn_unused_result, const));
+
+
+/**
+ * @brief Convert the given boolean value to one unsigned integer
+ *
+ * true is converted to 1 ; false is converted to 0
+ *
+ * @param boolean  The boolean value to convert
+ * @return         The converted unsigned integer value
+ */
+static inline unsigned int rohc_b2u(const bool boolean)
+{
+	return (boolean ? 1 : 0);
+}
 
 #endif
 

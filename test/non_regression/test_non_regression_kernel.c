@@ -324,7 +324,8 @@ static int test_run(const char *input_filename,
 	while((packet = (unsigned char *) pcap_next(context.input.handle, &header)) != NULL)
 	{
 		unsigned char *compare_packet;
-		struct pcap_pkthdr compare_header;
+		struct pcap_pkthdr compare_header =
+			{ .ts = { .tv_sec = 0, .tv_usec = 0 }, .caplen = 0, .len = 0 };
 		counter++;
 
 		/* get next ROHC packet from the comparison dump file if asked */
@@ -336,6 +337,7 @@ static int test_run(const char *input_filename,
 		else
 		{
 			compare_packet = NULL;
+			memset(&compare_header, 0, sizeof(struct pcap_pkthdr));
 		}
 
 		/* compress & decompress with ROHC couple #1 */
@@ -434,11 +436,17 @@ static int test_init(const char *input_filename,
 	}
 
 	if(link_layer_type == DLT_EN10MB)
+	{
 		context->input.link_length = ETHER_HDR_LEN;
+	}
 	else if(link_layer_type == DLT_LINUX_SLL)
+	{
 		context->input.link_length = LINUX_COOKED_HDR_LEN;
+	}
 	else /* DLT_RAW */
+	{
 		context->input.link_length = 0;
+	}
 
 	/* if asked, open the PCAP file that contains the ROHC packets that the
 	   test application must compare with the ROHC packets it generates */
@@ -464,11 +472,17 @@ static int test_init(const char *input_filename,
 		}
 
 		if(link_layer_type == DLT_EN10MB)
+		{
 			context->compare.link_length = ETHER_HDR_LEN;
+		}
 		else if(link_layer_type == DLT_LINUX_SLL)
+		{
 			context->compare.link_length = LINUX_COOKED_HDR_LEN;
+		}
 		else /* DLT_RAW */
+		{
 			context->compare.link_length = 0;
+		}
 	}
 	else
 	{
@@ -533,17 +547,27 @@ close_proc:
 	for(i = 0; i < 2; i++)
 	{
 		if(context->couples[i].proc_comp_in != NULL)
+		{
 			fclose(context->couples[i].proc_comp_in);
+		}
 		if(context->couples[i].proc_comp_out != NULL)
+		{
 			fclose(context->couples[i].proc_comp_out);
+		}
 		if(context->couples[i].proc_decomp_in != NULL)
+		{
 			fclose(context->couples[i].proc_decomp_in);
+		}
 		if(context->couples[i].proc_decomp_out != NULL)
+		{
 			fclose(context->couples[i].proc_decomp_out);
+		}
 	}
 close_pcap_compare:
 	if(context->compare.handle != NULL)
+	{
 		pcap_close(context->compare.handle);
+	}
 close_pcap_input:
 	pcap_close(context->input.handle);
 error:
@@ -570,7 +594,9 @@ static void test_release(test_context_t context)
 
 	pcap_close(context.input.handle);
 	if(context.compare.handle != NULL)
+	{
 		pcap_close(context.compare.handle);
+	}
 }
 
 
@@ -656,7 +682,7 @@ static test_result_t test_run_one_step(test_context_t context,
 		else if(ip_version == 6) /* IPv6 */
 		{
 			const struct ipv6_hdr *ip = (struct ipv6_hdr *) ip_packet;
-			tot_len = sizeof(struct ipv6_hdr) + ntohs(ip->ip6_plen);
+			tot_len = sizeof(struct ipv6_hdr) + ntohs(ip->plen);
 		}
 		else /* unknown IP version */
 		{
@@ -667,7 +693,7 @@ static test_result_t test_run_one_step(test_context_t context,
 		/* update the length of the IP packet if padding is present */
 		if(tot_len < ip_size)
 		{
-			fprintf(stderr, "Ethernet frame has %u bytes of padding after "
+			fprintf(stderr, "Ethernet frame has %d bytes of padding after "
 			        "the %u-byte IP packet!\n", ip_size - tot_len, tot_len);
 			ip_size = tot_len;
 		}
@@ -790,7 +816,7 @@ static test_result_t test_run_one_step(test_context_t context,
 	return result;
 
 error:
-	fprintf(stderr, "bad PCAP packet (len = %d, caplen = %d)\n",
+	fprintf(stderr, "bad PCAP packet (len = %u, caplen = %u)\n",
 	        header.len, header.caplen);
 error_comp:
 	fprintf(stderr, "Compression failed, cannot compare the packets!\n");
@@ -829,7 +855,9 @@ static int compare_packets(unsigned char *pkt1, int pkt1_size,
 
 	/* if packets are equal, do not print the packets */
 	if(pkt1_size == pkt2_size && memcmp(pkt1, pkt2, pkt1_size) == 0)
+	{
 		goto skip;
+	}
 
 	/* packets are different */
 	valid = 0;
@@ -837,8 +865,10 @@ static int compare_packets(unsigned char *pkt1, int pkt1_size,
 	fprintf(stderr, "------------------------------ Compare ------------------------------\n");
 
 	if(pkt1_size != pkt2_size)
+	{
 		fprintf(stderr, "packets have different sizes (%d != %d), compare only the %d "
-		       "first bytes\n", pkt1_size, pkt2_size, min_size);
+		        "first bytes\n", pkt1_size, pkt2_size, min_size);
+	}
 
 	j = 0;
 	for(i = 0; i < min_size; i++)
@@ -863,22 +893,30 @@ static int compare_packets(unsigned char *pkt1, int pkt1_size,
 			for(k = 0; k < 4; k++)
 			{
 				if(k < (j + 1))
+				{
 					fprintf(stderr, "%s  ", str1[k]);
+				}
 				else /* fill the line with blanks if nothing to print */
+				{
 					fprintf(stderr, "        ");
+				}
 			}
 
 			fprintf(stderr, "      ");
 
 			for(k = 0; k < (j + 1); k++)
+			{
 				fprintf(stderr, "%s  ", str2[k]);
+			}
 
 			fprintf(stderr, "\n");
 
 			j = 0;
 		}
 		else
+		{
 			j++;
+		}
 	}
 
 	fprintf(stderr, "----------------------- packets are different -----------------------\n");

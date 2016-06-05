@@ -16,11 +16,14 @@ noinst_LTLIBRARIES = librohc_comp_schemes.la
 
 librohc_comp_schemes_la_SOURCES = \
 	cid.c \
-	wlsb.c \
-	scaled_rtp_ts.c \
-	list.c \
-	list_ipv6.c \
-	rfc4996.c
+	comp_wlsb.c \
+	ip_id_offset.c \
+	comp_scaled_rtp_ts.c \
+	comp_list.c \
+	comp_list_ipv6.c \
+	rfc4996.c \
+	tcp_sack.c \
+	tcp_ts.c
 
 librohc_comp_schemes_la_LIBADD = \
 	$(additional_platform_libs)
@@ -30,18 +33,21 @@ librohc_comp_schemes_la_LDFLAGS = \
 	-no-undefined
 
 librohc_comp_schemes_la_CFLAGS = \
-	$(configure_cflags)
+	$(configure_cflags) \
+	$(configure_cflags_for_lib)
 
 librohc_comp_schemes_la_CPPFLAGS = \
-	-I$(top_srcdir)/src \
 	-I$(top_srcdir)/src/common \
 	-I$(srcdir)/..
 
 noinst_HEADERS = \
 	cid.h \
-	wlsb.h \
-	scaled_rtp_ts.h \
-	list.h \
-	list_ipv6.h \
-	rfc4996.h
+	comp_wlsb.h \
+	ip_id_offset.h \
+	comp_scaled_rtp_ts.h \
+	comp_list.h \
+	comp_list_ipv6.h \
+	rfc4996.h \
+	tcp_sack.h \
+	tcp_ts.h
 

@@ -114,15 +114,6 @@ int main(int argc, char *argv[])
 	/* rohc_decomp_profile_enabled() */
 	CHECK(rohc_decomp_profile_enabled(NULL, ROHC_PROFILE_IP) == false);
 	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_GENERAL) == false);
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_UNCOMPRESSED) == true);
-	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_RTP) == true);
-	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_UDP) == true);
-	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_ESP) == true);
-	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_IP) == true);
-	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_TCP) == false);
-	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_UDPLITE) == true);
-#else
 	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_UNCOMPRESSED) == false);
 	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_RTP) == false);
 	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_UDP) == false);
@@ -130,7 +121,6 @@ int main(int argc, char *argv[])
 	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_IP) == false);
 	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_TCP) == false);
 	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_UDPLITE) == false);
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
 
 	/* rohc_decomp_enable_profile() */
 	CHECK(rohc_decomp_enable_profile(NULL, ROHC_PROFILE_IP) == false);
@@ -157,15 +147,6 @@ int main(int argc, char *argv[])
 	                                   ROHC_PROFILE_RTP, -1) == true);
 
 	/* rohc_decomp_profile_enabled() */
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_UNCOMPRESSED) == true);
-	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_RTP) == false);
-	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_UDP) == false);
-	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_ESP) == true);
-	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_IP) == true);
-	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_TCP) == false);
-	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_UDPLITE) == true);
-#else
 	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_UNCOMPRESSED) == false);
 	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_RTP) == false);
 	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_UDP) == false);
@@ -173,7 +154,6 @@ int main(int argc, char *argv[])
 	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_IP) == true);
 	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_TCP) == false);
 	CHECK(rohc_decomp_profile_enabled(decomp, ROHC_PROFILE_UDPLITE) == false);
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
 
 	/* rohc_decomp_set_mrru() */
 	CHECK(rohc_decomp_set_mrru(NULL, 10) == false);
@@ -208,14 +188,63 @@ int main(int argc, char *argv[])
 		CHECK(cid_type == ROHC_LARGE_CID);
 	}
 
+	/* rohc_decomp_set_prtt() */
+	CHECK(rohc_decomp_set_prtt(NULL, 10) == false);
+	CHECK(rohc_decomp_set_prtt(decomp, SIZE_MAX / 2) == false);
+	CHECK(rohc_decomp_set_prtt(decomp, 0) == true);
+	CHECK(rohc_decomp_set_prtt(decomp, SIZE_MAX / 2 - 1) == true);
+
+	/* rohc_decomp_get_prtt() */
+	{
+		size_t prtt;
+		CHECK(rohc_decomp_get_prtt(NULL, &prtt) == false);
+		CHECK(rohc_decomp_get_prtt(decomp, NULL) == false);
+		CHECK(rohc_decomp_get_prtt(decomp, &prtt) == true);
+		CHECK(prtt == SIZE_MAX / 2 - 1);
+	}
+
+	/* rohc_decomp_set_rate_limits() */
+	CHECK(rohc_decomp_set_rate_limits(NULL,   30, 100, 31, 101, 32, 102) == false);
+	CHECK(rohc_decomp_set_rate_limits(decomp,  0, 100, 31, 101, 32, 102) == true);
+	CHECK(rohc_decomp_set_rate_limits(decomp, 30,   0, 31, 101, 32, 102) == false);
+	CHECK(rohc_decomp_set_rate_limits(decomp, 30, 100,  0, 101, 32, 102) == true);
+	CHECK(rohc_decomp_set_rate_limits(decomp, 30, 100, 31,   0, 32, 102) == false);
+	CHECK(rohc_decomp_set_rate_limits(decomp, 30, 100, 31, 101,  0, 102) == true);
+	CHECK(rohc_decomp_set_rate_limits(decomp, 30, 100, 31, 101, 32,   0) == false);
+	CHECK(rohc_decomp_set_rate_limits(decomp, 30, 100, 31, 101, 32, 102) == true);
+
+	/* rohc_decomp_get_rate_limits() */
+	{
+		size_t k, n, k_1, n_1, k_2, n_2;
+		CHECK(rohc_decomp_get_rate_limits(NULL,   &k,   &n,   &k_1, &n_1, &k_2, &n_2) == false);
+		CHECK(rohc_decomp_get_rate_limits(decomp, NULL, &n,   &k_1, &n_1, &k_2, &n_2) == false);
+		CHECK(rohc_decomp_get_rate_limits(decomp, &k,   NULL, &k_1, &n_1, &k_2, &n_2) == false);
+		CHECK(rohc_decomp_get_rate_limits(decomp, &k,   &n,   NULL, &n_1, &k_2, &n_2) == false);
+		CHECK(rohc_decomp_get_rate_limits(decomp, &k,   &n,   &k_1, NULL, &k_2, &n_2) == false);
+		CHECK(rohc_decomp_get_rate_limits(decomp, &k,   &n,   &k_1, &n_1, NULL, &n_2) == false);
+		CHECK(rohc_decomp_get_rate_limits(decomp, &k,   &n,   &k_1, &n_1, &k_2, NULL) == false);
+		CHECK(rohc_decomp_get_rate_limits(decomp, &k,   &n,   &k_1, &n_1, &k_2, &n_2) == true);
+		CHECK(k == 30);
+		CHECK(n == 100);
+		CHECK(k_1 == 31);
+		CHECK(n_1 == 101);
+		CHECK(k_2 == 32);
+		CHECK(n_2 == 102);
+	}
+
+	/* rohc_decomp_set_features */
+	CHECK(rohc_decomp_set_features(decomp, ROHC_DECOMP_FEATURE_COMPAT_1_6_x) == false);
+	CHECK(rohc_decomp_set_features(decomp, ROHC_DECOMP_FEATURE_CRC_REPAIR) == true);
+	CHECK(rohc_decomp_set_features(decomp, ROHC_DECOMP_FEATURE_NONE) == true);
+
 	/* rohc_decompress3() */
 	{
 		const struct rohc_ts ts = { .sec = 0, .nsec = 0 };
-		unsigned char buf1[1];
+		uint8_t buf1[1];
 		struct rohc_buf pkt1 = rohc_buf_init_full(buf1, 1, ts);
-		unsigned char buf2[100];
+		uint8_t buf2[100];
 		struct rohc_buf pkt2 = rohc_buf_init_empty(buf2, 100);
-		unsigned char buf[] =
+		uint8_t buf[] =
 		{
 			0xfd, 0x00, 0x04, 0xce,  0x40, 0x01, 0xc0, 0xa8,
 			0x13, 0x01, 0xc0, 0xa8,  0x13, 0x05, 0x00, 0x40,
@@ -248,6 +277,10 @@ int main(int argc, char *argv[])
 			pkt2.max_len = i;
 			pkt2.offset = 0;
 			pkt2.len = 0;
+			if(verbose)
+			{
+				printf("test with pkt2.max_len == %zu\n", i);
+			}
 			CHECK(rohc_decompress3(decomp, pkt, &pkt2, NULL, NULL) == ROHC_STATUS_OUTPUT_TOO_SMALL);
 			CHECK(pkt2.len == 0);
 		}
@@ -256,6 +289,25 @@ int main(int argc, char *argv[])
 		pkt2.len = 0;
 		CHECK(rohc_decompress3(decomp, pkt, &pkt2, NULL, NULL) == ROHC_STATUS_OK);
 		CHECK(pkt2.len > 0);
+
+		{
+			uint8_t buf_full[100];
+			struct rohc_buf pkt_full = rohc_buf_init_full(buf_full, 100, ts);
+			uint8_t buf_malformed[100];
+			struct rohc_buf pkt_malformed = rohc_buf_init_full(buf_malformed, 0, ts);
+			uint8_t buf_empty[100];
+			struct rohc_buf pkt_empty = rohc_buf_init_empty(buf_empty, 100);
+
+			rohc_buf_reset(&pkt2);
+			CHECK(rohc_decompress3(decomp, pkt_malformed, &pkt2, NULL, NULL) == ROHC_STATUS_ERROR);
+			CHECK(rohc_decompress3(decomp, pkt_empty, &pkt2, NULL, NULL) == ROHC_STATUS_ERROR);
+			CHECK(rohc_decompress3(decomp, pkt, &pkt_malformed, NULL, NULL) == ROHC_STATUS_ERROR);
+			CHECK(rohc_decompress3(decomp, pkt, &pkt_full, NULL, NULL) == ROHC_STATUS_ERROR);
+			CHECK(rohc_decompress3(decomp, pkt, &pkt2, &pkt_malformed, NULL) == ROHC_STATUS_ERROR);
+			CHECK(rohc_decompress3(decomp, pkt, &pkt2, &pkt_full, NULL) == ROHC_STATUS_ERROR);
+			CHECK(rohc_decompress3(decomp, pkt, &pkt2, NULL, &pkt_malformed) == ROHC_STATUS_ERROR);
+			CHECK(rohc_decompress3(decomp, pkt, &pkt2, NULL, &pkt_full) == ROHC_STATUS_ERROR);
+		}
 	}
 
 	/* rohc_decomp_get_last_packet_info() */
@@ -288,11 +340,17 @@ int main(int argc, char *argv[])
 		CHECK(rohc_decomp_get_general_info(decomp, &info) == true);
 	}
 
-
 	/* rohc_decomp_get_state_descr() */
 	CHECK(strcmp(rohc_decomp_get_state_descr(ROHC_DECOMP_STATE_NC), "No Context") == 0);
 	CHECK(strcmp(rohc_decomp_get_state_descr(ROHC_DECOMP_STATE_SC), "Static Context") == 0);
 	CHECK(strcmp(rohc_decomp_get_state_descr(ROHC_DECOMP_STATE_FC), "Full Context") == 0);
+	CHECK(strcmp(rohc_decomp_get_state_descr(ROHC_DECOMP_STATE_FC + 1), "no description") == 0);
+
+	/* several functions with some packets already compressed */
+	{
+		rohc_trace_callback2_t fct = (rohc_trace_callback2_t) NULL;
+		CHECK(rohc_decomp_set_traces_cb2(decomp, fct, decomp) == false);
+	}
 
 	/* rohc_decomp_free() */
 	rohc_decomp_free(NULL);

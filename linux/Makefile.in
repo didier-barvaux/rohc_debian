@@ -159,6 +159,7 @@ LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
@@ -211,6 +212,7 @@ build_os = @build_os@
 build_vendor = @build_vendor@
 builddir = @builddir@
 configure_cflags = @configure_cflags@
+configure_cflags_for_lib = @configure_cflags_for_lib@
 configure_ldflags = @configure_ldflags@
 datadir = @datadir@
 datarootdir = @datarootdir@
@@ -231,15 +233,14 @@ is_doxy2man_found = @is_doxy2man_found@
 is_doxygen_found = @is_doxygen_found@
 is_gnuplot_found = @is_gnuplot_found@
 is_help2man_found = @is_help2man_found@
-is_latex_found = @is_latex_found@
+is_lcov_found = @is_lcov_found@
+is_lcov_genhtml_found = @is_lcov_genhtml_found@
 is_qemu_found = @is_qemu_found@
 is_sort_found = @is_sort_found@
 is_tr_found = @is_tr_found@
 is_valgrind_found = @is_valgrind_found@
 is_wine_found = @is_wine_found@
 is_xsltproc_found = @is_xsltproc_found@
-is_zcov_genhtml_found = @is_zcov_genhtml_found@
-is_zcov_scan_found = @is_zcov_scan_found@
 libdir = @libdir@
 libexecdir = @libexecdir@
 libpcap_includes = @libpcap_includes@
@@ -383,7 +384,7 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-generic clean-libtool mostlyclean-am
+clean-am: clean-generic clean-libtool clean-local mostlyclean-am
 
 distclean: distclean-am
 	-rm -f Makefile
@@ -450,7 +451,7 @@ uninstall-am:
 .MAKE: install-am install-strip
 
 .PHONY: all all-am check check-am clean clean-generic clean-libtool \
-	cscopelist-am ctags-am distclean distclean-generic \
+	clean-local cscopelist-am ctags-am distclean distclean-generic \
 	distclean-libtool distdir dvi dvi-am html html-am info info-am \
 	install install-am install-data install-data-am install-dvi \
 	install-dvi-am install-exec install-exec-am install-html \
@@ -464,6 +465,17 @@ uninstall-am:
 
 all:
 	$(MAKE) -C $(linux_kernel_src) M=$(abs_srcdir)/kmod
+
+clean-local:
+	if test -d $(linux_kernel_src) ; then $(MAKE) -C $(linux_kernel_src) M=$(abs_srcdir)/kmod clean ; fi
+	$(RM) *.o .*.o.cmd
+	$(RM) $(srcdir)/../src/common/protocols/.*.o.cmd
+	$(RM) $(srcdir)/../src/common/schemes/.*.o.cmd
+	$(RM) $(srcdir)/../src/common/.*.o.cmd
+	$(RM) $(srcdir)/../src/comp/schemes/.*.o.cmd
+	$(RM) $(srcdir)/../src/comp/.*.o.cmd
+	$(RM) $(srcdir)/../src/decomp/schemes/.*.o.cmd
+	$(RM) $(srcdir)/../src/decomp/.*.o.cmd
 
 install:
 	$(INSTALL) -d $(DESTDIR)/$(rohc_moddir)
