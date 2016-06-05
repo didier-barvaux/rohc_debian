@@ -7,7 +7,7 @@ Build-Depends: autotools-dev, debhelper (>= 9), pkg-config,
 # for unit tests (if enable_rohc_tests)
  libcmocka-dev,
 # for rohc-doc
- doc-base, doxygen, texlive-latex-base, graphviz,
+ doc-base, doxygen, graphviz,
 Standards-Version: 3.9.5
 Section: libs
 Homepage: http://rohc-lib.org/
@@ -56,10 +56,9 @@ Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: Miscellaneous tools that come along the ROHC library
  The following tools are included:
-  * rohc_fuzzer: library testing using fuzzing technique
   * rohc_sniffer: library testing on live trafic
   * rohc_test_performance: library testing on pcap
-  * rohctunnel: make a ROHC-over-UDP or ROHC-over-Ethernet tunnel
+  * rohc_stats: compute ROHC statistics
  .
  RObust Header Compression (ROHC) is a standardized method defined by the IETF
  in RFC3095 to compress the IP, UDP, RTP, and TCP headers of Internet packets.

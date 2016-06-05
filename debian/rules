@@ -9,10 +9,9 @@
 
 override_dh_auto_configure:
 	dh_auto_configure -- \
-		--enable-app-fuzzer \
 		--enable-app-performance \
 		--enable-app-sniffer \
-		--enable-app-tunnel \
+		--enable-app-stats \
 		--enable-doc \
 		--enable-examples \
 		--enable-fail-on-warning \

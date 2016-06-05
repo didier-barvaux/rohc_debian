@@ -1,3 +1,9 @@
+rohc (2.0.0~269b665-1) UNRELEASED; urgency=medium
+
+  * Imported Upstream version 2.0.0~269b665
+
+ -- Didier Barvaux <didier@rohc-lib.org>  Sun,  5 Jun 2016 16:04:00 +0200
+
 rohc (1.7.0-1) UNRELEASED; urgency=medium
 
   * Initial release. (Closes: #756654)
