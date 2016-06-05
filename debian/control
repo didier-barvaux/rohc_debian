@@ -10,7 +10,7 @@ Build-Depends: autotools-dev, debhelper (>= 9), pkg-config,
  doc-base, doxygen, graphviz,
 # for rohc-tools
  gnuplot,
-Standards-Version: 3.9.5
+Standards-Version: 3.9.6
 Section: libs
 Homepage: http://rohc-lib.org/
 Vcs-Git: git://anonscm.debian.org/collab-maint/rohc.git
@@ -20,7 +20,7 @@ Package: librohc-dev
 Section: libdevel
 Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
-Depends: librohc0 (= ${binary:Version}), ${misc:Depends}
+Depends: librohc3 (= ${binary:Version}), ${misc:Depends}
 Description: Files for development of applications which will use the ROHC library
  RObust Header Compression (ROHC) is a standardized method defined by the IETF
  in RFC3095 to compress the IP, UDP, RTP, and TCP headers of Internet packets.
@@ -29,7 +29,7 @@ Description: Files for development of applications which will use the ROHC libra
  wireless links.
 Multi-Arch: same
 
-Package: librohc0
+Package: librohc3
 Section: libs
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}
