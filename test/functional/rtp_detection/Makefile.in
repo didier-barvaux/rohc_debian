@@ -99,7 +99,9 @@ CONFIG_CLEAN_VPATH_FILES =
 am_test_rtp_callback_OBJECTS =  \
 	test_rtp_callback-test_rtp_callback.$(OBJEXT)
 test_rtp_callback_OBJECTS = $(am_test_rtp_callback_OBJECTS)
-test_rtp_callback_DEPENDENCIES =
+am__DEPENDENCIES_1 =
+test_rtp_callback_DEPENDENCIES = $(top_builddir)/src/librohc.la \
+	$(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -415,6 +417,7 @@ LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
@@ -467,6 +470,7 @@ build_os = @build_os@
 build_vendor = @build_vendor@
 builddir = @builddir@
 configure_cflags = @configure_cflags@
+configure_cflags_for_lib = @configure_cflags_for_lib@
 configure_ldflags = @configure_ldflags@
 datadir = @datadir@
 datarootdir = @datarootdir@
@@ -487,15 +491,14 @@ is_doxy2man_found = @is_doxy2man_found@
 is_doxygen_found = @is_doxygen_found@
 is_gnuplot_found = @is_gnuplot_found@
 is_help2man_found = @is_help2man_found@
-is_latex_found = @is_latex_found@
+is_lcov_found = @is_lcov_found@
+is_lcov_genhtml_found = @is_lcov_genhtml_found@
 is_qemu_found = @is_qemu_found@
 is_sort_found = @is_sort_found@
 is_tr_found = @is_tr_found@
 is_valgrind_found = @is_valgrind_found@
 is_wine_found = @is_wine_found@
 is_xsltproc_found = @is_xsltproc_found@
-is_zcov_genhtml_found = @is_zcov_genhtml_found@
-is_zcov_scan_found = @is_zcov_scan_found@
 libdir = @libdir@
 libexecdir = @libexecdir@
 libpcap_includes = @libpcap_includes@
@@ -525,8 +528,8 @@ TESTS = \
 test_rtp_callback_SOURCES = test_rtp_callback.c
 test_rtp_callback_LDADD = \
 	-l$(pcap_lib_name) \
-	-lrohc_comp \
-	-lrohc_common
+	$(top_builddir)/src/librohc.la \
+	$(additional_platform_libs)
 
 test_rtp_callback_CFLAGS = \
 	$(configure_cflags) \
@@ -535,15 +538,12 @@ test_rtp_callback_CFLAGS = \
 
 test_rtp_callback_CPPFLAGS = \
 	-I$(top_srcdir)/test \
-	-I$(top_srcdir)/src \
 	-I$(top_srcdir)/src/common \
 	-I$(top_srcdir)/src/comp \
 	$(libpcap_includes)
 
 test_rtp_callback_LDFLAGS = \
-	$(configure_ldflags) \
-	-L$(top_builddir)/src/common/.libs \
-	-L$(top_builddir)/src/comp/.libs
+	$(configure_ldflags)
 
 
 # extra files for releases
@@ -1027,7 +1027,6 @@ uninstall-am:
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
 	recheck tags tags-am uninstall uninstall-am
 
-	$(additional_platform_libs)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

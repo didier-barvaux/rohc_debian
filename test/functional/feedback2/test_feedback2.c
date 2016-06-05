@@ -29,6 +29,8 @@
 
 #include "test.h"
 
+#include "config.h" /* for HAVE_*_H */
+
 /* system includes */
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,8 +40,15 @@
 #include <assert.h>
 #include <time.h> /* for time(2) */
 #include <stdarg.h>
-
-#include "config.h" /* for HAVE_*_H */
+#if HAVE_ARPA_INET_H == 1
+#  include <arpa/inet.h>
+#endif
+#if HAVE_WINSOCK2_H == 1
+#  include <winsock2.h>
+#endif
+#if HAVE_SYS_TYPES_H == 1
+#  include <sys/types.h>
+#endif
 
 /* include for the PCAP library */
 #if HAVE_PCAP_PCAP_H == 1
@@ -56,14 +65,13 @@ for ./configure ? If yes, check configure output and config.log"
 #include <rohc_comp.h>
 #include <rohc_decomp.h>
 #include <rohc_packets.h>
-#include <sdvl.h> /* to gain access to d_sdvalue_size() */
-#include <rohc_utils.h>
 
 
 /* prototypes of private functions */
 static void usage(void);
 static int test_comp_and_decomp(const char *filename,
                                 const rohc_cid_type_t cid_type,
+                                const bool disable_prtt,
                                 const char *expected_type,
                                 char **expected_options,
                                 const unsigned short expected_options_nr);
@@ -104,6 +112,7 @@ int main(int argc, char *argv[])
 	char **ack_options = NULL;
 	unsigned short ack_options_nr = 0;
 	rohc_cid_type_t cid_type;
+	bool disable_prtt;
 	int args_read;
 	int status = 1;
 
@@ -177,8 +186,24 @@ int main(int argc, char *argv[])
 		goto error;
 	}
 
+	/* send all SN bits in feedbacks or minimize them? */
+	if(strstr(filename, "smallsn") != NULL)
+	{
+		disable_prtt = false;
+	}
+	else if(strstr(filename, "largesn") != NULL)
+	{
+		disable_prtt = true;
+	}
+	else
+	{
+		fprintf(stderr, "unknown SN type: flow filename '%s' shall contain one "
+		        "keyword among 'smallsn' or 'largesn'\n", filename);
+		goto error;
+	}
+
 	/* test ROHC decompression with the packets from the file */
-	status = test_comp_and_decomp(filename, cid_type, ack_type,
+	status = test_comp_and_decomp(filename, cid_type, disable_prtt, ack_type,
 	                              ack_options, ack_options_nr);
 
 error:
@@ -217,6 +242,7 @@ static void usage(void)
  * @param filename             The name of the PCAP file that contains the
  *                             ROHC packets
  * @param cid_type             The type of CID to use
+ * @param disable_prtt         Whether to disable packets/RTT (pRTT) or not
  * @param expected_type        The type of acknowledgement that shall be
  *                             generated during the decompression of every
  *                             packet of the source capture
@@ -229,6 +255,7 @@ static void usage(void)
  */
 static int test_comp_and_decomp(const char *filename,
                                 const rohc_cid_type_t cid_type,
+                                const bool disable_prtt,
                                 const char *expected_type,
                                 char **expected_options,
                                 const unsigned short expected_options_nr)
@@ -241,7 +268,9 @@ static int test_comp_and_decomp(const char *filename,
 	int link_len;
 
 	struct rohc_comp *comp; /* compressor required only to generate feedback */
+//! [define ROHC decompressor]
 	struct rohc_decomp *decomp;
+//! [define ROHC decompressor]
 
 	struct pcap_pkthdr header;
 	unsigned char *packet;
@@ -320,6 +349,7 @@ static int test_comp_and_decomp(const char *filename,
 	}
 
 
+//! [create ROHC decompressor]
 	/* create the ROHC decompressor in bi-directional mode */
 	decomp = rohc_decomp_new2(cid_type, max_cid, ROHC_O_MODE);
 	if(decomp == NULL)
@@ -327,6 +357,7 @@ static int test_comp_and_decomp(const char *filename,
 		fprintf(stderr, "failed to create the ROHC decompressor\n");
 		goto destroy_comp;
 	}
+//! [create ROHC decompressor]
 
 	/* set the callback for traces on decompressor */
 	if(!rohc_decomp_set_traces_cb2(decomp, print_rohc_traces, NULL))
@@ -343,6 +374,18 @@ static int test_comp_and_decomp(const char *filename,
 	{
 		fprintf(stderr, "failed to enable the decompression profiles\n");
 		goto destroy_decomp;
+	}
+
+	/* if large SNs, send all SN bits in feedbacks */
+	if(disable_prtt)
+	{
+//! [set decompressor pRTT]
+		if(!rohc_decomp_set_prtt(decomp, 0))
+		{
+			fprintf(stderr, "failed to configure decompressor pRTT\n");
+			goto destroy_decomp;
+		}
+//! [set decompressor pRTT]
 	}
 
 	/* for each packet in the dump */
@@ -379,8 +422,8 @@ static int test_comp_and_decomp(const char *filename,
 		/* check the length of the link layer header/frame */
 		if(header.len <= link_len || header.len != header.caplen)
 		{
-			fprintf(stderr, "\ttruncated packet in capture (len = %d, "
-			        "caplen = %d)\n", header.len, header.caplen);
+			fprintf(stderr, "\ttruncated packet in capture (len = %u, "
+			        "caplen = %u)\n", header.len, header.caplen);
 			goto destroy_decomp;
 		}
 
@@ -450,13 +493,25 @@ static int test_comp_and_decomp(const char *filename,
 		if(cid_type == ROHC_LARGE_CID)
 		{
 			size_t sdvl_size;
-			uint32_t cid;
-			size_t cid_bits_nr;
 
 			/* determine the size of the SDVL-encoded large CID */
-			sdvl_size = sdvl_decode(rohc_buf_data(feedback_send),
-			                        feedback_send.len, &cid, &cid_bits_nr);
-			if(sdvl_size <= 0 || sdvl_size > 4)
+			if((rohc_buf_byte(feedback_send) & 0x80) == 0)
+			{
+				sdvl_size = 1;
+			}
+			else if(((rohc_buf_byte(feedback_send) & 0xc0) >> 6) == (0x8 >> 2))
+			{
+				sdvl_size = 2;
+			}
+			else if(((rohc_buf_byte(feedback_send) & 0xe0) >> 5) == (0xc >> 1))
+			{
+				sdvl_size = 3;
+			}
+			else if(((rohc_buf_byte(feedback_send) & 0xe0) >> 5) == (0xe >> 1))
+			{
+				sdvl_size = 4;
+			}
+			else
 			{
 				fprintf(stderr, "\tinvalid SDVL-encoded value for large CID\n");
 				goto destroy_decomp;
@@ -716,7 +771,7 @@ static bool rohc_comp_rtp_cb(const unsigned char *const ip __attribute__((unused
 	 * traffic by default (for compatibility reasons) */
 	for(i = 0; i < default_rtp_ports_nr; i++)
 	{
-		if(rohc_ntoh16(udp_dport) == default_rtp_ports[i])
+		if(ntohs(udp_dport) == default_rtp_ports[i])
 		{
 			is_rtp = true;
 			break;

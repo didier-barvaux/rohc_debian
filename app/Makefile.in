@@ -147,7 +147,7 @@ am__define_uniq_tagged_files = \
   done | $(am__uniquify_input)`
 ETAGS = etags
 CTAGS = ctags
-DIST_SUBDIRS = performance tunnel sniffer fuzzer stats
+DIST_SUBDIRS = performance sniffer stats
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 am__relativize = \
   dir0=`pwd`; \
@@ -216,6 +216,7 @@ LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
@@ -268,6 +269,7 @@ build_os = @build_os@
 build_vendor = @build_vendor@
 builddir = @builddir@
 configure_cflags = @configure_cflags@
+configure_cflags_for_lib = @configure_cflags_for_lib@
 configure_ldflags = @configure_ldflags@
 datadir = @datadir@
 datarootdir = @datarootdir@
@@ -288,15 +290,14 @@ is_doxy2man_found = @is_doxy2man_found@
 is_doxygen_found = @is_doxygen_found@
 is_gnuplot_found = @is_gnuplot_found@
 is_help2man_found = @is_help2man_found@
-is_latex_found = @is_latex_found@
+is_lcov_found = @is_lcov_found@
+is_lcov_genhtml_found = @is_lcov_genhtml_found@
 is_qemu_found = @is_qemu_found@
 is_sort_found = @is_sort_found@
 is_tr_found = @is_tr_found@
 is_valgrind_found = @is_valgrind_found@
 is_wine_found = @is_wine_found@
 is_xsltproc_found = @is_xsltproc_found@
-is_zcov_genhtml_found = @is_zcov_genhtml_found@
-is_zcov_scan_found = @is_zcov_scan_found@
 libdir = @libdir@
 libexecdir = @libexecdir@
 libpcap_includes = @libpcap_includes@
@@ -321,19 +322,13 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 @APP_PERF_FALSE@APP_PERF_DIR = 
 @APP_PERF_TRUE@APP_PERF_DIR = performance
-@APP_TUNNEL_FALSE@APP_TUNNEL_DIR = 
-@APP_TUNNEL_TRUE@APP_TUNNEL_DIR = tunnel
 @APP_SNIFFER_FALSE@APP_SNIFFER_DIR = 
 @APP_SNIFFER_TRUE@APP_SNIFFER_DIR = sniffer
-@APP_FUZZER_FALSE@APP_FUZZER_DIR = 
-@APP_FUZZER_TRUE@APP_FUZZER_DIR = fuzzer
 @APP_STATS_FALSE@APP_STATS_DIR = 
 @APP_STATS_TRUE@APP_STATS_DIR = stats
 SUBDIRS = \
 	$(APP_PERF_DIR) \
-	$(APP_TUNNEL_DIR) \
 	$(APP_SNIFFER_DIR) \
-	$(APP_FUZZER_DIR) \
 	$(APP_STATS_DIR)
 
 all: all-recursive

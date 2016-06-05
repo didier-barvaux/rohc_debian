@@ -39,6 +39,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <stdarg.h>
+#include <limits.h>
 
 /* includes for network headers */
 #include <ip.h> /* for IPv4 checksum */
@@ -73,7 +74,7 @@ static bool build_stream(const char *const filename,
                          const unsigned long max_packets,
                          const int use_large_cid,
                          const size_t wlsb_width,
-                         const unsigned int max_contexts)
+                         const size_t max_contexts)
 	__attribute__((warn_unused_result, nonnull(1, 2)));
 
 static void print_rohc_traces(void *const priv_ctxt,
@@ -179,7 +180,18 @@ int main(int argc, char *argv[])
 		else if(max_packets == 0)
 		{
 			/* get the number of packets to put in stream */
-			max_packets = atoi(argv[0]);
+			const int __max_packets = atoi(argv[0]);
+			if(__max_packets < 1)
+			{
+				fprintf(stderr, "MAX shall be at least 1\n");
+				goto error;
+			}
+			max_packets = (unsigned long) __max_packets;
+			if(max_packets >= ULONG_MAX)
+			{
+				fprintf(stderr, "MAX shall be strictly less than %lu\n", ULONG_MAX);
+				goto error;
+			}
 		}
 		else if(filename == NULL)
 		{
@@ -200,7 +212,7 @@ int main(int argc, char *argv[])
 		use_large_cid = 0;
 
 		/* the maximum number of ROHC contexts should be valid */
-		if(max_contexts < 1 || max_contexts > (ROHC_SMALL_CID_MAX + 1))
+		if(max_contexts < 1 || (size_t) max_contexts > (ROHC_SMALL_CID_MAX + 1))
 		{
 			fprintf(stderr, "the maximum number of ROHC contexts should be "
 			        "between 1 and %u\n\n", ROHC_SMALL_CID_MAX + 1);
@@ -213,7 +225,7 @@ int main(int argc, char *argv[])
 		use_large_cid = 1;
 
 		/* the maximum number of ROHC contexts should be valid */
-		if(max_contexts < 1 || max_contexts > (ROHC_LARGE_CID_MAX + 1))
+		if(max_contexts < 1 || (size_t) max_contexts > (ROHC_LARGE_CID_MAX + 1))
 		{
 			fprintf(stderr, "the maximum number of ROHC contexts should be "
 			        "between 1 and %u\n\n", ROHC_LARGE_CID_MAX + 1);
@@ -328,7 +340,7 @@ static bool build_stream(const char *const filename,
                          const unsigned long max_packets,
                          const int use_large_cid,
                          const size_t wlsb_width,
-                         const unsigned int max_contexts)
+                         const size_t max_contexts)
 {
 	const rohc_cid_type_t cid_type =
 		(use_large_cid ? ROHC_LARGE_CID : ROHC_SMALL_CID);
@@ -425,6 +437,7 @@ static bool build_stream(const char *const filename,
 		struct ipv4_hdr *ipv4;
 		struct udphdr *udp;
 		struct rtphdr *rtp;
+		size_t i;
 
 		/* skip the Ethernet header, it will be written later */
 		packet.len += ETHER_HDR_LEN;
@@ -473,7 +486,7 @@ static bool build_stream(const char *const filename,
 		rohc_buf_pull(&packet, sizeof(struct rtphdr));
 
 		/* build RTP payload */
-		for(size_t i = 0; i < payload_len; i++)
+		for(i = 0; i < payload_len; i++)
 		{
 			rohc_buf_byte_at(packet, i) = i % 0xff;
 		}
@@ -555,16 +568,15 @@ static void print_rohc_traces(void *const priv_ctxt __attribute__((unused)),
                               const char *const format,
                               ...)
 {
-	const char *level_descrs[] =
-	{
-		[ROHC_TRACE_DEBUG]   = "DEBUG",
-		[ROHC_TRACE_INFO]    = "INFO",
-		[ROHC_TRACE_WARNING] = "WARNING",
-		[ROHC_TRACE_ERROR]   = "ERROR"
-	};
-
 	if(level >= ROHC_TRACE_WARNING || is_verbose)
 	{
+		const char *level_descrs[] =
+		{
+			[ROHC_TRACE_DEBUG]   = "DEBUG",
+			[ROHC_TRACE_INFO]    = "INFO",
+			[ROHC_TRACE_WARNING] = "WARNING",
+			[ROHC_TRACE_ERROR]   = "ERROR"
+		};
 		va_list args;
 		fprintf(stdout, "[%s] ", level_descrs[level]);
 		va_start(args, format);

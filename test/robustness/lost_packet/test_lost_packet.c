@@ -265,7 +265,9 @@ static int test_comp_and_decomp(const char *const filename,
 	int link_len;
 
 	struct rohc_comp *comp;
+//! [define ROHC decompressor]
 	struct rohc_decomp *decomp;
+//! [define ROHC decompressor]
 
 	struct pcap_pkthdr header;
 	unsigned char *packet;
@@ -296,13 +298,21 @@ static int test_comp_and_decomp(const char *const filename,
 
 	/* determine the length of the link layer header */
 	if(link_layer_type == DLT_EN10MB)
+	{
 		link_len = ETHER_HDR_LEN;
+	}
 	else if(link_layer_type == DLT_LINUX_SLL)
+	{
 		link_len = LINUX_COOKED_HDR_LEN;
+	}
 	else if(link_layer_type == DLT_NULL)
+	{
 		link_len = BSD_LOOPBACK_HDR_LEN;
+	}
 	else /* DLT_RAW */
+	{
 		link_len = 0;
+	}
 
 	/* create the ROHC compressor with small CID */
 	comp = rohc_comp_new2(ROHC_SMALL_CID, ROHC_SMALL_CID_MAX,
@@ -348,6 +358,7 @@ static int test_comp_and_decomp(const char *const filename,
 		goto destroy_comp;
 	}
 
+//! [create ROHC decompressor]
 	/* create the ROHC decompressor in unidirectional mode */
 	decomp = rohc_decomp_new2(ROHC_SMALL_CID, ROHC_SMALL_CID_MAX, ROHC_U_MODE);
 	if(decomp == NULL)
@@ -355,6 +366,7 @@ static int test_comp_and_decomp(const char *const filename,
 		fprintf(stderr, "failed to create the ROHC decompressor\n");
 		goto destroy_comp;
 	}
+//! [create ROHC decompressor]
 
 	/* set the callback for traces on decompressor */
 	if(!rohc_decomp_set_traces_cb2(decomp, print_rohc_traces, NULL))
@@ -373,6 +385,15 @@ static int test_comp_and_decomp(const char *const filename,
 		goto destroy_decomp;
 	}
 
+//! [set decompressor rate limits]
+	/* increase the default rate limits */
+	if(!rohc_decomp_set_rate_limits(decomp, 4, 100, 20, 100, 20, 100))
+	{
+		fprintf(stderr, "failed to increase the default rate limits\n");
+		goto destroy_decomp;
+	}
+//! [set decompressor rate limits]
+
 	if(do_repair)
 	{
 		/* enable some features: CRC repair */
@@ -390,8 +411,7 @@ static int test_comp_and_decomp(const char *const filename,
 		struct rohc_buf ip_packet =
 			rohc_buf_init_full(packet, header.caplen, arrival_time);
 		uint8_t rohc_buffer[MAX_ROHC_SIZE];
-		struct rohc_buf rohc_packet =
-			rohc_buf_init_empty(rohc_buffer, MAX_ROHC_SIZE);
+		struct rohc_buf rohc_packet = rohc_buf_init_empty(rohc_buffer, MAX_ROHC_SIZE);
 		uint8_t decomp_buffer[MAX_ROHC_SIZE];
 		struct rohc_buf decomp_packet =
 			rohc_buf_init_empty(decomp_buffer, MAX_ROHC_SIZE);
@@ -412,8 +432,8 @@ static int test_comp_and_decomp(const char *const filename,
 		/* check the length of the link layer header/frame */
 		if(header.len <= link_len || header.len != header.caplen)
 		{
-			fprintf(stderr, "\ttruncated packet in capture (len = %d, "
-			        "caplen = %d)\n", header.len, header.caplen);
+			fprintf(stderr, "\ttruncated packet in capture (len = %u, "
+			        "caplen = %u)\n", header.len, header.caplen);
 			goto destroy_decomp;
 		}
 
@@ -440,7 +460,7 @@ static int test_comp_and_decomp(const char *const filename,
 			{
 				const struct ipv6_hdr *const ip =
 					(struct ipv6_hdr *) rohc_buf_data(ip_packet);
-				tot_len = sizeof(struct ipv6_hdr) + ntohs(ip->ip6_plen);
+				tot_len = sizeof(struct ipv6_hdr) + ntohs(ip->plen);
 			}
 
 			/* determine if there is Ethernet padding after IP packet */
@@ -465,7 +485,7 @@ static int test_comp_and_decomp(const char *const filename,
 		/* is it the packet to lose? */
 		if(counter >= first_packet_to_lose && counter <= last_packet_to_lose)
 		{
-			fprintf(stderr, "\tvoluntary lose packet #%d\n", counter);
+			fprintf(stderr, "\tvoluntary lose packet #%u\n", counter);
 			continue;
 		}
 

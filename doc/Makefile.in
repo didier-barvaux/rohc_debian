@@ -194,6 +194,7 @@ LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
@@ -246,6 +247,7 @@ build_os = @build_os@
 build_vendor = @build_vendor@
 builddir = @builddir@
 configure_cflags = @configure_cflags@
+configure_cflags_for_lib = @configure_cflags_for_lib@
 configure_ldflags = @configure_ldflags@
 datadir = @datadir@
 datarootdir = @datarootdir@
@@ -266,15 +268,14 @@ is_doxy2man_found = @is_doxy2man_found@
 is_doxygen_found = @is_doxygen_found@
 is_gnuplot_found = @is_gnuplot_found@
 is_help2man_found = @is_help2man_found@
-is_latex_found = @is_latex_found@
+is_lcov_found = @is_lcov_found@
+is_lcov_genhtml_found = @is_lcov_genhtml_found@
 is_qemu_found = @is_qemu_found@
 is_sort_found = @is_sort_found@
 is_tr_found = @is_tr_found@
 is_valgrind_found = @is_valgrind_found@
 is_wine_found = @is_wine_found@
 is_xsltproc_found = @is_xsltproc_found@
-is_zcov_genhtml_found = @is_zcov_genhtml_found@
-is_zcov_scan_found = @is_zcov_scan_found@
 libdir = @libdir@
 libexecdir = @libexecdir@
 libpcap_includes = @libpcap_includes@
@@ -308,59 +309,66 @@ rohc_common_man = \
 
 rohc_common_mans = \
 	man/man3/rohc_version.3 \
+	man/man3/rohc_strerror.3 \
 	man/man3/rohc_get_mode_descr.3 \
 	man/man3/rohc_get_profile_descr.3 \
 	man/man3/rohc_get_packet_descr.3 \
-	man/man3/rohc_get_ext_descr.3
+	man/man3/rohc_get_ext_descr.3 \
+	man/man3/rohc_buf_append.3 \
+	man/man3/rohc_buf_append_buf.3 \
+	man/man3/rohc_buf_avail_len.3 \
+	man/man3/rohc_buf_data.3 \
+	man/man3/rohc_buf_data_at.3 \
+	man/man3/rohc_buf_is_empty.3 \
+	man/man3/rohc_buf_is_malformed.3 \
+	man/man3/rohc_buf_prepend.3 \
+	man/man3/rohc_buf_pull.3 \
+	man/man3/rohc_buf_push.3 \
+	man/man3/rohc_buf_reset.3
 
 rohc_comp_man = \
 	man/man3/rohc_comp.h.3
 
 rohc_comp_mans = \
-	man/man3/rohc_comp_new.3 \
+	man/man3/rohc_comp_new2.3 \
 	man/man3/rohc_comp_free.3 \
-	man/man3/rohc_compress3.3 \
-	man/man3/rohc_comp_get_segment.3 \
+	man/man3/rohc_compress4.3 \
+	man/man3/rohc_comp_get_segment2.3 \
+	man/man3/rohc_comp_deliver_feedback2.3 \
 	man/man3/rohc_comp_profile_enabled.3 \
 	man/man3/rohc_comp_enable_profile.3 \
 	man/man3/rohc_comp_enable_profiles.3 \
 	man/man3/rohc_comp_disable_profile.3 \
 	man/man3/rohc_comp_disable_profiles.3 \
-	man/man3/rohc_comp_set_random_cb.3 \
-	man/man3/rohc_comp_set_traces_cb.3 \
+	man/man3/rohc_comp_set_features.3 \
+	man/man3/rohc_comp_set_traces_cb2.3 \
 	man/man3/rohc_comp_set_rtp_detection_cb.3 \
-	man/man3/rohc_comp_add_rtp_port.3 \
-	man/man3/rohc_comp_remove_rtp_port.3 \
-	man/man3/rohc_comp_reset_rtp_ports.3 \
 	man/man3/rohc_comp_force_contexts_reinit.3 \
 	man/man3/rohc_comp_get_cid_type.3 \
 	man/man3/rohc_comp_get_max_cid.3 \
 	man/man3/rohc_comp_set_periodic_refreshes.3 \
 	man/man3/rohc_comp_set_wlsb_window_width.3 \
+	man/man3/rohc_comp_set_list_trans_nr.3 \
 	man/man3/rohc_comp_get_mrru.3 \
 	man/man3/rohc_comp_set_mrru.3 \
 	man/man3/rohc_comp_get_state_descr.3 \
 	man/man3/rohc_comp_get_general_info.3 \
-	man/man3/rohc_comp_get_last_packet_info2.3 \
-	man/man3/rohc_feedback_avail_bytes.3 \
-	man/man3/rohc_feedback_flush.3 \
-	man/man3/rohc_feedback_remove_locked.3 \
-	man/man3/rohc_feedback_unlock.3
+	man/man3/rohc_comp_get_last_packet_info2.3
 
 rohc_decomp_man = \
 	man/man3/rohc_decomp.h.3
 
 rohc_decomp_mans = \
-	man/man3/rohc_decomp_new.3 \
+	man/man3/rohc_decomp_new2.3 \
 	man/man3/rohc_decomp_free.3 \
-	man/man3/rohc_decompress2.3 \
+	man/man3/rohc_decompress3.3 \
 	man/man3/rohc_decomp_profile_enabled.3 \
 	man/man3/rohc_decomp_enable_profile.3 \
 	man/man3/rohc_decomp_enable_profiles.3 \
 	man/man3/rohc_decomp_disable_profile.3 \
 	man/man3/rohc_decomp_disable_profiles.3 \
 	man/man3/rohc_decomp_set_features.3 \
-	man/man3/rohc_decomp_set_traces_cb.3 \
+	man/man3/rohc_decomp_set_traces_cb2.3 \
 	man/man3/rohc_decomp_get_cid_type.3 \
 	man/man3/rohc_decomp_get_max_cid.3 \
 	man/man3/rohc_decomp_set_mrru.3 \
@@ -369,20 +377,24 @@ rohc_decomp_mans = \
 	man/man3/rohc_decomp_get_general_info.3 \
 	man/man3/rohc_decomp_get_last_packet_info.3
 
-@BUILD_DOC_MAN_FALSE@man_MANS = 
-@BUILD_DOC_MAN_TRUE@man_MANS = \
-@BUILD_DOC_MAN_TRUE@	rohc.7 \
-@BUILD_DOC_MAN_TRUE@	rohc_protocol.7 \
-@BUILD_DOC_MAN_TRUE@	rohc_library.7 \
-@BUILD_DOC_MAN_TRUE@	$(rohc_common_man) \
-@BUILD_DOC_MAN_TRUE@	$(rohc_common_mans) \
-@BUILD_DOC_MAN_TRUE@	$(rohc_comp_man) \
-@BUILD_DOC_MAN_TRUE@	$(rohc_comp_mans) \
-@BUILD_DOC_MAN_TRUE@	$(rohc_decomp_man) \
-@BUILD_DOC_MAN_TRUE@	$(rohc_decomp_mans)
+static_man_pages = \
+	rohc.7 \
+	rohc_protocol.7 \
+	rohc_library.7
+
+dynamic_man_pages = \
+	$(rohc_common_man) \
+	$(rohc_common_mans) \
+	$(rohc_comp_man) \
+	$(rohc_comp_mans) \
+	$(rohc_decomp_man) \
+	$(rohc_decomp_mans)
+
+man_MANS = \
+	$(static_man_pages) \
+	$(dynamic_man_pages)
 
 rohc_all_sources = \
-	$(top_srcdir)/src/*.h \
 	$(top_srcdir)/src/test/*.c \
 	$(top_srcdir)/src/common/*.c \
 	$(top_srcdir)/src/common/*.h \
@@ -401,10 +413,8 @@ rohc_all_sources = \
 	$(top_srcdir)/src/decomp/schemes/*.h \
 	$(top_srcdir)/src/decomp/schemes/test/*.c \
 	$(top_srcdir)/examples/*.c \
-	$(top_srcdir)/app/fuzzer/*.c \
 	$(top_srcdir)/app/performance/*.c \
 	$(top_srcdir)/app/sniffer/*.c \
-	$(top_srcdir)/app/tunnel/*.c \
 	$(top_srcdir)/app/stats/*.c \
 	$(top_srcdir)/linux/include/*.h \
 	$(top_srcdir)/linux/*.c \
@@ -413,7 +423,7 @@ rohc_all_sources = \
 	$(top_srcdir)/test/functional/decompress_feedback_only/*.c \
 	$(top_srcdir)/test/functional/feedback2/*.c \
 	$(top_srcdir)/test/functional/rtp_detection/*.c \
-	$(top_srcdir)/test/functional/rtp_uo_disambiguation/*.c \
+	$(top_srcdir)/test/functional/packet_types/*.c \
 	$(top_srcdir)/test/functional/segment/*.c \
 	$(top_srcdir)/test/robustness/damaged_packet/*.c \
 	$(top_srcdir)/test/robustness/empty_payload/*.c \
@@ -447,7 +457,8 @@ rohc_decomp_sources = \
 
 # extra files for releases
 EXTRA_DIST = \
-	doxygen.conf
+	doxygen.conf \
+	$(dynamic_man_pages)
 
 all: all-am
 
@@ -771,23 +782,25 @@ html/*.map: $(rohc_all_sources) | doxygen
 html/*.css: $(rohc_all_sources) | doxygen
 html/*.png: $(rohc_all_sources) | doxygen
 
-$(rohc_common_man): $(rohc_common_sources) $(rohc_examples_sources) | doxygen
-	$(AM_V_GEN)doxy2man $(doxy2man_options) xml/group__rohc.xml
+@BUILD_DOC_MAN_TRUE@$(rohc_common_man): $(rohc_common_sources) $(rohc_examples_sources) | doxygen
+@BUILD_DOC_MAN_TRUE@	$(AM_V_GEN)doxy2man $(doxy2man_options) xml/group__rohc.xml
+@BUILD_DOC_MAN_FALSE@$(rohc_common_man):
 $(rohc_common_mans):
 
-$(rohc_comp_man): $(rohc_comp_sources) $(rohc_examples_sources) | doxygen
-	$(AM_V_GEN)doxy2man $(doxy2man_options) xml/group__rohc__comp.xml
+@BUILD_DOC_MAN_TRUE@$(rohc_comp_man): $(rohc_comp_sources) $(rohc_examples_sources) | doxygen
+@BUILD_DOC_MAN_TRUE@	$(AM_V_GEN)doxy2man $(doxy2man_options) xml/group__rohc__comp.xml
+@BUILD_DOC_MAN_FALSE@$(rohc_comp_man):
 $(rohc_comp_mans):
 
-$(rohc_decomp_man): $(rohc_decomp_sources) $(rohc_examples_sources) | doxygen
-	$(AM_V_GEN)doxy2man $(doxy2man_options) xml/group__rohc__decomp.xml
+@BUILD_DOC_MAN_TRUE@$(rohc_decomp_man): $(rohc_decomp_sources) $(rohc_examples_sources) | doxygen
+@BUILD_DOC_MAN_TRUE@	$(AM_V_GEN)doxy2man $(doxy2man_options) xml/group__rohc__decomp.xml
+@BUILD_DOC_MAN_FALSE@$(rohc_decomp_man):
 $(rohc_decomp_mans):
 
 clean-local:
 	-$(RM) doxygen
 	-$(RM) -r html/
 	-$(RM) -r xml/
-	-$(RM) -r man/
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

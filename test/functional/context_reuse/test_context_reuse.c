@@ -309,8 +309,8 @@ static int test_comp_and_decomp(const char *filename)
 		/* check the length of the link layer header/frame */
 		if(header.len <= link_len || header.len != header.caplen)
 		{
-			fprintf(stderr, "\ttruncated packet in capture (len = %d, "
-			        "caplen = %d)\n", header.len, header.caplen);
+			fprintf(stderr, "\ttruncated packet in capture (len = %u, "
+			        "caplen = %u)\n", header.len, header.caplen);
 			goto destroy_decomp;
 		}
 
@@ -332,12 +332,12 @@ static int test_comp_and_decomp(const char *filename)
 			else
 			{
 				struct ipv6_hdr *ip = (struct ipv6_hdr *) rohc_buf_data(ip_packet);
-				tot_len = sizeof(struct ipv6_hdr) + ntohs(ip->ip6_plen);
+				tot_len = sizeof(struct ipv6_hdr) + ntohs(ip->plen);
 			}
 
 			if(tot_len < ip_packet.len)
 			{
-				fprintf(stderr, "the Ethernet frame has %zd bytes of padding "
+				fprintf(stderr, "the Ethernet frame has %zu bytes of padding "
 				        "after the %zu byte IP packet!\n",
 				        ip_packet.len - tot_len, tot_len);
 				ip_packet.len = tot_len;
@@ -362,6 +362,16 @@ static int test_comp_and_decomp(const char *filename)
 			goto destroy_decomp;
 		}
 		fprintf(stderr, "\tdecompression is successful\n");
+
+		/* compare input and output */
+		if(ip_packet.len != decomp_packet.len ||
+		   memcmp(rohc_buf_data(ip_packet), rohc_buf_data(decomp_packet),
+		          ip_packet.len) != 0)
+		{
+			fprintf(stderr, "\toutput packet does not match input packet\n");
+			goto destroy_decomp;
+		}
+		fprintf(stderr, "\toutput packet matches input packet\n");
 	}
 
 	/* everything went fine */

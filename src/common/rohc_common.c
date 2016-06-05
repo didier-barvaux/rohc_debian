@@ -83,7 +83,7 @@ const char * rohc_strerror(const rohc_status_t status)
 		case ROHC_STATUS_MALFORMED:
 			return "malformed packet";
 		case ROHC_STATUS_NO_CONTEXT:
-			return "no matching context";
+			return "no matching context and creation was impossible or failed";
 		case ROHC_STATUS_BAD_CRC:
 			return "CRC failure";
 		case ROHC_STATUS_OUTPUT_TOO_SMALL:
@@ -91,10 +91,7 @@ const char * rohc_strerror(const rohc_status_t status)
 		case ROHC_STATUS_ERROR:
 			return "undefined problem";
 		default:
-			assert(0);
-#if defined(__KERNEL__) || defined(ENABLE_DEAD_CODE)
 			return "no description";
-#endif
 	}
 }
 
@@ -124,6 +121,51 @@ const char * rohc_get_mode_descr(const rohc_mode_t mode)
 			return "O-mode";
 		case ROHC_R_MODE:
 			return "R-mode";
+		case ROHC_UNKNOWN_MODE:
+		default:
+			return "no description";
+	}
+}
+
+
+/**
+ * @brief Give a description for the given ROHC profile
+ *
+ * Give a description for the given ROHC compression/decompression profile.
+ *
+ * The descriptions are not part of the API. They may change between
+ * releases without any warning. Do NOT use them for other means that
+ * providing to users a textual description of profiles used by the
+ * library. If unsure, ask on the mailing list.
+ *
+ * @param profile  The ROHC profile to get a description for
+ * @return         A string that describes the given ROHC profile
+ *
+ * @ingroup rohc
+ */
+const char * rohc_get_profile_descr(const rohc_profile_t profile)
+{
+	switch(profile)
+	{
+		case ROHC_PROFILE_UNCOMPRESSED:
+			return "Uncompressed";
+		case ROHC_PROFILE_RTP:
+			return "IP/UDP/RTP";
+		case ROHC_PROFILE_UDP:
+			return "IP/UDP";
+		case ROHC_PROFILE_ESP:
+			return "IP/ESP";
+		case ROHC_PROFILE_IP:
+			return "IP-only";
+		case ROHC_PROFILE_RTP_LLA:
+			return "IP/UDP/RTP (LLA)";
+		case ROHC_PROFILE_TCP:
+			return "IP/TCP";
+		case ROHC_PROFILE_UDPLITE_RTP:
+			return "IP/UDP-Lite/RTP";
+		case ROHC_PROFILE_UDPLITE:
+			return "IP/UDP-Lite";
+		case ROHC_PROFILE_MAX:
 		default:
 			assert(0);
 #if defined(__KERNEL__) || defined(ENABLE_DEAD_CODE)

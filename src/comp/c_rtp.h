@@ -29,8 +29,8 @@
 #ifndef ROHC_COMP_RTP_H
 #define ROHC_COMP_RTP_H
 
-#include "c_generic.h"
-#include "schemes/scaled_rtp_ts.h"
+#include "rohc_comp_rfc3095.h"
+#include "schemes/comp_scaled_rtp_ts.h"
 #include "protocols/udp.h"
 #include "protocols/rtp.h"
 
@@ -50,7 +50,8 @@ struct rtp_tmp_vars
 	int send_rtp_dynamic;
 
 	/// The number of bits needed to encode ts_send
-	size_t nr_ts_bits;
+	size_t nr_ts_bits_less_equal_than_2;
+	size_t nr_ts_bits_more_than_2;
 
 	/// The number of bits of TS to place in the extension 3 header
 	size_t nr_ts_bits_ext3;
@@ -76,25 +77,29 @@ struct rtp_tmp_vars
  * @brief Define the RTP part of the profile decompression context.
  *
  * This object must be used with the generic part of the decompression
- * context c_generic_context.
+ * context rohc_comp_rfc3095_ctxt.
  *
  * @warning The 2 first fields MUST stay at the beginning of the structure
  *          to be compatible with \ref sc_udp_context
  *
- * @see c_generic_context
+ * @see rohc_comp_rfc3095_ctxt
  */
 struct sc_rtp_context
 {
 	/// @brief The number of times the UDP checksum field was added to the
 	///        compressed header
-	int udp_checksum_change_count;
+	size_t udp_checksum_change_count;
 
 	/// The previous UDP header
 	struct udphdr old_udp;
 
+	/// @brief The number of times the RTP Version field was added to
+	///        the compressed header
+	size_t rtp_version_change_count;
+
 	/// @brief The number of times the RTP Payload Type (PT) field was added to
 	///        the compressed header
-	int rtp_pt_change_count;
+	size_t rtp_pt_change_count;
 
 	/// @brief The number of times the RTP Padding (P) bit was added to
 	///        the compressed header

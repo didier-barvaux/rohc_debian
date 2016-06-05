@@ -27,6 +27,7 @@
 #ifndef ROHC_TEST__H
 #define ROHC_TEST__H
 
+#include <rohc/rohc_traces.h>
 #include <stdint.h>
 
 /// The maximal size for the ROHC packets
@@ -50,10 +51,10 @@
 /** The 10Mb/s ethernet header */
 struct ether_header
 {
-	uint8_t  ether_dhost[ETH_ALEN]; /**< destination eth addr */
-	uint8_t  ether_shost[ETH_ALEN]; /**< source ether addr */
+	uint8_t ether_dhost[ETH_ALEN];  /**< destination eth addr */
+	uint8_t ether_shost[ETH_ALEN];  /**< source ether addr */
 	uint16_t ether_type;            /**< packet type ID field */
-} __attribute__ ((__packed__));
+} __attribute__((__packed__));
 
 
 /** A simple maximum macro */
@@ -64,6 +65,15 @@ struct ether_header
 #define min(x, y) \
 	(((x) < (y)) ? (x) : (y))
 
+
+/** Descriptions for the different trace levels */
+static const char *trace_level_descrs[] __attribute__((unused)) =
+{
+	[ROHC_TRACE_DEBUG]   = "DEBUG",
+	[ROHC_TRACE_INFO]    = "INFO",
+	[ROHC_TRACE_WARNING] = "WARNING",
+	[ROHC_TRACE_ERROR]   = "ERROR"
+};
 
 #endif
 

@@ -9,7 +9,8 @@
 TESTS = \
 	test_lost_packet_7-7_7_non_sequential_rtp_ts.sh \
 	test_lost_packet_102-105_125_rtp_with_sn_wrapround.sh \
-	test_lost_packet_274-287_289_nominal_rtp.sh
+	test_lost_packet_274-287_289_nominal_rtp.sh \
+	test_lost_packet_13-16_16_nominal_tcp.sh
 
 check_PROGRAMS = \
 	test_lost_packet
@@ -27,19 +28,14 @@ test_lost_packet_CPPFLAGS = \
 	$(libpcap_includes)
 
 test_lost_packet_LDFLAGS = \
-	$(configure_ldflags) \
-	-L$(top_builddir)/src/common/.libs \
-	-L$(top_builddir)/src/comp/.libs \
-	-L$(top_builddir)/src/decomp/.libs
+	$(configure_ldflags)
 
 test_lost_packet_SOURCES = \
 	test_lost_packet.c
 
 test_lost_packet_LDADD = \
 	-l$(pcap_lib_name) \
-	-lrohc_comp \
-	-lrohc_decomp \
-	-lrohc_common \
+	$(top_builddir)/src/librohc.la \
 	$(additional_platform_libs)
 
 EXTRA_DIST = \

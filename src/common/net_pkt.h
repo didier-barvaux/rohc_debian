@@ -26,13 +26,9 @@
 #ifndef ROHC_COMMON_NET_PKT_H
 #define ROHC_COMMON_NET_PKT_H
 
-#include "rohc_buf.h"
+#include <rohc/rohc_buf.h>
 #include "ip.h"
 #include "rohc_traces.h"
-
-#include "dllexport.h"
-
-#include "config.h" /* for ROHC_ENABLE_DEPRECATED_API */
 
 
 /** The key to help identify (not quaranted unique) a compression context */
@@ -53,28 +49,21 @@ struct net_pkt
 
 	rohc_ctxt_key_t key;         /**< The hash key of the packet */
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-	/** The old callback function used to manage traces */
-	rohc_trace_callback_t trace_callback;
-#endif
-	/** The new callback function used to manage traces */
-	rohc_trace_callback2_t trace_callback2;
+	/** The callback function used to manage traces */
+	rohc_trace_callback2_t trace_callback;
 	/** The private context of the callback function used to manage traces */
 	void *trace_callback_priv;
 };
 
 
-bool ROHC_EXPORT net_pkt_parse(struct net_pkt *const packet,
-                               const struct rohc_buf data,
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-                               rohc_trace_callback_t trace_cb,
-#endif
-                               rohc_trace_callback2_t trace_cb2,
-                               void *const trace_cb_priv,
-                               rohc_trace_entity_t trace_entity)
+bool net_pkt_parse(struct net_pkt *const packet,
+                   const struct rohc_buf data,
+                   rohc_trace_callback2_t trace_cb,
+                   void *const trace_cb_priv,
+                   rohc_trace_entity_t trace_entity)
 	__attribute__((warn_unused_result, nonnull(1)));
 
-size_t ROHC_EXPORT net_pkt_get_payload_offset(const struct net_pkt *const packet)
+size_t net_pkt_get_payload_offset(const struct net_pkt *const packet)
 	__attribute__((warn_unused_result, nonnull(1)));
 
 #endif

@@ -34,8 +34,7 @@
  *
  * @param[out] packet    The parsed packet
  * @param data           The data to parse
- * @param trace_cb       The old function to call for printing traces
- * @param trace_cb2      The new function to call for printing traces
+ * @param trace_cb       The function to call for printing traces
  * @param trace_cb_priv  An optional private context, may be NULL
  * @param trace_entity   The entity that emits the traces
  * @return               true if the packet was successfully parsed,
@@ -44,10 +43,7 @@
  */
 bool net_pkt_parse(struct net_pkt *const packet,
                    const struct rohc_buf data,
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-                   rohc_trace_callback_t trace_cb,
-#endif
-                   rohc_trace_callback2_t trace_cb2,
+                   rohc_trace_callback2_t trace_cb,
                    void *const trace_cb_priv,
                    rohc_trace_entity_t trace_entity)
 {
@@ -57,10 +53,7 @@ bool net_pkt_parse(struct net_pkt *const packet,
 	packet->key = 0;
 
 	/* traces */
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 	packet->trace_callback = trace_cb;
-#endif
-	packet->trace_callback2 = trace_cb2;
 	packet->trace_callback_priv = trace_cb_priv;
 
 	/* create the outer IP packet from raw data */
@@ -98,14 +91,14 @@ bool net_pkt_parse(struct net_pkt *const packet,
 	{
 		const struct ipv6_addr *const saddr = ipv6_get_saddr(&packet->outer_ip);
 		const struct ipv6_addr *const daddr = ipv6_get_daddr(&packet->outer_ip);
-		packet->key ^= saddr->addr.u32[0];
-		packet->key ^= saddr->addr.u32[1];
-		packet->key ^= saddr->addr.u32[2];
-		packet->key ^= saddr->addr.u32[3];
-		packet->key ^= daddr->addr.u32[0];
-		packet->key ^= daddr->addr.u32[1];
-		packet->key ^= daddr->addr.u32[2];
-		packet->key ^= daddr->addr.u32[3];
+		packet->key ^= saddr->u32[0];
+		packet->key ^= saddr->u32[1];
+		packet->key ^= saddr->u32[2];
+		packet->key ^= saddr->u32[3];
+		packet->key ^= daddr->u32[0];
+		packet->key ^= daddr->u32[1];
+		packet->key ^= daddr->u32[2];
+		packet->key ^= daddr->u32[3];
 	}
 
 	/* get the transport protocol */

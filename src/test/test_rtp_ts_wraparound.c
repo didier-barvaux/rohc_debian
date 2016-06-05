@@ -23,10 +23,8 @@
  * @author  Didier Barvaux <didier@barvaux.org>
  */
 
-#include "comp/schemes/scaled_rtp_ts.h"
-#include "decomp/schemes/scaled_rtp_ts.h"
-
-#include "config.h"
+#include "schemes/comp_scaled_rtp_ts.h"
+#include "schemes/decomp_scaled_rtp_ts.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -145,11 +143,7 @@ bool run_test(bool be_verbose, const unsigned int incr)
 	uint64_t i;
 
 	/* create the RTP TS encoding context */
-	ret = c_create_sc(&ts_sc_comp, ROHC_WLSB_WINDOW_WIDTH,
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-	                  NULL,
-#endif
-	                  NULL, NULL);
+	ret = c_create_sc(&ts_sc_comp, ROHC_WLSB_WINDOW_WIDTH, NULL, NULL);
 	if(ret != 1)
 	{
 		fprintf(stderr, "failed to initialize the RTP TS encoding context\n");
@@ -157,11 +151,7 @@ bool run_test(bool be_verbose, const unsigned int incr)
 	}
 
 	/* create the RTP TS decoding context */
-	ts_sc_decomp = d_create_sc(
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-	                           NULL,
-#endif
-	                           NULL, NULL);
+	ts_sc_decomp = d_create_sc(NULL, NULL);
 	if(ts_sc_decomp == NULL)
 	{
 		fprintf(stderr, "failed to initialize the RTP TS decoding context\n");
@@ -178,16 +168,13 @@ bool run_test(bool be_verbose, const unsigned int incr)
 		real_incr = incr;
 	}
 	value = (0xffffffff - 50 * real_incr);
-	if(value > 0xffffffff)
-	{
-		value = 0;
-	}
 
 	/* encode then decode values from ranges [0xffffffff - 50 * incr, 0xffffffff]
 	 * and [0, 49 * incr] */
 	for(i = 1; i < 100; i++)
 	{
-		size_t required_bits;
+		size_t required_bits_less_equal_than_2;
+		size_t required_bits_more_than_2;
 		uint32_t required_bits_mask;
 		uint32_t ts_stride;
 
@@ -195,9 +182,13 @@ bool run_test(bool be_verbose, const unsigned int incr)
 		if(incr == 0)
 		{
 			if((i % 2) == 0)
+			{
 				real_incr = 20;
+			}
 			else
+			{
 				real_incr = 10;
+			}
 		}
 		else
 		{
@@ -221,13 +212,15 @@ bool run_test(bool be_verbose, const unsigned int incr)
 				/* transmit all bits without encoding */
 				trace(be_verbose, "\t\ttransmit all bits without encoding\n");
 				value_encoded = value;
-				required_bits = 32;
+				required_bits_less_equal_than_2 = 32;
+				required_bits_more_than_2 = 32;
 				/* change for INIT_STRIDE state */
 				ts_sc_comp.state = INIT_STRIDE;
 				/* simulate transmission */
 				/* decode received unscaled TS */
 				if(!ts_decode_unscaled_bits(ts_sc_decomp, value_encoded,
-				                            required_bits, &value_decoded, false))
+				                            required_bits_more_than_2,
+				                            &value_decoded))
 				{
 					trace(be_verbose, "failed to decode received absolute unscaled TS\n");
 					goto destroy_ts_sc_decomp;
@@ -240,7 +233,8 @@ bool run_test(bool be_verbose, const unsigned int incr)
 				      "and TS_STRIDE\n");
 				value_encoded = value;
 				ts_stride = get_ts_stride(&ts_sc_comp);
-				required_bits = 32;
+				required_bits_less_equal_than_2 = 32;
+				required_bits_more_than_2 = 32;
 				/* change for INIT_STRIDE state? */
 				ts_sc_comp.nr_init_stride_packets++;
 				if(ts_sc_comp.nr_init_stride_packets >= ROHC_INIT_TS_STRIDE_MIN)
@@ -250,7 +244,8 @@ bool run_test(bool be_verbose, const unsigned int incr)
 				/* simulate transmission */
 				/* decode received unscaled TS */
 				if(!ts_decode_unscaled_bits(ts_sc_decomp, value_encoded,
-				                            required_bits, &value_decoded, false))
+				                            required_bits_more_than_2,
+				                            &value_decoded))
 				{
 					trace(be_verbose, "failed to decode received unscaled TS\n");
 					goto destroy_ts_sc_decomp;
@@ -264,38 +259,38 @@ bool run_test(bool be_verbose, const unsigned int incr)
 				/* get TS_SCALED */
 				value_encoded = get_ts_scaled(&ts_sc_comp);
 				/* determine how many bits of TS_SCALED we need to send */
-				if(!nb_bits_scaled(&ts_sc_comp, &required_bits))
-				{
-					size_t nr_bits;
-					uint32_t mask;
-
-					/* this is the first TS scaled to be sent, we cannot code it
-					 * with W-LSB and we must find its size (in bits) */
-					for(nr_bits = 1, mask = 1;
-					    nr_bits <= 32 && (value_encoded & mask) != value_encoded;
-					    nr_bits++, mask |= (1 << (nr_bits - 1)))
-					{
-					}
-					assert((value_encoded & mask) == value_encoded);
-					required_bits = nr_bits;
-				}
-				assert(required_bits <= 32);
+				nb_bits_scaled(&ts_sc_comp, &required_bits_less_equal_than_2,
+				               &required_bits_more_than_2);
+				assert(required_bits_less_equal_than_2 <= 32);
+				assert(required_bits_more_than_2 <= 32);
 				/* truncate the encoded TS_SCALED to the number of bits we send */
-				if(required_bits == 32)
+				if(required_bits_more_than_2 == 32)
 				{
 					required_bits_mask = 0xffffffff;
 				}
+				else if(required_bits_less_equal_than_2 <= 2)
+				{
+					required_bits_mask = (1 << required_bits_less_equal_than_2) - 1;
+				}
+				else if(required_bits_more_than_2 > 2)
+				{
+					required_bits_mask = (1 << required_bits_more_than_2) - 1;
+				}
 				else
 				{
-					required_bits_mask = (1 << required_bits) - 1;
+					assert(0);
 				}
 				value_encoded = value_encoded & required_bits_mask;
 				/* save the new TS_SCALED value */
 				add_scaled(&ts_sc_comp, i);
 				/* simulate transmission */
 				/* decode TS */
-				if(required_bits > 0)
+				if(required_bits_less_equal_than_2 > 0 || required_bits_more_than_2 > 0)
 				{
+					const size_t required_bits =
+						(required_bits_less_equal_than_2 <= 2 ?
+						 required_bits_less_equal_than_2 : required_bits_more_than_2);
+
 					/* decode the received TS_SCALED value */
 					if(!ts_decode_scaled_bits(ts_sc_decomp, value_encoded,
 					                          required_bits, &value_decoded))
@@ -316,7 +311,8 @@ bool run_test(bool be_verbose, const unsigned int incr)
 				assert(0);
 				goto destroy_ts_sc_decomp;
 		}
-		trace(be_verbose, "\t\tencoded on %zd bits: 0x%04x\n", required_bits,
+		trace(be_verbose, "\t\tencoded on %zu/2 or %zu/32 bits: 0x%04x\n",
+		      required_bits_less_equal_than_2, required_bits_more_than_2,
 		      value_encoded);
 
 		/* check test result */

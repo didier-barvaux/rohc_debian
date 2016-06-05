@@ -27,16 +27,15 @@
 #ifndef ROHC_COMMON_IP_H
 #define ROHC_COMMON_IP_H
 
-#include "dllexport.h"
 #include "protocols/ipv4.h"
 #include "protocols/ipv6.h"
 
 #include <stdlib.h>
 #include <stdint.h>
 #ifdef __KERNEL__
-#	include <linux/types.h>
+#  include <linux/types.h>
 #else
-#	include <stdbool.h>
+#  include <stdbool.h>
 #endif
 
 
@@ -105,116 +104,6 @@ struct ip_packet
 
 
 /*
- * Generic IP macros:
- */
-
-/// Get a subpart of a 16-bit IP field
-#define IP_GET_16_SUBFIELD(field, bitmask, offset) \
-	((rohc_ntoh16(field) & (bitmask)) >> (offset))
-
-/// Get a subpart of a 32-bit IP field
-#define IP_GET_32_SUBFIELD(field, bitmask, offset) \
-	((rohc_ntoh32(field) & (bitmask)) >> (offset))
-
-/// Set a subpart of a 16-bit IP field
-#define IP_SET_16_SUBFIELD(field, bitmask, offset, value) \
-	(field) = (((field) & rohc_hton16(~(bitmask))) | \
-	           rohc_hton16(((value) << (offset)) & (bitmask)))
-
-/// Set a subpart of a 32-bit IP field
-#define IP_SET_32_SUBFIELD(field, bitmask, offset, value) \
-	(field) = (((field) & rohc_hton32(~(bitmask))) | \
-	           rohc_hton32(((value) << (offset)) & (bitmask)))
-
-
-/*
- * IPv4 definitions & macros:
- */
-
-/// The offset for the DF flag in an ipv4_hdr->frag_off variable
-#define IPV4_DF_OFFSET  14
-
-/// Get the IPv4 Don't Fragment (DF) bit from an ipv4_hdr object
-#define IPV4_GET_DF(ip4) \
-	IP_GET_16_SUBFIELD((ip4).frag_off, IP_DF, IPV4_DF_OFFSET)
-
-/// Set the IPv4 Don't Fragment (DF) bit in an ipv4_hdr object
-#define IPV4_SET_DF(ip4, value) \
-	IP_SET_16_SUBFIELD((ip4)->frag_off, IP_DF, IPV4_DF_OFFSET, (value))
-
-/// The format to print an IPv4 address
-#define IPV4_ADDR_FORMAT \
-	"%02x%02x%02x%02x (%u.%u.%u.%u)"
-
-/// The data to print an IPv4 address in raw format
-#define IPV4_ADDR_RAW(x) \
-	(x)[0], (x)[1], (x)[2], (x)[3], \
-	(x)[0], (x)[1], (x)[2], (x)[3]
-
-
-/*
- * IPv6 definitions & macros:
- */
-
-/// The bitmask for the Version field in an ipv6_hdr->ip6_flow variable
-#define IPV6_VERSION_MASK  0xf0000000
-/// The offset for the Version field in an ipv6_hdr->ip6_flow variable
-#define IPV6_VERSION_OFFSET  28
-
-/// The bitmask for the Traffic Class (TC) field in an ipv6_hdr->ip6_flow variable
-#define IPV6_TC_MASK  0x0ff00000
-/// The offset for the Traffic Class (TC) field in an ipv6_hdr->ip6_flow variable
-#define IPV6_TC_OFFSET  20
-
-/// The bitmask for the FLow Label field in an ipv6_hdr->ip6_flow variable
-#define IPV6_FLOW_LABEL_MASK  0x000fffff
-
-/// Get the IPv6 Version 4-bit field from ipv6_hdr object
-#define IPV6_GET_VERSION(ip6) \
-	IP_GET_32_SUBFIELD((ip6).ip6_flow, IPV6_VERSION_MASK, IPV6_VERSION_OFFSET)
-
-/// Set the IPv6 Version 4-bit field in an ipv6_hdr object
-#define IPV6_SET_VERSION(ip6, value) \
-	IP_SET_32_SUBFIELD((ip6)->ip6_flow, IPV6_VERSION_MASK, IPV6_VERSION_OFFSET, (value))
-
-/// Get the IPv6 Traffic Class (TC) byte from an ipv6_hdr object
-#define IPV6_GET_TC(ip6) \
-	IP_GET_32_SUBFIELD((ip6).ip6_flow, IPV6_TC_MASK, IPV6_TC_OFFSET)
-
-/// Set the IPv6 Traffic Class (TC) byte in an ipv6_hdr object
-#define IPV6_SET_TC(ip6, value) \
-	IP_SET_32_SUBFIELD((ip6)->ip6_flow, IPV6_TC_MASK, IPV6_TC_OFFSET, (value))
-
-/// Get the IPv6 Flow Label 20-bit field from an ipv6_hdr object
-#define IPV6_GET_FLOW_LABEL(ip6) \
-	IP_GET_32_SUBFIELD((ip6).ip6_flow, IPV6_FLOW_LABEL_MASK, 0)
-
-/// Set the IPv6 Flow Label 20-bit field in an ipv6_hdr variable
-#define IPV6_SET_FLOW_LABEL(ip6, value) \
-	IP_SET_32_SUBFIELD((ip6)->ip6_flow, IPV6_FLOW_LABEL_MASK, 0, (value))
-
-/// The format to print an IPv6 address
-#define IPV6_ADDR_FORMAT \
-	"%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x"
-
-/// The data to print an IPv6 address in (struct ipv6_addr *) format
-#define IPV6_ADDR_IN6(x) \
-	IPV6_ADDR_RAW((x)->addr.u8)
-
-/// The data to print an IPv6 address in raw format
-#define IPV6_ADDR_RAW(x) \
-	(x)[0], (x)[1], (x)[2], (x)[3], (x)[4], (x)[5], (x)[6], (x)[7], \
-	(x)[8], (x)[9], (x)[10], (x)[11], (x)[12], (x)[13], (x)[14], (x)[15]
-
-/// Compare two IPv6 addresses in (struct ipv6_addr *) format
-#define IPV6_ADDR_CMP(x, y) \
-	((x)->addr.u32[0] == (y)->addr.u32[0] && \
-	 (x)->addr.u32[1] == (y)->addr.u32[1] && \
-	 (x)->addr.u32[2] == (y)->addr.u32[2] && \
-	 (x)->addr.u32[3] == (y)->addr.u32[3])
-
-
-/*
  * Inline functions
  */
 
@@ -235,7 +124,11 @@ static inline uint16_t swab16(const uint16_t value)
 }
 
 
-#ifdef __i386__
+#if defined(__i386__) || defined(__x86_64__)
+
+static inline uint16_t ip_fast_csum(const uint8_t *iph,
+                                    const size_t ihl)
+	__attribute__((nonnull(1), warn_unused_result, pure));
 
 static inline uint16_t ip_fast_csum(const uint8_t *iph,
                                     size_t ihl)
@@ -253,8 +146,9 @@ static inline uint16_t ip_fast_csum(const uint8_t *iph,
  * @return    The IPv4 checksum
  */
 static inline uint16_t ip_fast_csum(const uint8_t *iph,
-                                    size_t ihl)
+                                    const size_t ihl)
 {
+	uint32_t __ihl = ihl;
 	uint32_t sum;
 
 	__asm__ __volatile__(
@@ -280,8 +174,8 @@ static inline uint16_t ip_fast_csum(const uint8_t *iph,
 	   /* Since the input registers which are loaded with iph and ihl
 	      are modified, we must also specify them as outputs, or gcc
 	      will assume they contain their original values. */
-		: "=r" (sum), "=r" (iph), "=r" (ihl)
-		: "1" (iph), "2" (ihl)
+		: "=r" (sum), "=r" (iph), "=r" (__ihl)
+		: "1" (iph), "2" (__ihl)
 		: "memory");
 
 	return (uint16_t) (sum & 0xffff);
@@ -320,7 +214,7 @@ static inline uint16_t ip_fast_csum(const uint8_t *const iph,
 	size_t count;
 	uint32_t result = 0;
 
-	if(len <= 0)
+	if(len == 0)
 	{
 		goto out;
 	}
@@ -386,10 +280,10 @@ out:
 }
 
 
-#endif /* !__i386__ */
+#endif /* !__i386__ && !__x86_64__ */
 
 #else /* !__KERNEL__ */
-#	include <asm/checksum.h>
+#  include <asm/checksum.h>
 #endif /* __KERNEL__ */
 
 
@@ -399,109 +293,93 @@ out:
 
 /* Generic functions */
 
-bool ROHC_EXPORT ip_create(struct ip_packet *const ip,
-                           const uint8_t *const packet,
-                           const size_t size)
+bool ip_create(struct ip_packet *const ip,
+               const uint8_t *const packet,
+               const size_t size)
 	__attribute__((warn_unused_result, nonnull(1, 2)));
-bool ROHC_EXPORT ip_get_inner_packet(const struct ip_packet *const outer,
-                                     struct ip_packet *const inner)
-	__attribute__((warn_unused_result, nonnull(1, 2)));
-
-const uint8_t * ROHC_EXPORT ip_get_raw_data(const struct ip_packet *const ip)
-	__attribute__((warn_unused_result, nonnull(1)));
-uint8_t * ROHC_EXPORT ip_get_next_header(const struct ip_packet *const ip,
-                                               uint8_t *const type)
-	__attribute__((warn_unused_result, nonnull(1, 2)));
-uint8_t * ROHC_EXPORT ip_get_next_layer(const struct ip_packet *const ip)
-	__attribute__((warn_unused_result, nonnull(1)));
-uint8_t * ROHC_EXPORT ip_get_next_ext_from_ip(const struct ip_packet *const ip,
-                                                    uint8_t *const type)
-	__attribute__((warn_unused_result, nonnull(1, 2)));
-uint8_t * ROHC_EXPORT ip_get_next_ext_from_ext(const uint8_t *const ext,
-                                                     uint8_t *const type)
+bool ip_get_inner_packet(const struct ip_packet *const outer,
+                         struct ip_packet *const inner)
 	__attribute__((warn_unused_result, nonnull(1, 2)));
 
-unsigned int ROHC_EXPORT ip_get_totlen(const struct ip_packet *const ip)
+const uint8_t * ip_get_raw_data(const struct ip_packet *const ip)
+	__attribute__((warn_unused_result, nonnull(1), pure));
+uint8_t * ip_get_next_header(const struct ip_packet *const ip,
+                             uint8_t *const type)
+	__attribute__((warn_unused_result, nonnull(1, 2)));
+uint8_t * ip_get_next_layer(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1)));
-unsigned int ROHC_EXPORT ip_get_hdrlen(const struct ip_packet *const ip)
-	__attribute__((warn_unused_result, nonnull(1)));
-unsigned int ROHC_EXPORT ip_get_plen(const struct ip_packet *const ip)
+uint8_t * ip_get_next_ext_from_ip(const struct ip_packet *const ip,
+                                  uint8_t *const type)
+	__attribute__((warn_unused_result, nonnull(1, 2)));
+uint8_t * ip_get_next_ext_from_ext(const uint8_t *const ext,
+                                   uint8_t *const type)
+	__attribute__((warn_unused_result, nonnull(1, 2)));
+
+unsigned int ip_get_totlen(const struct ip_packet *const ip)
+	__attribute__((warn_unused_result, nonnull(1), pure));
+unsigned int ip_get_hdrlen(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1)));
 
-bool ROHC_EXPORT ip_is_fragment(const struct ip_packet *const ip)
+bool ip_is_fragment(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1), pure));
-ip_version ROHC_EXPORT ip_get_version(const struct ip_packet *const ip)
+ip_version ip_get_version(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1), pure));
-uint8_t ROHC_EXPORT ip_get_protocol(const struct ip_packet *const ip)
+uint8_t ip_get_protocol(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1), pure));
-unsigned int ROHC_EXPORT ip_get_tos(const struct ip_packet *const ip)
+unsigned int ip_get_tos(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1), pure));
-unsigned int ROHC_EXPORT ip_get_ttl(const struct ip_packet *const ip)
+unsigned int ip_get_ttl(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1), pure));
 
-void ROHC_EXPORT ip_set_version(struct ip_packet *const ip,
-                                const ip_version value)
+void ip_set_version(struct ip_packet *const ip, const ip_version value)
 	__attribute__((nonnull(1)));
-void ROHC_EXPORT ip_set_protocol(struct ip_packet *const ip,
-                                 const uint8_t value)
+void ip_set_protocol(struct ip_packet *const ip, const uint8_t value)
 	__attribute__((nonnull(1)));
-void ROHC_EXPORT ip_set_tos(struct ip_packet *const ip,
-                            const uint8_t value)
+void ip_set_tos(struct ip_packet *const ip, const uint8_t value)
 	__attribute__((nonnull(1)));
-void ROHC_EXPORT ip_set_ttl(struct ip_packet *const ip,
-                            const uint8_t value)
+void ip_set_ttl(struct ip_packet *const ip, const uint8_t value)
 	__attribute__((nonnull(1)));
-void ROHC_EXPORT ip_set_saddr(struct ip_packet *const ip,
-                              const uint8_t *value)
+void ip_set_saddr(struct ip_packet *const ip, const uint8_t *value)
 	__attribute__((nonnull(1, 2)));
-void ROHC_EXPORT ip_set_daddr(struct ip_packet *const ip,
-                              const uint8_t *value)
+void ip_set_daddr(struct ip_packet *const ip, const uint8_t *value)
 	__attribute__((nonnull(1, 2)));
 
 /* IPv4 specific functions */
 
-const struct ipv4_hdr * ROHC_EXPORT ipv4_get_header(const struct ip_packet *const ip)
+const struct ipv4_hdr * ipv4_get_header(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1), pure));
-uint16_t ROHC_EXPORT ipv4_get_id(const struct ip_packet *const ip)
+uint16_t ipv4_get_id(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1), pure));
-uint16_t ROHC_EXPORT ipv4_get_id_nbo(const struct ip_packet *const ip,
-                                     const unsigned int nbo)
+uint16_t ipv4_get_id_nbo(const struct ip_packet *const ip, const unsigned int nbo)
 	__attribute__((warn_unused_result, nonnull(1), pure));
-int ROHC_EXPORT ipv4_get_df(const struct ip_packet *const ip)
+int ipv4_get_df(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1), pure));
-uint32_t ROHC_EXPORT ipv4_get_saddr(const struct ip_packet *const ip)
+uint32_t ipv4_get_saddr(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1), pure));
-uint32_t ROHC_EXPORT ipv4_get_daddr(const struct ip_packet *const ip)
+uint32_t ipv4_get_daddr(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1), pure));
 
-void ROHC_EXPORT ipv4_set_id(struct ip_packet *const ip, const int value)
+void ipv4_set_id(struct ip_packet *const ip, const int value)
 	__attribute__((nonnull(1)));
-void ROHC_EXPORT ipv4_set_df(struct ip_packet *const ip, const int value)
+void ipv4_set_df(struct ip_packet *const ip, const int value)
 	__attribute__((nonnull(1)));
 
 /* IPv6 specific functions */
 
-const struct ipv6_hdr * ROHC_EXPORT ipv6_get_header(const struct ip_packet *const ip)
+const struct ipv6_hdr * ipv6_get_header(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1), pure));
-uint32_t ROHC_EXPORT ipv6_get_flow_label(const struct ip_packet *const ip)
+uint32_t ip_get_flow_label(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1), pure));
-const struct ipv6_addr * ROHC_EXPORT ipv6_get_saddr(const struct ip_packet *const ip)
+const struct ipv6_addr * ipv6_get_saddr(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1), pure));
-const struct ipv6_addr * ROHC_EXPORT ipv6_get_daddr(const struct ip_packet *const ip)
+const struct ipv6_addr * ipv6_get_daddr(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1), pure));
-void ROHC_EXPORT ipv6_set_flow_label(struct ip_packet *const ip,
-                                     const uint32_t value)
+void ip_set_flow_label(struct ip_packet *const ip, const uint32_t value)
 	__attribute__((nonnull(1)));
-unsigned short ROHC_EXPORT ip_get_extension_size(const uint8_t *const ext)
+unsigned short ip_get_extension_size(const uint8_t *const ext)
+	__attribute__((warn_unused_result, nonnull(1), pure));
+unsigned short ip_get_total_extension_size(const struct ip_packet *const ip)
 	__attribute__((warn_unused_result, nonnull(1)));
-unsigned short ROHC_EXPORT ip_get_total_extension_size(const struct ip_packet *const ip)
-	__attribute__((warn_unused_result, nonnull(1)));
-
-/* Private functions (do not use directly) */
-bool get_ip_version(const uint8_t *const packet,
-                    const size_t size,
-                    ip_version *const version)
-	__attribute__((warn_unused_result, nonnull(1, 3)));
 
 
 #endif

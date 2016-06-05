@@ -25,10 +25,9 @@
 #ifndef ROHC_COMMON_INTERVAL_H
 #define ROHC_COMMON_INTERVAL_H
 
-#include "dllexport.h"
-
 #include <stdlib.h>
 #include <stdint.h>
+#include <assert.h>
 
 
 /**
@@ -42,13 +41,43 @@
  */
 typedef enum
 {
-	ROHC_LSB_SHIFT_IP_ID  =  0,  /**< real value for IP-ID */
-	ROHC_LSB_SHIFT_RTP_TS =  2,  /**< need to compute real value for RTP TS */
-	ROHC_LSB_SHIFT_RTP_SN =  3,  /**< need to compute real value for RTP SN */
-	ROHC_LSB_SHIFT_ESP_SN =  3,  /**< need to compute real value for ESP SN */
-	ROHC_LSB_SHIFT_SN     = -1,  /**< real value for non-RTP SN */
-	ROHC_LSB_SHIFT_VAR    =  1,  /**< real value is variable */
+	ROHC_LSB_SHIFT_SN         = -1,      /**< real value for non-RTP SN */
+#define ROHC_LSB_SHIFT_TCP_TS_1B  ROHC_LSB_SHIFT_SN /**< real value for TCP TS */
+#define ROHC_LSB_SHIFT_TCP_TS_2B  ROHC_LSB_SHIFT_SN /**< real value for TCP TS */
+	ROHC_LSB_SHIFT_IP_ID      =  0,      /**< real value for IP-ID */
+	ROHC_LSB_SHIFT_TCP_TTL    =  3,      /**< real value for TCP TTL/HL */
+#define ROHC_LSB_SHIFT_TCP_ACK_SCALED  ROHC_LSB_SHIFT_TCP_TTL
+	ROHC_LSB_SHIFT_TCP_SN     =  4,      /**< real value for TCP MSN */
+	ROHC_LSB_SHIFT_TCP_SEQ_SCALED =  7,      /**< real value for TCP seq/ack scaled */
+	ROHC_LSB_SHIFT_RTP_TS     =  100,    /**< need to compute real value for RTP TS */
+	ROHC_LSB_SHIFT_RTP_SN     =  101,    /**< need to compute real value for RTP SN */
+	ROHC_LSB_SHIFT_ESP_SN     =  102,    /**< need to compute real value for ESP SN */
+	ROHC_LSB_SHIFT_VAR        =  103,    /**< real value is variable */
+	ROHC_LSB_SHIFT_TCP_WINDOW = 16383,   /**< real value for TCP window */
+	ROHC_LSB_SHIFT_TCP_TS_3B  = 0x00040000, /**< real value for TCP TS */
+	ROHC_LSB_SHIFT_TCP_TS_4B  = 0x04000000, /**< real value for TCP TS */
 } rohc_lsb_shift_t;
+
+
+/**
+ * @brief An interval of 8-bit values
+ *
+ * Lower and upper bound values are always included in the interval.
+ *
+ * The upper bound may be greater that the lower bound of the interval if the
+ * interval straddles the interval boundaries.
+ *
+ * Example of interval that does not straddle field boundaries:
+ *   [1, 3]
+ *
+ * Example of interval that straddles field boundaries (8-bit field):
+ *   [250, 4]
+ */
+struct rohc_interval8
+{
+	uint8_t min;  /**< The lower bound of the interval */
+	uint8_t max;  /**< The upper bound of the interval */
+};
 
 
 /**
@@ -101,15 +130,20 @@ static inline int32_t rohc_interval_compute_p(const size_t k,
                                               const rohc_lsb_shift_t p)
 	__attribute__((warn_unused_result, const));
 
-struct rohc_interval16 ROHC_EXPORT rohc_f_16bits(const uint16_t v_ref,
-                                                 const size_t k,
-                                                 const rohc_lsb_shift_t p)
-	__attribute__((warn_unused_result, const));
+struct rohc_interval8 rohc_f_8bits(const uint8_t v_ref,
+                                   const size_t k,
+                                   const rohc_lsb_shift_t p)
+	__attribute__((warn_unused_result));
 
-struct rohc_interval32 ROHC_EXPORT rohc_f_32bits(const uint32_t v_ref,
-                                                 const size_t k,
-                                                 const rohc_lsb_shift_t p)
-	__attribute__((warn_unused_result, const));
+struct rohc_interval16 rohc_f_16bits(const uint16_t v_ref,
+                                     const size_t k,
+                                     const rohc_lsb_shift_t p)
+	__attribute__((warn_unused_result));
+
+struct rohc_interval32 rohc_f_32bits(const uint32_t v_ref,
+                                     const size_t k,
+                                     const rohc_lsb_shift_t p)
+	__attribute__((warn_unused_result));
 
 
 /**
@@ -142,7 +176,8 @@ static inline int32_t rohc_interval_compute_p(const size_t k,
 		break;
 
 		/* special computation for RTP and ESP SN encoding */
-		case ROHC_LSB_SHIFT_RTP_SN: /* = ROHC_LSB_SHIFT_ESP_SN */
+		case ROHC_LSB_SHIFT_RTP_SN:
+		case ROHC_LSB_SHIFT_ESP_SN:
 		{
 			if(k <= 4)
 			{
@@ -155,6 +190,19 @@ static inline int32_t rohc_interval_compute_p(const size_t k,
 		}
 		break;
 
+		case ROHC_LSB_SHIFT_VAR:
+			assert(0); /* should not happen */
+			computed_p = p;
+			break;
+
+		case ROHC_LSB_SHIFT_SN:
+		case ROHC_LSB_SHIFT_IP_ID:
+		case ROHC_LSB_SHIFT_TCP_TTL:
+		case ROHC_LSB_SHIFT_TCP_SN:
+		case ROHC_LSB_SHIFT_TCP_SEQ_SCALED:
+		case ROHC_LSB_SHIFT_TCP_WINDOW:
+		case ROHC_LSB_SHIFT_TCP_TS_3B:
+		case ROHC_LSB_SHIFT_TCP_TS_4B:
 		default: /* otherwise: use the p value given as parameter */
 		{
 			computed_p = p;

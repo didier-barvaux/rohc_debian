@@ -32,52 +32,13 @@
 #include "rohc_time.h" /* for public definition of struct rohc_ts */
 
 #ifndef __KERNEL__
-#	include <sys/time.h>
+#  include <sys/time.h>
 #endif
 
 
 static inline uint64_t rohc_time_interval(const struct rohc_ts begin,
                                           const struct rohc_ts end)
 	__attribute__((warn_unused_result, const));
-
-
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-
-#ifndef __KERNEL__
-
-/**
- * @brief Get the current time in seconds
- *
- * @return The current time in seconds
- */
-static inline uint64_t rohc_get_seconds(void)
-{
-	struct timeval tv;
-
-	gettimeofday(&tv, NULL);
-
-	return tv.tv_sec;
-}
-
-#else /* __KERNEL__ */
-
-/**
- * @brief Get the current time in seconds
- *
- * @return The current time in seconds
- */
-static inline uint64_t rohc_get_seconds(void)
-{
-	struct timespec ts;
-
-	ktime_get_ts(&ts);
-
-	return ts.tv_sec;
-}
-
-#endif /* __KERNEL__ */
-
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
 
 
 /**
@@ -93,13 +54,14 @@ static inline uint64_t rohc_time_interval(const struct rohc_ts begin,
 	uint64_t interval;
 
 	interval = end.sec - begin.sec; /* difference btw seconds */
-	interval *= 1e9;                /* convert in nanoseconds */
+	interval *= 1000000000UL;       /* convert in nanoseconds */
 	interval += end.nsec;           /* additional end nanoseconds */
 	interval -= begin.nsec;         /* superfluous begin nanoseconds */
-	interval /= 1e3;
+	interval /= 1000UL;             /* convert in microseconds */
 
 	return interval;
 }
+
 
 #endif /* ROHC_TIME_INTERNAL_H */
 

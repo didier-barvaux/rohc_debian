@@ -101,7 +101,8 @@ PROGRAMS = $(sbin_PROGRAMS)
 am_rohc_sniffer_OBJECTS = rohc_sniffer-sniffer.$(OBJEXT)
 rohc_sniffer_OBJECTS = $(am_rohc_sniffer_OBJECTS)
 am__DEPENDENCIES_1 =
-rohc_sniffer_DEPENDENCIES = $(am__DEPENDENCIES_1)
+rohc_sniffer_DEPENDENCIES = $(top_builddir)/src/librohc.la \
+	$(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -242,6 +243,7 @@ LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
+LT_SYS_LIBRARY_PATH = @LT_SYS_LIBRARY_PATH@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
@@ -294,6 +296,7 @@ build_os = @build_os@
 build_vendor = @build_vendor@
 builddir = @builddir@
 configure_cflags = @configure_cflags@
+configure_cflags_for_lib = @configure_cflags_for_lib@
 configure_ldflags = @configure_ldflags@
 datadir = @datadir@
 datarootdir = @datarootdir@
@@ -314,15 +317,14 @@ is_doxy2man_found = @is_doxy2man_found@
 is_doxygen_found = @is_doxygen_found@
 is_gnuplot_found = @is_gnuplot_found@
 is_help2man_found = @is_help2man_found@
-is_latex_found = @is_latex_found@
+is_lcov_found = @is_lcov_found@
+is_lcov_genhtml_found = @is_lcov_genhtml_found@
 is_qemu_found = @is_qemu_found@
 is_sort_found = @is_sort_found@
 is_tr_found = @is_tr_found@
 is_valgrind_found = @is_valgrind_found@
 is_wine_found = @is_wine_found@
 is_xsltproc_found = @is_xsltproc_found@
-is_zcov_genhtml_found = @is_zcov_genhtml_found@
-is_zcov_scan_found = @is_zcov_scan_found@
 libdir = @libdir@
 libexecdir = @libexecdir@
 libpcap_includes = @libpcap_includes@
@@ -345,7 +347,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-@BUILD_DOC_MAN_TRUE@man_MANS = rohc_sniffer.1
+man_MANS = rohc_sniffer.1
 rohc_sniffer_CFLAGS = \
 	$(configure_cflags)
 
@@ -357,20 +359,20 @@ rohc_sniffer_CPPFLAGS = \
 	$(libpcap_includes)
 
 rohc_sniffer_LDFLAGS = \
-	$(configure_ldflags) \
-	-L$(top_builddir)/src/common/.libs \
-	-L$(top_builddir)/src/comp/.libs \
-	-L$(top_builddir)/src/decomp/.libs
+	$(configure_ldflags)
 
 rohc_sniffer_SOURCES = \
 	sniffer.c
 
 rohc_sniffer_LDADD = \
 	-l$(pcap_lib_name) \
-	-lrohc_comp \
-	-lrohc_decomp \
-	-lrohc_common \
+	$(top_builddir)/src/librohc.la \
 	$(additional_platform_libs)
+
+
+# extra files for releases
+EXTRA_DIST = \
+	$(man_MANS)
 
 all: all-am
 
@@ -762,11 +764,11 @@ uninstall-man: uninstall-man1
 	uninstall-man uninstall-man1 uninstall-sbinPROGRAMS
 
 
-rohc_sniffer.1: $(rohc_sniffer_SOURCES) $(builddir)/rohc_sniffer
-	$(AM_V_GEN)help2man --output=$@ -s 1 --no-info \
-		-m "$(PACKAGE_NAME)'s tools" -S "$(PACKAGE_NAME)" \
-		-n "The ROHC sniffer" \
-		$(builddir)/rohc_sniffer
+@BUILD_DOC_MAN_TRUE@rohc_sniffer.1: $(rohc_sniffer_SOURCES) $(builddir)/rohc_sniffer
+@BUILD_DOC_MAN_TRUE@	$(AM_V_GEN)help2man --output=$@ -s 1 --no-info \
+@BUILD_DOC_MAN_TRUE@		-m "$(PACKAGE_NAME)'s tools" -S "$(PACKAGE_NAME)" \
+@BUILD_DOC_MAN_TRUE@		-n "The ROHC sniffer" \
+@BUILD_DOC_MAN_TRUE@		$(builddir)/rohc_sniffer
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

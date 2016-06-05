@@ -27,7 +27,7 @@
 
 #include "d_ip.h"
 #include "d_udp.h"
-#include "d_generic.h"
+#include "rohc_decomp_rfc3095.h"
 #include "rohc_bit_ops.h"
 #include "rohc_traces_internal.h"
 #include "rohc_debug.h"
@@ -49,42 +49,21 @@
  * @brief Define the UDP-Lite part of the decompression profile context.
  *
  * This object must be used with the generic part of the decompression
- * context d_generic_context.
+ * context rohc_decomp_rfc3095_ctxt.
  *
- * @see d_generic_context
+ * @see rohc_decomp_rfc3095_ctxt
  */
 struct d_udp_lite_context
 {
-	/**
-	 * @brief Whether the UDP-Lite checksum coverage field is present or not
-	 *
-	 * Possible values are:
-	 *   -1 if not initialized
-	 *    0 if not present
-	 *    1 if present
-	 */
-	int cfp;
+	uint16_t sport;             /**< UDP source port */
+	uint16_t dport;             /**< UDP destination port */
 
-	/**
-	 * @brief Whether the UDP-Lite checksum coverage field can be inferred
-	 *        or not
-	 *
-	 * Possible values are:
-	 *   -1 if not initialized
-	 *    0 if not present
-	 *    1 if present
-	 */
-	int cfi;
-
-	/**
-	 * @brief Checksum Coverage Extension
-	 *
-	 * Possible values are:
-	 *  - 0 if not present
-	 *  - ROHC_PACKET_CCE if present and ON
-	 *  - ROHC_PACKET_CCE_OFF if present and OFF
-	 */
-	int cce_packet;
+	/** Whether the UDP-Lite checksum coverage field is present or not */
+	rohc_tristate_t cfp;
+	/** Whether the UDP-Lite checksum coverage field can be inferred or not */
+	rohc_tristate_t cfi;
+	/** The Checksum Coverage (CC) */
+	uint16_t cc;
 };
 
 
@@ -92,8 +71,14 @@ struct d_udp_lite_context
  * Private function prototypes.
  */
 
-static void d_udp_lite_destroy(void *const context)
-	__attribute__((nonnull(1)));
+static bool d_udp_lite_create(const struct rohc_decomp_ctxt *const context,
+                              struct rohc_decomp_rfc3095_ctxt **const persist_ctxt,
+                              struct rohc_decomp_volat_ctxt *const volat_ctxt)
+	__attribute__((warn_unused_result, nonnull(1, 2, 3)));
+
+static void d_udp_lite_destroy(struct rohc_decomp_rfc3095_ctxt *const rfc3095_ctxt,
+                               const struct rohc_decomp_volat_ctxt *const volat_ctxt)
+	__attribute__((nonnull(1, 2)));
 
 static rohc_packet_t udp_lite_detect_packet_type(const struct rohc_decomp_ctxt *const context,
                                                  const uint8_t *const rohc_packet,
@@ -101,24 +86,38 @@ static rohc_packet_t udp_lite_detect_packet_type(const struct rohc_decomp_ctxt *
                                                  const size_t large_cid_len)
 	__attribute__((warn_unused_result, nonnull(1, 2)));
 
+static bool d_udp_lite_parse(const struct rohc_decomp_ctxt *const context,
+                             const struct rohc_buf rohc_packet,
+                             const size_t large_cid_len,
+                             rohc_packet_t *const packet_type,
+                             struct rohc_decomp_crc *const extr_crc,
+                             struct rohc_extr_bits *const bits,
+                             size_t *const rohc_hdr_len)
+	__attribute__((warn_unused_result, nonnull(1, 4, 5, 6, 7)));
+
 static int udp_lite_parse_dynamic_udp(const struct rohc_decomp_ctxt *const context,
                                       const uint8_t *packet,
                                       const size_t length,
                                       struct rohc_extr_bits *const bits);
 
 static int udp_lite_parse_uo_remainder(const struct rohc_decomp_ctxt *const context,
-                                       const unsigned char *packet,
+                                       const uint8_t *packet,
                                        unsigned int length,
                                        struct rohc_extr_bits *const bits);
 
 static bool udp_lite_decode_values_from_bits(const struct rohc_decomp_ctxt *context,
-                                             const struct rohc_extr_bits bits,
-                                             struct rohc_decoded_values *const decoded);
+                                             const struct rohc_extr_bits *const bits,
+                                             struct rohc_decoded_values *const decoded)
+	__attribute__((warn_unused_result, nonnull(1, 2, 3)));
 
 static int udp_lite_build_uncomp_udp(const struct rohc_decomp_ctxt *const context,
-                                     const struct rohc_decoded_values decoded,
-                                     unsigned char *dest,
+                                     const struct rohc_decoded_values *const decoded,
+                                     uint8_t *const dest,
                                      const unsigned int payload_len);
+
+static void udp_lite_update_context(struct rohc_decomp_ctxt *const context,
+                                    const struct rohc_decoded_values *const decoded)
+	__attribute__((nonnull(1, 2)));
 
 
 /*
@@ -131,12 +130,17 @@ static int udp_lite_build_uncomp_udp(const struct rohc_decomp_ctxt *const contex
  * This function is one of the functions that must exist in one profile for the
  * framework to work.
  *
- * @param context  The decompression context
- * @return         The newly-created UDP-Lite decompression context
+ * @param context            The main decompression context
+ * @param[out] persist_ctxt  The persistent part of the decompression context
+ * @param[out] volat_ctxt    The volatile part of the decompression context
+ * @return                   true if the UDP-Lite context was successfully created,
+ *                           false if a problem occurred
  */
-void * d_udp_lite_create(const struct rohc_decomp_ctxt *const context)
+static bool d_udp_lite_create(const struct rohc_decomp_ctxt *const context,
+                              struct rohc_decomp_rfc3095_ctxt **const persist_ctxt,
+                              struct rohc_decomp_volat_ctxt *const volat_ctxt)
 {
-	struct d_generic_context *g_context;
+	struct rohc_decomp_rfc3095_ctxt *rfc3095_ctxt;
 	struct d_udp_lite_context *udp_lite_context;
 
 	assert(context != NULL);
@@ -144,19 +148,16 @@ void * d_udp_lite_create(const struct rohc_decomp_ctxt *const context)
 	assert(context->profile != NULL);
 
 	/* create the generic context */
-	g_context = d_generic_create(context,
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-	                             context->decompressor->trace_callback,
-#endif
-	                             context->decompressor->trace_callback2,
-	                             context->decompressor->trace_callback_priv,
-	                             context->profile->id);
-	if(g_context == NULL)
+	if(!rohc_decomp_rfc3095_create(context, persist_ctxt, volat_ctxt,
+	                               context->decompressor->trace_callback,
+	                               context->decompressor->trace_callback_priv,
+	                               context->profile->id))
 	{
 		rohc_error(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
 		           "failed to create the generic decompression context");
 		goto quit;
 	}
+	rfc3095_ctxt = *persist_ctxt;
 
 	/* create the UDP-Lite-specific part of the context */
 	udp_lite_context = malloc(sizeof(struct d_udp_lite_context));
@@ -167,11 +168,12 @@ void * d_udp_lite_create(const struct rohc_decomp_ctxt *const context)
 		goto destroy_context;
 	}
 	memset(udp_lite_context, 0, sizeof(struct d_udp_lite_context));
-	g_context->specific = udp_lite_context;
+	rfc3095_ctxt->specific = udp_lite_context;
 
 	/* create the LSB decoding context for SN */
-	g_context->sn_lsb_ctxt = rohc_lsb_new(ROHC_LSB_SHIFT_SN, 16);
-	if(g_context->sn_lsb_ctxt == NULL)
+	rfc3095_ctxt->sn_lsb_p = ROHC_LSB_SHIFT_SN;
+	rfc3095_ctxt->sn_lsb_ctxt = rohc_lsb_new(16);
+	if(rfc3095_ctxt->sn_lsb_ctxt == NULL)
 	{
 		rohc_error(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
 		           "failed to create the LSB decoding context for SN");
@@ -180,59 +182,59 @@ void * d_udp_lite_create(const struct rohc_decomp_ctxt *const context)
 
 	/* the UDP-Lite checksum coverage field present flag will be initialized
 	 * with the IR or IR-DYN packets */
-	udp_lite_context->cfp = -1;
-	udp_lite_context->cfi = -1;
+	udp_lite_context->cfp = ROHC_TRISTATE_NONE;
+	udp_lite_context->cfi = ROHC_TRISTATE_NONE;
 
 	/* some UDP-Lite-specific values and functions */
-	g_context->next_header_len = sizeof(struct udphdr);
-	g_context->parse_static_next_hdr = udp_parse_static_udp;
-	g_context->parse_dyn_next_hdr = udp_lite_parse_dynamic_udp;
-	g_context->parse_ext3 = ip_parse_ext3;
-	g_context->parse_uo_remainder = udp_lite_parse_uo_remainder;
-	g_context->decode_values_from_bits = udp_lite_decode_values_from_bits;
-	g_context->build_next_header = udp_lite_build_uncomp_udp;
-	g_context->compute_crc_static = udp_compute_crc_static;
-	g_context->compute_crc_dynamic = udp_compute_crc_dynamic;
-	g_context->update_context = udp_update_context;
+	rfc3095_ctxt->next_header_len = sizeof(struct udphdr);
+	rfc3095_ctxt->parse_static_next_hdr = udp_parse_static_udp;
+	rfc3095_ctxt->parse_dyn_next_hdr = udp_lite_parse_dynamic_udp;
+	rfc3095_ctxt->parse_ext3 = ip_parse_ext3;
+	rfc3095_ctxt->parse_uo_remainder = udp_lite_parse_uo_remainder;
+	rfc3095_ctxt->decode_values_from_bits = udp_lite_decode_values_from_bits;
+	rfc3095_ctxt->build_next_header = udp_lite_build_uncomp_udp;
+	rfc3095_ctxt->compute_crc_static = udp_compute_crc_static;
+	rfc3095_ctxt->compute_crc_dynamic = udp_compute_crc_dynamic;
+	rfc3095_ctxt->update_context = udp_lite_update_context;
 
 	/* create the UDP-Lite-specific part of the header changes */
-	g_context->outer_ip_changes->next_header_len = sizeof(struct udphdr);
-	g_context->outer_ip_changes->next_header = malloc(sizeof(struct udphdr));
-	if(g_context->outer_ip_changes->next_header == NULL)
+	rfc3095_ctxt->outer_ip_changes->next_header_len = sizeof(struct udphdr);
+	rfc3095_ctxt->outer_ip_changes->next_header = malloc(sizeof(struct udphdr));
+	if(rfc3095_ctxt->outer_ip_changes->next_header == NULL)
 	{
 		rohc_error(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
 		           "cannot allocate memory for the UDP-Lite-specific part "
 		           "of the outer IP header changes");
 		goto free_lsb_sn;
 	}
-	memset(g_context->outer_ip_changes->next_header, 0, sizeof(struct udphdr));
+	memset(rfc3095_ctxt->outer_ip_changes->next_header, 0, sizeof(struct udphdr));
 
-	g_context->inner_ip_changes->next_header_len = sizeof(struct udphdr);
-	g_context->inner_ip_changes->next_header = malloc(sizeof(struct udphdr));
-	if(g_context->inner_ip_changes->next_header == NULL)
+	rfc3095_ctxt->inner_ip_changes->next_header_len = sizeof(struct udphdr);
+	rfc3095_ctxt->inner_ip_changes->next_header = malloc(sizeof(struct udphdr));
+	if(rfc3095_ctxt->inner_ip_changes->next_header == NULL)
 	{
 		rohc_error(context->decompressor, ROHC_TRACE_DECOMP, context->profile->id,
 		           "cannot allocate memory for the UDP-Lite-specific part "
 		           "of the inner IP header changes");
 		goto free_outer_ip_changes_next_header;
 	}
-	memset(g_context->inner_ip_changes->next_header, 0, sizeof(struct udphdr));
+	memset(rfc3095_ctxt->inner_ip_changes->next_header, 0, sizeof(struct udphdr));
 
 	/* set next header to UDP-Lite */
-	g_context->next_header_proto = ROHC_IPPROTO_UDPLITE;
+	rfc3095_ctxt->next_header_proto = ROHC_IPPROTO_UDPLITE;
 
-	return g_context;
+	return true;
 
 free_outer_ip_changes_next_header:
-	zfree(g_context->outer_ip_changes->next_header);
+	zfree(rfc3095_ctxt->outer_ip_changes->next_header);
 free_lsb_sn:
-	rohc_lsb_free(g_context->sn_lsb_ctxt);
+	rohc_lsb_free(rfc3095_ctxt->sn_lsb_ctxt);
 free_udp_context:
 	zfree(udp_lite_context);
 destroy_context:
-	d_generic_destroy(g_context);
+	rohc_decomp_rfc3095_destroy(rfc3095_ctxt, volat_ctxt);
 quit:
-	return NULL;
+	return false;
 }
 
 
@@ -242,28 +244,23 @@ quit:
  * This function is one of the functions that must exist in one profile for the
  * framework to work.
  *
- * @param context The compression context
+ * @param rfc3095_ctxt  The persistent decompression context for the RFC3095 profiles
+ * @param volat_ctxt    The volatile decompression context
  */
-static void d_udp_lite_destroy(void *const context)
+static void d_udp_lite_destroy(struct rohc_decomp_rfc3095_ctxt *const rfc3095_ctxt,
+                               const struct rohc_decomp_volat_ctxt *const volat_ctxt)
 {
-	struct d_generic_context *g_context;
-
-	assert(context != NULL);
-	g_context = (struct d_generic_context *) context;
-
 	/* clean UDP-specific memory */
-	assert(g_context->outer_ip_changes != NULL);
-	assert(g_context->outer_ip_changes->next_header != NULL);
-	zfree(g_context->outer_ip_changes->next_header);
-	assert(g_context->inner_ip_changes != NULL);
-	assert(g_context->inner_ip_changes->next_header != NULL);
-	zfree(g_context->inner_ip_changes->next_header);
+	assert(rfc3095_ctxt->outer_ip_changes != NULL);
+	zfree(rfc3095_ctxt->outer_ip_changes->next_header);
+	assert(rfc3095_ctxt->inner_ip_changes != NULL);
+	zfree(rfc3095_ctxt->inner_ip_changes->next_header);
 
 	/* destroy the LSB decoding context for SN */
-	rohc_lsb_free(g_context->sn_lsb_ctxt);
+	rohc_lsb_free(rfc3095_ctxt->sn_lsb_ctxt);
 
 	/* destroy the resources of the generic context */
-	d_generic_destroy(context);
+	rohc_decomp_rfc3095_destroy(rfc3095_ctxt, volat_ctxt);
 }
 
 
@@ -283,12 +280,10 @@ static rohc_packet_t udp_lite_detect_packet_type(const struct rohc_decomp_ctxt *
                                                  const size_t rohc_length,
                                                  const size_t large_cid_len)
 {
-	struct d_generic_context *g_context = context->specific;
-	struct d_udp_lite_context *udp_lite_context = g_context->specific;
 	size_t new_large_cid_len;
 
 	/* remaining ROHC data not parsed yet */
-	const unsigned char *rohc_remain_data = rohc_packet;
+	const uint8_t *rohc_remain_data = rohc_packet;
 	size_t rohc_remain_len = rohc_length;
 
 	/* check if the ROHC packet is large enough to read the first byte */
@@ -304,7 +299,6 @@ static rohc_packet_t udp_lite_detect_packet_type(const struct rohc_decomp_ctxt *
 	{
 		case 0xf9: /* CCE() */
 			rohc_decomp_debug(context, "CCE()");
-			udp_lite_context->cce_packet = ROHC_PACKET_CCE;
 			/* skip CCE byte (and optional large CID field) */
 			rohc_remain_data += 1 + large_cid_len;
 			rohc_remain_len -= 1 + large_cid_len;
@@ -312,8 +306,6 @@ static rohc_packet_t udp_lite_detect_packet_type(const struct rohc_decomp_ctxt *
 			break;
 		case 0xfa: /* CEC(ON) */
 			rohc_decomp_debug(context, "CCE(ON)");
-			udp_lite_context->cfp = 1;
-			udp_lite_context->cce_packet = ROHC_PACKET_CCE;
 			/* skip CCE byte (and optional large CID field) */
 			rohc_remain_data += 1 + large_cid_len;
 			rohc_remain_len -= 1 + large_cid_len;
@@ -321,14 +313,11 @@ static rohc_packet_t udp_lite_detect_packet_type(const struct rohc_decomp_ctxt *
 			break;
 		case 0xfb: /* CCE(OFF) */
 			rohc_decomp_debug(context, "CCE(OFF)");
-			udp_lite_context->cfp = 0;
-			udp_lite_context->cce_packet = ROHC_PACKET_CCE_OFF;
 			/* no CCE byte to skip */
 			new_large_cid_len = large_cid_len;
 			break;
 		default:
 			rohc_decomp_debug(context, "CCE not present");
-			udp_lite_context->cce_packet = 0;
 			/* no CCE byte to skip */
 			new_large_cid_len = large_cid_len;
 			break;
@@ -350,33 +339,32 @@ error:
  * This function is one of the functions that must exist in one profile for the
  * framework to work.
  *
- * @param decomp              The ROHC decompressor
- * @param context             The decompression context
- * @param rohc_packet         The ROHC packet to decode
- * @param add_cid_len         The length of the optional Add-CID field
- * @param large_cid_len       The length of the optional large CID field
- * @param[out] uncomp_packet  The uncompressed packet
- * @param packet_type         IN:  The type of the ROHC packet to parse
- *                            OUT: The type of the parsed ROHC packet
- * @return                    ROHC_STATUS_OK if packet is successfully decoded,
- *                            ROHC_STATUS_MALFORMED if packet is malformed,
- *                            ROHC_STATUS_BAD_CRC if a CRC error occurs,
- *                            ROHC_STATUS_ERROR if an error occurs
+ * @param context              The decompression context
+ * @param rohc_packet          The ROHC packet to decode
+ * @param large_cid_len        The length of the optional large CID field
+ * @param[in,out] packet_type  IN:  The type of the ROHC packet to parse
+ *                             OUT: The type of the parsed ROHC packet
+ * @param[out] extr_crc        The CRC bits extracted from the ROHC header
+ * @param[out] bits            The bits extracted from the ROHC header
+ * @param[out] rohc_hdr_len    The length of the ROHC header (in bytes)
+ * @return                     true if packet is successfully parsed,
+ *                             false otherwise
  */
-static rohc_status_t d_udp_lite_decode(struct rohc_decomp *const decomp,
-                                       struct rohc_decomp_ctxt *const context,
-                                       const struct rohc_buf rohc_packet,
-                                       const size_t add_cid_len,
-                                       const size_t large_cid_len,
-                                       struct rohc_buf *const uncomp_packet,
-                                       rohc_packet_t *const packet_type)
+static bool d_udp_lite_parse(const struct rohc_decomp_ctxt *const context,
+                             const struct rohc_buf rohc_packet,
+                             const size_t large_cid_len,
+                             rohc_packet_t *const packet_type,
+                             struct rohc_decomp_crc *const extr_crc,
+                             struct rohc_extr_bits *const bits,
+                             size_t *const rohc_hdr_len)
 {
-	struct d_generic_context *g_context = context->specific;
-	struct d_udp_lite_context *udp_lite_context = g_context->specific;
+	const struct rohc_decomp_rfc3095_ctxt *const rfc3095_ctxt = context->persist_ctxt;
+	const struct d_udp_lite_context *const udp_lite_context = rfc3095_ctxt->specific;
+	struct rohc_buf rohc_remain_data = rohc_packet;
 	size_t new_large_cid_len;
 
-	/* remaining ROHC data not parsed yet */
-	struct rohc_buf rohc_remain_data = rohc_packet;
+	bits->cfp = udp_lite_context->cfp;
+	bits->cfi = udp_lite_context->cfi;
 
 	/* check if the ROHC packet is large enough to read the first byte */
 	if(rohc_remain_data.len < (1 + large_cid_len))
@@ -386,9 +374,33 @@ static rohc_status_t d_udp_lite_decode(struct rohc_decomp *const decomp,
 		goto error_malformed;
 	}
 
+	/* find whether the packet owns an Coverage Checksum Extension or not */
+	switch(rohc_buf_byte(rohc_remain_data))
+	{
+		case 0xf9: /* CCE() */
+			rohc_decomp_debug(context, "CCE()");
+			bits->cce_pkt = ROHC_PACKET_CCE;
+			bits->cfp = ROHC_TRISTATE_YES;
+			break;
+		case 0xfa: /* CEC(ON) */
+			rohc_decomp_debug(context, "CCE(ON)");
+			bits->cce_pkt = ROHC_PACKET_CCE_ON;
+			bits->cfp = ROHC_TRISTATE_YES;
+			break;
+		case 0xfb: /* CCE(OFF) */
+			rohc_decomp_debug(context, "CCE(OFF)");
+			bits->cce_pkt = ROHC_PACKET_CCE_OFF;
+			bits->cfp = ROHC_TRISTATE_NO;
+			break;
+		default:
+			rohc_decomp_debug(context, "CCE not present");
+			bits->cce_pkt = ROHC_PACKET_CCE_OTHER;
+			break;
+	}
+
 	/* if the CE extension is present, skip the CCE byte type (and the
 	 * optional large CID field) */
-	if(udp_lite_context->cce_packet)
+	if(bits->cce_pkt != ROHC_PACKET_CCE_OTHER)
 	{
 		rohc_buf_pull(&rohc_remain_data, 1 + large_cid_len);
 		new_large_cid_len = 0;
@@ -400,8 +412,8 @@ static rohc_status_t d_udp_lite_decode(struct rohc_decomp *const decomp,
 
 	/* decode the remaining part of the part as a normal IP-based packet
 	 * (with a fake length for the large CID field eventually) */
-	return d_generic_decode(decomp, context, rohc_remain_data, add_cid_len,
-	                        new_large_cid_len, uncomp_packet, packet_type);
+	return rfc3095_decomp_parse_pkt(context, rohc_remain_data, new_large_cid_len,
+	                                packet_type, extr_crc, bits, rohc_hdr_len);
 
 error_malformed:
 	return ROHC_STATUS_MALFORMED;
@@ -423,18 +435,11 @@ static int udp_lite_parse_dynamic_udp(const struct rohc_decomp_ctxt *const conte
                                       const size_t length,
                                       struct rohc_extr_bits *const bits)
 {
-	struct d_generic_context *g_context;
-	struct d_udp_lite_context *udp_lite_context;
 	const size_t udplite_dyn_length = 4; /* checksum coverage + checksum */
 	size_t udp_lite_length;
 	int read = 0;
 	int ret;
 
-	assert(context != NULL);
-	assert(context->specific != NULL);
-	g_context = context->specific;
-	assert(g_context->specific != NULL);
-	udp_lite_context = g_context->specific;
 	assert(packet != NULL);
 	assert(bits != NULL);
 
@@ -459,18 +464,21 @@ static int udp_lite_parse_dynamic_udp(const struct rohc_decomp_ctxt *const conte
 	packet += 2;
 
 	/* init the Coverage Field Present (CFP) (see 5.2.2 in RFC 4019) */
-	udp_lite_context->cfp =
-		(udp_lite_length != rohc_ntoh16(bits->udp_lite_cc));
-	rohc_decomp_debug(context, "init CFP to %d (length = %zd, CC = %d)",
-	                  udp_lite_context->cfp, udp_lite_length,
-	                  rohc_ntoh16(bits->udp_lite_cc));
-
 	/* init Coverage Field Inferred (CFI) (see 5.2.2 in RFC 4019) */
-	udp_lite_context->cfi =
-		(udp_lite_length == rohc_ntoh16(bits->udp_lite_cc));
+	if(udp_lite_length != rohc_ntoh16(bits->udp_lite_cc))
+	{
+		bits->cfp = ROHC_TRISTATE_YES;
+		bits->cfi = ROHC_TRISTATE_NO;
+	}
+	else
+	{
+		bits->cfp = ROHC_TRISTATE_NO;
+		bits->cfi = ROHC_TRISTATE_YES;
+	}
+	rohc_decomp_debug(context, "init CFP to %d (length = %zd, CC = %d)",
+	                  bits->cfp, udp_lite_length, rohc_ntoh16(bits->udp_lite_cc));
 	rohc_decomp_debug(context, "init CFI to %d (length = %zd, CC = %d)",
-	                  udp_lite_context->cfi, udp_lite_length,
-	                  rohc_ntoh16(bits->udp_lite_cc));
+	                  bits->cfi, udp_lite_length, rohc_ntoh16(bits->udp_lite_cc));
 
 	/* retrieve the checksum field from the ROHC packet */
 	bits->udp_check = GET_NEXT_16_BITS(packet);
@@ -509,28 +517,23 @@ error:
  *                     -1 in case of failure
  */
 static int udp_lite_parse_uo_remainder(const struct rohc_decomp_ctxt *const context,
-                                       const unsigned char *packet,
+                                       const uint8_t *packet,
                                        unsigned int length,
                                        struct rohc_extr_bits *const bits)
 {
-	struct d_generic_context *g_context;
-	struct d_udp_lite_context *udp_lite_context;
+	const struct rohc_decomp_rfc3095_ctxt *const rfc3095_ctxt = context->persist_ctxt;
+	const struct d_udp_lite_context *const udp_lite_context = rfc3095_ctxt->specific;
 	size_t remainder_length; /* optional checksum coverage + checksum */
+	size_t udp_lite_length;
 	int read = 0; /* number of bytes read from the packet */
 
-	assert(context != NULL);
-	assert(context->specific != NULL);
-	g_context = context->specific;
-	assert(g_context->specific != NULL);
-	udp_lite_context = g_context->specific;
 	assert(packet != NULL);
 	assert(bits != NULL);
 
-	rohc_decomp_debug(context, "CFP = %d, CFI = %d, cce_packet = %d",
-	                  udp_lite_context->cfp, udp_lite_context->cfi,
-	                  udp_lite_context->cce_packet);
+	rohc_decomp_debug(context, "CFP = %d, CFI = %d, CCE = %d",
+	                  bits->cfp, bits->cfi, bits->cce_pkt);
 
-	remainder_length = (udp_lite_context->cfp != 0 ? 2 : 0) + 2;
+	remainder_length = (bits->cfp == ROHC_TRISTATE_YES ? 2 : 0) + 2;
 
 	/* check the minimal length to decode the tail of UO* packet */
 	if(length < remainder_length)
@@ -539,8 +542,13 @@ static int udp_lite_parse_uo_remainder(const struct rohc_decomp_ctxt *const cont
 		goto error;
 	}
 
+	/* compute the length of the UDP-Lite packet: UDP-Lite UO remainder contains
+	 * an optional 2-byte checksum coverage, a 2-byte checksum and a 2-byte SN
+	 * fields */
+	udp_lite_length = sizeof(struct udphdr) + length - remainder_length - 2;
+
 	/* checksum coverage if present */
-	if(udp_lite_context->cfp > 0)
+	if(bits->cfp == ROHC_TRISTATE_YES)
 	{
 		/* retrieve the checksum coverage field from the ROHC packet */
 		bits->udp_lite_cc = GET_NEXT_16_BITS(packet);
@@ -550,18 +558,9 @@ static int udp_lite_parse_uo_remainder(const struct rohc_decomp_ctxt *const cont
 		read += 2;
 		packet += 2;
 	}
-	else if(udp_lite_context->cfp < 0)
+	else if(bits->cfp == ROHC_TRISTATE_NONE)
 	{
-		rohc_decomp_warn(context, "cfp not initialized and packet is not one "
-		                 "IR packet");
-		goto error;
-	}
-
-	/* check if Coverage Field Inferred (CFI) is uninitialized */
-	if(udp_lite_context->cfi < 0)
-	{
-		rohc_decomp_warn(context, "cfi not initialized and packet is not one "
-		                 "IR packet");
+		rohc_decomp_warn(context, "CFP not initialized");
 		goto error;
 	}
 
@@ -574,6 +573,33 @@ static int udp_lite_parse_uo_remainder(const struct rohc_decomp_ctxt *const cont
 	packet += 2;
 #endif
 	read += 2;
+
+	/* CFI is updated by CCE(OFF) is CC equals packet length */
+	if(bits->cce_pkt == ROHC_PACKET_CCE_OFF)
+	{
+		uint16_t cc;
+
+		/* if present, packet(CC) has precedence over context(CC) */
+		if(bits->cfp == ROHC_TRISTATE_YES)
+		{
+			cc = rohc_hton16(bits->udp_lite_cc);
+		}
+		else
+		{
+			cc = rohc_hton16(udp_lite_context->cc);
+		}
+
+		if(udp_lite_length == cc)
+		{
+			bits->cfi = ROHC_TRISTATE_YES;
+		}
+		else
+		{
+			bits->cfi = ROHC_TRISTATE_NO;
+		}
+		rohc_decomp_debug(context, "CFI updated to %d (length = %zu, CC = %u)",
+		                  bits->cfi, udp_lite_length, cc);
+	}
 
 	return read;
 
@@ -597,26 +623,23 @@ error:
  * @return         true if decoding is successful, false otherwise
  */
 static bool udp_lite_decode_values_from_bits(const struct rohc_decomp_ctxt *context,
-                                             const struct rohc_extr_bits bits,
+                                             const struct rohc_extr_bits *const bits,
                                              struct rohc_decoded_values *const decoded)
 {
-	struct d_generic_context *g_context;
+	const struct rohc_decomp_rfc3095_ctxt *const rfc3095_ctxt = context->persist_ctxt;
+	const struct d_udp_lite_context *const udp_lite_context = rfc3095_ctxt->specific;
 	struct udphdr *udp_lite;
 
-	assert(context != NULL);
-	assert(context->specific != NULL);
-	g_context = context->specific;
-	assert(g_context->specific != NULL);
 	assert(decoded != NULL);
 
-	udp_lite = (struct udphdr *) g_context->outer_ip_changes->next_header;
+	udp_lite = (struct udphdr *) rfc3095_ctxt->outer_ip_changes->next_header;
 
 	/* decode UDP-Lite source port */
-	if(bits.udp_src_nr > 0)
+	if(bits->udp_src_nr > 0)
 	{
 		/* take packet value */
-		assert(bits.udp_src_nr == 16);
-		decoded->udp_src = bits.udp_src;
+		assert(bits->udp_src_nr == 16);
+		decoded->udp_src = bits->udp_src;
 	}
 	else
 	{
@@ -627,11 +650,11 @@ static bool udp_lite_decode_values_from_bits(const struct rohc_decomp_ctxt *cont
 	                  rohc_ntoh16(decoded->udp_src));
 
 	/* decode UDP-Lite destination port */
-	if(bits.udp_dst_nr > 0)
+	if(bits->udp_dst_nr > 0)
 	{
 		/* take packet value */
-		assert(bits.udp_dst_nr == 16);
-		decoded->udp_dst = bits.udp_dst;
+		assert(bits->udp_dst_nr == 16);
+		decoded->udp_dst = bits->udp_dst;
 	}
 	else
 	{
@@ -642,23 +665,28 @@ static bool udp_lite_decode_values_from_bits(const struct rohc_decomp_ctxt *cont
 	                  rohc_ntoh16(decoded->udp_dst));
 
 	/* decode UDP-Lite checksum */
-	assert(bits.udp_check_nr == 16);
-	decoded->udp_check = bits.udp_check;
+	assert(bits->udp_check_nr == 16);
+	decoded->udp_check = bits->udp_check;
 	rohc_decomp_debug(context, "decoded UDP checksum = 0x%04x",
 	                  rohc_ntoh16(decoded->udp_check));
 
 	/* decode UDP-Lite Checksum Coverage (CC) */
-	if(bits.udp_lite_cc_nr > 0)
+	if(bits->udp_lite_cc_nr > 0)
 	{
 		/* take packet value */
-		assert(bits.udp_lite_cc_nr == 16);
-		decoded->udp_lite_cc = bits.udp_lite_cc;
+		assert(bits->udp_lite_cc_nr == 16);
+		decoded->udp_lite_cc = bits->udp_lite_cc;
 	}
 	else
 	{
 		/* keep context value, will be replaced if value is inferred */
-		decoded->udp_lite_cc = udp_lite->len;
+		decoded->udp_lite_cc = udp_lite_context->cc;
 	}
+
+	/* CCE packet type and CFP/CFI flags */
+	decoded->cce_pkt = bits->cce_pkt;
+	decoded->cfp = bits->cfp;
+	decoded->cfi = bits->cfi;
 
 	return true;
 }
@@ -677,46 +705,86 @@ static bool udp_lite_decode_values_from_bits(const struct rohc_decomp_ctxt *cont
  *                     -1 in case of error
  */
 static int udp_lite_build_uncomp_udp(const struct rohc_decomp_ctxt *const context,
-                                     const struct rohc_decoded_values decoded,
-                                     unsigned char *dest,
+                                     const struct rohc_decoded_values *const decoded,
+                                     uint8_t *const dest,
                                      const unsigned int payload_len)
 {
-	struct d_generic_context *g_context;
-	struct d_udp_lite_context *udp_lite_context;
 	struct udphdr *udp_lite;
 
-	assert(context != NULL);
-	assert(context->specific != NULL);
-	g_context = context->specific;
-	assert(g_context->specific != NULL);
-	udp_lite_context = g_context->specific;
 	assert(dest != NULL);
 	udp_lite = (struct udphdr *) dest;
 
 	/* static fields */
-	udp_lite->source = decoded.udp_src;
-	udp_lite->dest = decoded.udp_dst;
+	udp_lite->source = decoded->udp_src;
+	udp_lite->dest = decoded->udp_dst;
 
 	/* changing fields */
-	udp_lite->check = decoded.udp_check;
+	udp_lite->check = decoded->udp_check;
 	rohc_decomp_debug(context, "checksum = 0x%04x",
 	                  rohc_ntoh16(udp_lite->check));
 
 	/* set checksum coverage if inferred, get from packet otherwise */
-	if(udp_lite_context->cfi > 0)
+	if(decoded->cfi == ROHC_TRISTATE_YES)
 	{
 		udp_lite->len = rohc_hton16(payload_len + sizeof(struct udphdr));
 		rohc_decomp_debug(context, "checksum coverage (0x%04x) is inferred",
 		                  udp_lite->len);
 	}
+	else if(decoded->cfi == ROHC_TRISTATE_NONE)
+	{
+		rohc_decomp_warn(context, "CFI not initialized");
+		goto error;
+	}
 	else
 	{
-		udp_lite->len = decoded.udp_lite_cc;
+		udp_lite->len = decoded->udp_lite_cc;
 		rohc_decomp_debug(context, "checksum coverage (0x%04x) is not inferred",
 		                  udp_lite->len);
 	}
 
 	return sizeof(struct udphdr);
+
+error:
+	return -1;
+}
+
+
+/**
+ * @brief Update context with decoded UDP-Lite values
+ *
+ * The following decoded values are updated in context:
+ *  - UDP-Lite source port
+ *  - UDP-Lite destination port
+ *
+ * @param context  The decompression context
+ * @param decoded  The decoded values to update in the context
+ */
+static void udp_lite_update_context(struct rohc_decomp_ctxt *const context,
+                                    const struct rohc_decoded_values *const decoded)
+{
+	struct rohc_decomp_rfc3095_ctxt *const rfc3095_ctxt = context->persist_ctxt;
+	struct d_udp_lite_context *const udp_lite_context = rfc3095_ctxt->specific;
+	struct udphdr *udp;
+
+	assert(rfc3095_ctxt->outer_ip_changes != NULL);
+	assert(rfc3095_ctxt->outer_ip_changes->next_header != NULL);
+	udp = (struct udphdr *) rfc3095_ctxt->outer_ip_changes->next_header;
+	udp->source = decoded->udp_src;
+	udp->dest = decoded->udp_dst;
+
+	if(decoded->cce_pkt != ROHC_PACKET_CCE)
+	{
+		rohc_decomp_debug(context, "packet updates CFP to %d", decoded->cfp);
+		udp_lite_context->cfp = decoded->cfp;
+	}
+	if(decoded->cce_pkt == ROHC_PACKET_CCE_OTHER ||
+	   decoded->cce_pkt == ROHC_PACKET_CCE_OFF)
+	{
+		rohc_decomp_debug(context, "packet updates CFI to %d", decoded->cfi);
+		udp_lite_context->cfi = decoded->cfi;
+		rohc_decomp_debug(context, "packet updates CC to 0x%04x", decoded->udp_lite_cc);
+		udp_lite_context->cc = decoded->udp_lite_cc;
+	}
 }
 
 
@@ -727,10 +795,15 @@ static int udp_lite_build_uncomp_udp(const struct rohc_decomp_ctxt *const contex
 const struct rohc_decomp_profile d_udplite_profile =
 {
 	.id              = ROHC_PROFILE_UDPLITE, /* profile ID (RFC 4019, §7) */
-	.new_context     = d_udp_lite_create,
-	.free_context    = d_udp_lite_destroy,
-	.decode          = d_udp_lite_decode,
+	.msn_max_bits    = 16,
+	.new_context     = (rohc_decomp_new_context_t) d_udp_lite_create,
+	.free_context    = (rohc_decomp_free_context_t) d_udp_lite_destroy,
 	.detect_pkt_type = udp_lite_detect_packet_type,
-	.get_sn          = d_generic_get_sn,
+	.parse_pkt       = (rohc_decomp_parse_pkt_t) d_udp_lite_parse,
+	.decode_bits     = (rohc_decomp_decode_bits_t) rfc3095_decomp_decode_bits,
+	.build_hdrs      = (rohc_decomp_build_hdrs_t) rfc3095_decomp_build_hdrs,
+	.update_ctxt     = (rohc_decomp_update_ctxt_t) rfc3095_decomp_update_ctxt,
+	.attempt_repair  = (rohc_decomp_attempt_repair_t) rfc3095_decomp_attempt_repair,
+	.get_sn          = rohc_decomp_rfc3095_get_sn,
 };
 

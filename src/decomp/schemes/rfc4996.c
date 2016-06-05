@@ -42,207 +42,141 @@
 #include <assert.h>
 
 
-/* TODO: to be removed once c_lsb and d_c_lsb are removed */
-/**
- * @brief Table of the mask for lsb()
- */
-static unsigned int lsb_masks[] =
-{
-	0x00000,
-	0x00001, 0x00003, 0x00007, 0x0000F,
-	0x0001F, 0x0003F, 0x0007F, 0x000FF,
-	0x001FF, 0x003FF, 0x007FF, 0x00FFF,
-	0x01FFF, 0x03FFF, 0x07FFF, 0x0FFFF,
-	0x1FFFF, 0x3FFFF, 0x7FFFF, 0xFFFFF
-};
-
-
-/**
- * @brief Table of the mask for lsb()
- */
-
-unsigned int lsb_xor_masks[] =
-{
-	0xFFFFFFFF,
-	0xFFFFFFFE, 0xFFFFFFFC, 0xFFFFFFF8, 0xFFFFFFF0,
-	0xFFFFFFE0, 0xFFFFFFC0, 0xFFFFFF80, 0xFFFFFF00,
-	0xFFFFFE00, 0xFFFFFC00, 0xFFFFF800, 0xFFFFF000,
-	0xFFFFE000, 0xFFFFC000, 0xFFFF8000, 0xFFFF0000,
-	0xFFFE0000, 0xFFFC0000, 0xFFF80000, 0xFFF00000
-};
-
-/**
- * @brief Decompress the lower bits from the given value and the context value.
- *
- * See RFC4997 page 27
- *
- * @param context          The decompression context
- * @param num_lsbs_param   The number of bits
- * @param offset_param     The offset
- * @param context_value    The value of the context
- * @param value            The compressed value
- * @return                 The uncompressed value
- */
-uint32_t d_lsb(const struct rohc_decomp_ctxt *const context,
-               int num_lsbs_param,
-               int offset_param __attribute__((unused)),
-               unsigned int context_value,
-               unsigned int value)
-{
-	assert(context != NULL);
-	assert( num_lsbs_param < 20 );
-	rohc_decomp_debug(context, "num_lsbs_param = %d, context_value = 0x%x, "
-	                  "mask = 0x%x, value = 0x%x -> 0x%x", num_lsbs_param,
-	                  context_value, lsb_xor_masks[num_lsbs_param], value,
-	                  (context_value & lsb_xor_masks[num_lsbs_param]) | value);
-	return ( context_value & lsb_xor_masks[num_lsbs_param] ) | value;
-}
-
-
 /**
  * @brief Decompress the 8-bit given value, according to the indicator
  *
- * @param rohc_data           The packet value
- * @param context_value       The context value
- * @param indicator           The indicator of compression
- * @param[out] decoded_value  The decoded value
- * @return                    The length (in bytes) of the compressed value,
- *                            -1 if ROHC data is malformed
+ * @param rohc_data  The ROHC data to parse
+ * @param rohc_len   The length of the ROHC data to parse (in bytes)
+ * @param indicator  The indicator of compression
+ * @param[out] lsb   The LSB bits extracted from the ROHC packet
+ * @return           The length (in bytes) of the compressed value,
+ *                   -1 if ROHC data is malformed
  */
-int d_static_or_irreg8(const uint8_t *rohc_data,
-                       const uint8_t context_value,
+int d_static_or_irreg8(const uint8_t *const rohc_data,
+                       const size_t rohc_len,
                        const int indicator,
-                       uint8_t *const decoded_value)
+                       struct rohc_lsb_field8 *const lsb)
 {
-	size_t length;
+	size_t length = 0;
 
-	if(indicator == 0)
+	if(indicator == 1)
 	{
-		*decoded_value = context_value;
-		length = 0;
-	}
-	else
-	{
-		/* TODO: check ROHC packet length */
-		*decoded_value = rohc_data[0];
-		length = 1;
+		if(rohc_len < 1)
+		{
+			goto error;
+		}
+		lsb->bits = rohc_data[0];
+		lsb->bits_nr = 8;
+		length++;
 	}
 
 	return length;
+
+error:
+	return -1;
 }
 
 
 /**
  * @brief Decompress the 16-bit given value, according to the indicator
  *
- * @param rohc_data           The packet value
- * @param context_value       The context value
- * @param indicator           The indicator of compression
- * @param[out] decoded_value  The decoded value
- * @return                    The length (in bytes) of the compressed value,
- *                            -1 if ROHC data is malformed
+ * @param rohc_data  The ROHC data to parse
+ * @param rohc_len   The length of the ROHC data to parse (in bytes)
+ * @param indicator  The indicator of compression
+ * @param[out] lsb   The LSB bits extracted from the ROHC packet
+ * @return           The length (in bytes) of the compressed value,
+ *                   -1 if ROHC data is malformed
  */
-int d_static_or_irreg16(const uint8_t *rohc_data,
-                        const uint16_t context_value,
+int d_static_or_irreg16(const uint8_t *const rohc_data,
+                        const size_t rohc_len,
                         const int indicator,
-                        uint16_t *const decoded_value)
+                        struct rohc_lsb_field16 *const lsb)
 {
 	size_t length;
 
 	if(indicator == 0)
 	{
-		*decoded_value = context_value;
+		lsb->bits_nr = 0;
 		length = 0;
+	}
+	else if(indicator == 1)
+	{
+		if(rohc_len < 2)
+		{
+			goto error;
+		}
+		memcpy(&(lsb->bits), rohc_data, sizeof(uint16_t));
+		lsb->bits = rohc_ntoh16(lsb->bits);
+		lsb->bits_nr = 16;
+		length = sizeof(uint16_t);
 	}
 	else
 	{
-		/* TODO: check ROHC packet length */
-		memcpy(decoded_value, rohc_data, sizeof(uint16_t));
-		length = sizeof(uint16_t);
+		goto error;
 	}
 
 	return length;
+
+error:
+	return -1;
 }
 
-
-/**
- * @brief Table of the size of the variable_length_32 encode value.
- */
-
-unsigned int variable_length_32_size[4] =
-{
-	0,1,2,4
-};
 
 /**
  * @brief Decode the 32 bits value, according to the indicator
  *
  * See RFC4996 page 46
  *
- * @param lsb                 The WLSB decoding context
- * @param context             The decompression context
- * @param rohc_data           The compressed value
- * @param indicator           The indicator of compression
- * @param[out] decoded_value  The decoded value (in NBO)
- * @return                    The length (in bytes) of the compressed value,
- *                            -1 if ROHC data is malformed
+ * @param rohc_data  The ROHC data to parse
+ * @param rohc_len   The length of the ROHC data to parse (in bytes)
+ * @param indicator  The indicator of compression
+ * @param[out] lsb   The LSB bits extracted from the ROHC packet
+ * @return           The length (in bytes) of the compressed value,
+ *                   -1 if ROHC data is malformed
  */
-int variable_length_32_dec(const struct rohc_lsb_decode *const lsb,
-                           const struct rohc_decomp_ctxt *const context,
-                           const uint8_t *rohc_data,
+int variable_length_32_dec(const uint8_t *const rohc_data,
+                           const size_t rohc_len,
                            const int indicator,
-                           uint32_t *const decoded_value)
+                           struct rohc_lsb_field32 *const lsb)
 {
-	uint32_t decoded_hbo;
-	uint32_t decoded_nbo;
-	uint32_t bits;
 	size_t length = 0;
-	bool decode_ok;
 
-	assert(context != NULL);
-	assert(rohc_data != NULL);
-	assert(decoded_value != NULL);
-
-	/* TODO: check ROHC packet length */
 	switch(indicator)
 	{
 		case 0:
-			decoded_hbo = rohc_lsb_get_ref(lsb, ROHC_LSB_REF_0);
-			decoded_nbo = rohc_hton32(decoded_hbo);
+			lsb->bits_nr = 0;
 			break;
 		case 1:
-			bits = rohc_data[0] & 0xff;
-			rohc_data++;
-			length++;
-			decode_ok = rohc_lsb_decode(lsb, ROHC_LSB_REF_0, 0, bits, 8, 63,
-												 &decoded_hbo);
-			if(!decode_ok)
+			if(rohc_len < 1)
 			{
 				goto error;
 			}
-			decoded_nbo = rohc_hton32(decoded_hbo);
+			lsb->bits = rohc_data[0] & 0xff;
+			lsb->bits_nr = 8;
+			lsb->p = 63;
+			length++;
 			break;
 		case 2:
-			bits = 0;
-			bits |= (rohc_data[0] << 8) & 0xff00;
-			rohc_data++;
-			length++;
-			bits |= rohc_data[0] & 0xff;
-			rohc_data++;
-			length++;
-			decode_ok = rohc_lsb_decode(lsb, ROHC_LSB_REF_0, 0, bits, 16, 16383,
-												 &decoded_hbo);
-			if(!decode_ok)
+			if(rohc_len < 2)
 			{
 				goto error;
 			}
-			decoded_nbo = rohc_hton32(decoded_hbo);
+			lsb->bits = (rohc_data[0] << 8) & 0xff00;
+			length++;
+			lsb->bits_nr += 8;
+			lsb->bits |= rohc_data[1] & 0xff;
+			length++;
+			lsb->bits_nr += 8;
+			lsb->p = 16383;
 			break;
 		case 3:
-			memcpy(&decoded_nbo, rohc_data, sizeof(uint32_t));
-#ifndef __clang_analyzer__ /* silent warning about dead decrement */
-			rohc_data += sizeof(uint32_t);
-#endif
+			if(rohc_len < 4)
+			{
+				goto error;
+			}
+			memcpy(&(lsb->bits), rohc_data, sizeof(uint32_t));
+			lsb->bits = rohc_ntoh32(lsb->bits);
+			lsb->bits_nr = 32;
 			length += sizeof(uint32_t);
 			break;
 		default: /* should not happen */
@@ -250,75 +184,10 @@ int variable_length_32_dec(const struct rohc_lsb_decode *const lsb,
 			goto error;
 	}
 
-	rohc_decomp_debug(context, "indicator = %d, return value = %u (0x%x)",
-	                  indicator, decoded_nbo, decoded_nbo);
-	memcpy(decoded_value, &decoded_nbo, sizeof(uint32_t));
-
 	return length;
 
 error:
 	return -1;
-}
-
-
-/**
- * @brief Decode the 32 bits value, according to the indicator
- *
- * See RFC4996 page 47
- *
- * @param flag                Flag of compression
- * @param data                The remaining part of the ROHC packet
- * @param data_len            The length of the remaining part of the packet
- * @param context_value       The context value
- * @param[out] decoded_value  The uncompressed value
- * @return                    The number of ROHC bytes parsed,
- *                            -1 if packet is malformed
- */
-int d_optional32(const int flag,
-                 const uint8_t *const data,
-                 const size_t data_len,
-                 uint32_t context_value,
-                 uint32_t *const decoded_value)
-{
-	size_t length;
-
-	if(flag == 1)
-	{
-		if(data_len < sizeof(uint32_t))
-		{
-			goto error;
-		}
-		memcpy(decoded_value, data, sizeof(uint32_t));
-		length = sizeof(uint32_t);
-	}
-	else
-	{
-		*decoded_value = context_value;
-		length = 0;
-	}
-
-	return length;
-
-error:
-	return -1;
-}
-
-
-/**
- * @brief Calculate the value from the scaling factor, scaled value and residue
- *
- * See RFC4996 page 49
- *
- * @param scaling_factor   The scaling factor
- * @param scaled_value     The scaled value
- * @param residue_field    The residue value
- * @return                 The unscaled value
- */
-uint32_t d_field_scaling(const uint32_t scaling_factor,
-                         const uint32_t scaled_value,
-                         const uint32_t residue_field)
-{
-	return ((scaled_value * scaling_factor) + residue_field);
 }
 
 
@@ -330,8 +199,7 @@ uint32_t d_field_scaling(const uint32_t scaling_factor,
  * @param rsf_index    The rsf index
  * @return             The rsf flags
  */
-
-unsigned int rsf_index_dec( unsigned int rsf_index )
+unsigned int rsf_index_dec(const unsigned int rsf_index)
 {
 	switch(rsf_index)
 	{
@@ -350,106 +218,58 @@ unsigned int rsf_index_dec( unsigned int rsf_index )
 
 
 /**
- * @brief Compress the lower bits of the given value.
- *
- * See RFC4997 page 27
- *
- * @param context          The compressor context
- * @param num_lsbs_param   The number of bits
- * @param offset_param     The offset
- * @param context_value    The value of the context
- * @param original_value   The value to compress
- * @return                 The compressed value with num_lsbs_param bits
- *
- * @todo TODO: duplicated code from rfc4996_encoding.c
- */
-static uint32_t d_c_lsb(const struct rohc_decomp_ctxt *const context,
-                        int num_lsbs_param,
-                        unsigned int offset_param,
-                        unsigned int context_value,
-                        unsigned int original_value)
-{
-	unsigned int lower_bound;
-	unsigned int upper_bound;
-	unsigned int value;
-
-	assert(context != NULL);
-
-	rohc_decomp_debug(context, "num_lsb = %d, offset_param = %d, "
-	                  "context_value = 0x%x, original_value = 0x%x",
-	                  num_lsbs_param, offset_param, context_value,
-	                  original_value);
-
-	assert( num_lsbs_param > 0 && num_lsbs_param <= 18 );
-
-	lower_bound = context_value - offset_param;
-	upper_bound = context_value + lsb_masks[num_lsbs_param] - offset_param;
-
-	value = original_value & lsb_masks[num_lsbs_param];
-
-	rohc_decomp_debug(context, "0x%x < value (0x%x) < 0x%x => return 0x%x",
-	                  lower_bound, original_value, upper_bound, value);
-
-	return value;
-}
-
-
-/**
  * @brief Decompress the lower bits of IP-ID
  *
  * See RFC4996 page 75
  *
- * @param context        The decompression context
- * @param behavior       The IP-ID behavior
- * @param k              The num_lsbs_param parameter for d_lsb()
- * @param p              The offset parameter for d_lsb()
- * @param context_ip_id  The context IP-ID value
- * @param value          The value to decompress
- * @param msn            The Master Sequence Number
- * @return               The IP-ID
+ * @param context            The decompression context
+ * @param ip_id_lsb_ctxt     The LSB decoding context for the IP-ID offset
+ * @param msn                The Master Sequence Number
+ * @param ip_id_bits         The received IP-ID offset bits to decode
+ * @param ip_id_bits_nr      The number of received IP-ID offset bits to decode
+ * @param p                  The offset parameter p to use for LSB decoding
+ * @param[out] ip_id         The decoded IP-ID value
+ * @return                   true if IP-ID was successfully decoded,
+ *                           false if decoding failed
+ *
+ * @todo TODO: could be merged with decomp/schemes/ip_id_offset.[ch] module
  */
-uint16_t d_ip_id_lsb(const struct rohc_decomp_ctxt *const context,
-                     const int behavior,
-                     const unsigned int k,
-                     const unsigned int p,
-                     const uint16_t context_ip_id,
-                     const uint16_t value,
-                     const uint16_t msn)
+bool d_ip_id_lsb(const struct rohc_decomp_ctxt *const context,
+                 const struct rohc_lsb_decode *const ip_id_lsb_ctxt,
+                 const uint16_t msn,
+                 const uint32_t ip_id_bits,
+                 const size_t ip_id_bits_nr,
+                 const rohc_lsb_shift_t p,
+                 uint16_t *const ip_id)
 {
+	bool decode_ok;
+	uint32_t ip_id_offset32;
 	uint16_t ip_id_offset;
-	uint16_t ip_id;
 
 	assert(context != NULL);
+	assert(ip_id_lsb_ctxt != NULL);
+	assert(ip_id != NULL);
 
-	rohc_decomp_debug(context, "behavior = %d, k = %d, p = %d, "
-	                  "context_ip_id = 0x%04x, value = 0x%04x, msn = 0x%04x",
-	                  behavior, k, p, context_ip_id, value, msn);
-
-	switch(behavior)
+	decode_ok = rohc_lsb_decode(ip_id_lsb_ctxt, ROHC_LSB_REF_0, 0,
+	                            ip_id_bits, ip_id_bits_nr, p, &ip_id_offset32);
+	if(!decode_ok)
 	{
-		case IP_ID_BEHAVIOR_SEQ:
-			ip_id = context_ip_id + 1;
-			ip_id_offset = ip_id - msn;
-			ip_id_offset = d_c_lsb(context, k, p, context_ip_id - msn,
-			                       ip_id_offset);
-			rohc_decomp_debug(context, "new ip_id = 0x%04x, ip_id_offset = "
-			                  "0x%04x, value = 0x%04x", ip_id, ip_id_offset,
-			                  value);
-			assert(ip_id_offset == value); /* TODO: should not assert */
-			return ip_id;
-		case IP_ID_BEHAVIOR_SEQ_SWAP:
-			ip_id = swab16(context_ip_id);
-			ip_id++;
-			ip_id_offset = ip_id - msn;
-			ip_id_offset = d_c_lsb(context, k, p, ip_id - 1 - msn, ip_id_offset);
-			rohc_decomp_debug(context, "new ip_id = 0x%04x, ip_id_offset = "
-			                  "0x%04x, value = 0x%04x", ip_id, ip_id_offset,
-			                  value);
-			assert(ip_id_offset == value); /* TODO: should not assert */
-			return ip_id;
+		rohc_decomp_warn(context, "failed to decode %zu innermost IP-ID offset "
+		                 "bits 0x%x with p = %u", ip_id_bits_nr, ip_id_bits, p);
+		goto error;
 	}
+	ip_id_offset = (uint16_t) (ip_id_offset32 & 0xffff);
+	rohc_decomp_debug(context, "decoded IP-ID offset = 0x%x (%zu bits 0x%x with "
+	                  "p = %d)", ip_id_offset, ip_id_bits_nr, ip_id_bits, p);
 
-	return 0;
+	/* add the decoded offset with SN, taking care of overflow */
+	*ip_id = (msn + ip_id_offset) & 0xffff;
+	rohc_decomp_debug(context, "decoded IP-ID = 0x%04x (MSN = 0x%04x)", *ip_id, msn);
+
+	return true;
+
+error:
+	return false;
 }
 
 
@@ -458,117 +278,79 @@ uint16_t d_ip_id_lsb(const struct rohc_decomp_ctxt *const context,
  *
  * See RFC4996 page 76
  *
- * @param context        The decompression context
- * @param rohc_data      The compressed value
- * @param behavior       The IP-ID behavior
- * @param indicator      The compression indicator
- * @param context_ip_id  The context IP-ID value
- * @param ip_id          Pointer to the uncompressed IP-ID
- * @param msn            The Master Sequence Number
- * @return               The length (in bytes) of the compressed value,
- *                       -1 if ROHC data is malformed
+ * @param context    The decompression context
+ * @param rohc_data  The ROHC data to parse
+ * @param data_len   The length of the ROHC data to parse (in bytes)
+ * @param behavior   The IP-ID behavior
+ * @param indicator  The compression indicator
+ * @param[out] lsb   The LSB bits extracted from the ROHC packet
+ * @return           The length (in bytes) of the compressed value,
+ *                   -1 if ROHC data is malformed
  */
 int d_optional_ip_id_lsb(const struct rohc_decomp_ctxt *const context,
                          const uint8_t *const rohc_data,
+                         const size_t data_len,
                          const int behavior,
                          const int indicator,
-                         const uint16_t context_ip_id,
-                         uint16_t *const ip_id,
-                         const uint16_t msn)
+                         struct rohc_lsb_field16 *const lsb)
 {
-	size_t length = 0;
+	int length;
 
 	assert(context != NULL);
-
-	rohc_decomp_debug(context, "behavior = %d, indicator = %d, "
-	                  "context_ip_id = 0x%04x, msn = 0x%04x", behavior,
-	                  indicator, context_ip_id, msn);
 
 	switch(behavior)
 	{
 		case IP_ID_BEHAVIOR_SEQ:
-			if(indicator == 0)
-			{
-				*ip_id = (context_ip_id & 0xff00) |
-				         d_ip_id_lsb(context, behavior, 8, 3, context_ip_id,
-				                     rohc_data[0], msn);
-				rohc_decomp_debug(context, "read ip_id = 0x%04x -> 0x%04x",
-				                  rohc_data[0], *ip_id);
-				length++;
-			}
-			else
-			{
-				memcpy(ip_id, rohc_data, sizeof(uint16_t));
-				length += sizeof(uint16_t);
-				*ip_id = rohc_ntoh16(*ip_id);
-				rohc_decomp_debug(context, "read ip_id = 0x%04x", *ip_id);
-			}
-			break;
 		case IP_ID_BEHAVIOR_SEQ_SWAP:
 		{
-			const uint16_t swapped_context_ip_id = swab16(context_ip_id);
 			if(indicator == 0)
 			{
-				*ip_id = (swapped_context_ip_id & 0xff00) |
-				          d_ip_id_lsb(context, behavior, 8, 3, context_ip_id,
-				                      rohc_data[0], msn);
-				rohc_decomp_debug(context, "read ip_id = 0x%04x -> 0x%04x",
-				                  rohc_data[0], *ip_id);
-				length++;
+				if(data_len < 1)
+				{
+					rohc_decomp_warn(context, "ROHC packet too small for optional_ip_id "
+					                 "(len = %zu)", data_len);
+					goto error;
+				}
+				lsb->bits = rohc_data[0];
+				lsb->bits_nr = 8;
+				lsb->p = 3;
+				length = 1;
 			}
 			else
 			{
-				memcpy(ip_id, rohc_data, sizeof(uint16_t));
-				length += sizeof(uint16_t);
-				*ip_id = rohc_ntoh16(*ip_id);
-				rohc_decomp_debug(context, "read ip_id = 0x%04x", *ip_id);
+				if(data_len < 2)
+				{
+					rohc_decomp_warn(context, "ROHC packet too small for optional_ip_id "
+					                 "(len = %zu)", data_len);
+					goto error;
+				}
+				memcpy(&(lsb->bits), rohc_data, sizeof(uint16_t));
+				lsb->bits = rohc_ntoh16(lsb->bits);
+				lsb->bits_nr = 16;
+				lsb->p = 3;
+				length = sizeof(uint16_t);
 			}
 			break;
 		}
 		case IP_ID_BEHAVIOR_RAND:
-			break;
 		case IP_ID_BEHAVIOR_ZERO:
-			*ip_id = 0;
+		{
+			rohc_decomp_debug(context, "IP-ID not present since IP-ID behavior is %d",
+			                  behavior);
+			length = 0;
 			break;
+		}
 		default:
-			break;
+		{
+			rohc_decomp_warn(context, "failed to decode innermost IP-ID offset: "
+			                 "unexpected behavior %d", behavior);
+			goto error;
+		}
 	}
 
 	return length;
-}
 
-
-/**
- * @brief Decode the DSCP field
- *
- * @param rohc_data           The compressed value
- * @param context_value       The context DSCP value
- * @param indicator           The indicator of the compression
- * @param[out] decoded_value  The decoded value
- * @return                    The length (in bytes) of the compressed value,
- *                            -1 if ROHC data is malformed
- */
-int dscp_decode(const uint8_t *const rohc_data,
-                const uint8_t context_value,
-                const int indicator,
-                uint8_t *const decoded_value)
-{
-	size_t length;
-
-	if(indicator == 0)
-	{
-		/* DSCP value not transmitted in packet, take value from context */
-		*decoded_value = context_value;
-		length = 0;
-	}
-	else
-	{
-		/* TODO: check packet length */
-		/* DSCP value transmitted in packet */
-		*decoded_value = (rohc_data[0] & 0x3f);
-		length = 1;
-	}
-
-	return length;
+error:
+	return -1;
 }
 

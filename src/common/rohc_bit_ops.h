@@ -28,9 +28,10 @@
 #define ROHC_BIT_OPS_H
 
 #ifdef __KERNEL__
-#	include <endian.h>
+#  include <endian.h>
+#  include <bitops.h>
 #else
-#	include "config.h" /* for WORDS_BIGENDIAN */
+#  include "config.h" /* for WORDS_BIGENDIAN */
 #endif
 
 
@@ -99,11 +100,11 @@
  *        in Network Byte Order
  */
 #if WORDS_BIGENDIAN == 1
-	#define GET_NEXT_16_BITS(x) \
-		((((*(x)) << 8) & 0xff00) | ((*((x) + 1)) & 0x00ff))
+#  define GET_NEXT_16_BITS(x) \
+          ((((*(x)) << 8) & 0xff00) | ((*((x) + 1)) & 0x00ff))
 #else
-	#define GET_NEXT_16_BITS(x) \
-		((((*((x) + 1)) << 8) & 0xff00) | ((*(x)) & 0x00ff))
+#  define GET_NEXT_16_BITS(x) \
+          ((((*((x) + 1)) << 8) & 0xff00) | ((*(x)) & 0x00ff))
 #endif
 
 
@@ -124,7 +125,7 @@
 		{ \
 			/* enough room: make and clear room, copy LSB */ \
 			field <<= (_bits_nr); \
-			field &= ~((1 << (_bits_nr)) - 1); \
+			field &= ~((1U << (_bits_nr)) - 1); \
 			field |= (_bits); \
 			field_nr += (_bits_nr); \
 		} \
@@ -135,7 +136,7 @@
 			assert((_bits_nr) > 0); \
 			assert((_bits_nr) <= (_max)); \
 			/* remove extra MSB (warn if dropped MSB are non-zero) */ \
-			_mask = (1 << ((_max) - (_bits_nr))) - 1; \
+			_mask = (1U << ((_max) - (_bits_nr))) - 1; \
 			if((field & _mask) != field) \
 			{ \
 				rohc_info((context)->decompressor, ROHC_TRACE_DECOMP, \
@@ -148,7 +149,7 @@
 			field &= _mask; \
 			/* make room and clear that room for new LSB */ \
 			field <<= (_bits_nr); \
-			field &= ~((1 << (_bits_nr)) - 1); \
+			field &= ~((1U << (_bits_nr)) - 1); \
 			/* add new LSB */ \
 			field |= (_bits); \
 			field_nr = (_max); \
