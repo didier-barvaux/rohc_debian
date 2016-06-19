@@ -22,6 +22,9 @@ Architecture: any
 Pre-Depends: ${misc:Pre-Depends}
 Depends: librohc3 (= ${binary:Version}), ${misc:Depends}
 Description: Files for development of applications which will use the ROHC library
+ The files required for the development of applications which will use the ROHC
+ library.
+ .
  RObust Header Compression (ROHC) is a standardized method defined by the IETF
  in RFC3095 to compress the IP, UDP, RTP, and TCP headers of Internet packets.
  This compression scheme differs from other compression schemes by the fact
@@ -30,10 +33,11 @@ Description: Files for development of applications which will use the ROHC libra
 Multi-Arch: same
 
 Package: librohc3
-Section: libs
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}
 Description: RObust Header Compression (ROHC) library
+ The RObust Header Compression (ROHC) library.
+ .
  RObust Header Compression (ROHC) is a standardized method defined by the IETF
  in RFC3095 to compress the IP, UDP, RTP, and TCP headers of Internet packets.
  This compression scheme differs from other compression schemes by the fact
@@ -46,6 +50,8 @@ Section: doc
 Architecture: all
 Depends: ${misc:Depends}
 Description: API documentation of the ROHC library
+ The API documentation of the ROHC library in HTML format.
+ .
  RObust Header Compression (ROHC) is a standardized method defined by the IETF
  in RFC3095 to compress the IP, UDP, RTP, and TCP headers of Internet packets.
  This compression scheme differs from other compression schemes by the fact
@@ -57,6 +63,9 @@ Package: rohc-tools
 Architecture: any
 Depends: ${misc:Depends}, ${shlibs:Depends}, libpcap0.8, gnuplot
 Description: Miscellaneous tools that come along the ROHC library
+ Miscellaneous tools that come along the ROHC library and help testing the ROHC
+ protocol on a local network.
+ .
  The following tools are included:
   * rohc_sniffer: library testing on live trafic
   * rohc_test_performance: library testing on pcap
