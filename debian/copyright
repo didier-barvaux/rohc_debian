@@ -25,6 +25,139 @@ License: LGPL-2.1+
  On Debian systems, the complete text of the GNU Lesser General
  Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
 
+Files: configure.ac
+ configure
+ config.h.in
+ config.h
+ config.sub
+ depcomp
+ missing
+ install-sh
+ test-driver
+Copyright: 2010-2016, Didier Barvaux
+  2017,2009-2010,2012-2014, Viveris Technologies
+  2014, Simon Paillard <spaillard@debian.org>
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: rohc.pc.in
+Copyright: 2012-2014, Didier Barvaux
+  2010, Viveris Technologies
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: contrib/rohc.spec.in
+ contrib/rohc.spec
+ doc/rohc.7.in
+ doc/rohc_protocol.7.in
+ doc/rohc_library.7.in
+Copyright: 2013-2014,2016, Didier Barvaux
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: doc/doxygen.conf.in
+ doc/doxygen.conf
+Copyright: 2013-2015, Didier Barvaux
+  2010,2013, Viveris Technologies
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: linux/kmod/Makefile
+Copyright: 2013-2015, Didier Barvaux
+  2013, Viveris Technologies
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: src/common/feedback.h
+Copyright: 2015-2016, Didier Barvaux
+  2015, Steven Brown
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
 Files: src/decomp/schemes/test/test_wlsb.sh
 Copyright: 2013, Viveris Technologies
 License: LGPL-2.1+
@@ -45,6 +178,8 @@ License: LGPL-2.1+
  Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
 
 Files: test/functional/decompress_padding/test_decompress_padding.sh
+ git_ref.in
+ git_ref
 Copyright: 2014, Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
@@ -103,10 +238,42 @@ License: LGPL-2.1+
  On Debian systems, the complete text of the GNU Lesser General
  Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
 
+Files: test/robustness/empty_payload/inputs/irdyn.pcap
+ test/robustness/damaged_packet/inputs/uo0.pcap
+ test/robustness/empty_payload/inputs/uo0.pcap
+ test/robustness/empty_payload/inputs/uo0_iponlyprofile.pcap
+ test/robustness/empty_payload/inputs/uo0_udpprofile.pcap
+Copyright: 2011-2012, Didier Barvaux
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
 Files: src/test/test_rtp_ts_wraparound.sh
  src/test/test_wlsb_packet_loss.sh
  src/test/test_wlsb_wraparound.sh
  test/valgrind.xsl
+ test/robustness/damaged_packet/inputs/irdyn_with-tss-not-set.pcap
+ test/robustness/damaged_packet/inputs/irdyn_with-tss-set.pcap
+ test/robustness/damaged_packet/inputs/ir_with-tss-not-set.pcap
+ test/robustness/damaged_packet/inputs/ir_with-tss-set.pcap
+ test/robustness/empty_payload/inputs/uo0_espprofile.pcap
+ test/robustness/damaged_packet/inputs/uor2ts_with-ext3-and-ts-stride.pcap
+ test/robustness/damaged_packet/inputs/uor2ts_without-ext3.pcap
+ test/robustness/damaged_packet/inputs/uor2_with-ext3-but-not-ts-stride.pcap
+ test/robustness/lost_packet/inputs/rtp_with_sn_wrapround.pcap
 Copyright: 2012, Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
@@ -225,6 +392,7 @@ Files: test/functional/context_reuse/test_context_reuse.sh
  test/robustness/malformed_rohc_packets/test_malformed_rohc_packets_fuzzer_crash_5632_1.sh
  test/robustness/malformed_rohc_packets/test_malformed_rohc_packets_fuzzer_crash_916_1.sh
  test/valgrind.sh
+ contrib/README
 Copyright: 2012-2013, Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
@@ -273,6 +441,26 @@ Files: test/functional/feedback2/test_feedback2.sh
  test/robustness/empty_payload/test_empty_payload_uor2.sh
  test/functional/decompress_feedback_only/test_decompress_feedback_only.sh
 Copyright: 2011-2013, Didier Barvaux
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: test/robustness/lost_packet/inputs/non_sequential_rtp_ts.pcap
+ test/functional/rtp_detection/input/rtp.pcap
+Copyright: 2012, Viveris Technologies
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public
@@ -362,6 +550,26 @@ Files: test/functional/rtp_detection/test_rtp_callback.sh
  test/functional/segment/test_segment.sh
 Copyright: 2012, Viveris Technologies
   2013, Didier Barvaux
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: test/robustness/empty_payload/inputs/uo1.pcap
+Copyright: 2012, Viveris Technologies
+  2011, Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public
@@ -489,6 +697,9 @@ License: LGPL-2.1+
 Files: test/interop/test_interop.sh
  test/interop/test_interop_Aeroflex-TM500-1.sh
  test/interop/test_interop_Aeroflex-TM500-2.sh
+ test/interop/inputs/Aeroflex-TM500-1/ref_uncomp.pcap
+ test/interop/inputs/Aeroflex-TM500-1/source_rohc.pcap
+ test/robustness/lost_packet/inputs/nominal_tcp.pcap
 Copyright: 2014, Viveris Technologies
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
@@ -2053,8 +2264,6 @@ Files: app/performance/rohc_gen_stream.c
  app/stats/rohc_stats.c
  app/stats/rohc_stats.1
  examples/simple_rohc_program.c
- src/common/comp_list.c
- src/common/comp_list.h
  src/common/feedback_parse.c
  src/common/feedback_parse.h
  src/common/net_pkt.c
@@ -2079,10 +2288,6 @@ Files: app/performance/rohc_gen_stream.c
  src/comp/rohc_comp_internals.h
  src/comp/schemes/cid.c
  src/comp/schemes/cid.h
- src/comp/schemes/scaled_rtp_ts.c
- src/comp/schemes/scaled_rtp_ts.h
- src/comp/schemes/wlsb.c
- src/comp/schemes/wlsb.h
  src/decomp/d_uncompressed.c
  src/decomp/feedback_create.c
  src/decomp/feedback_create.h
@@ -2094,14 +2299,11 @@ Files: app/performance/rohc_gen_stream.c
  src/decomp/schemes/ip_id_offset.c
  src/decomp/schemes/ip_id_offset.h
  src/decomp/schemes/test/test_wlsb.c
- src/decomp/schemes/wlsb.c
- src/decomp/schemes/wlsb.h
  src/test/test_rtp_ts_wraparound.c
  test/functional/context_reuse/test_context_reuse.c
  test/functional/decompress_feedback_only/test_decompress_feedback_only.c
  test/functional/feedback2/test_feedback2.c
  test/functional/rtp_detection/test_rtp_callback.c
- test/functional/rtp_uo_disambiguation/test_rtp_uo_disambiguation.c
  test/functional/segment/test_segment.c
  test/non_regression/test_non_regression.c
  test/non_regression/test_non_regression_kernel.c
@@ -2129,9 +2331,7 @@ License: LGPL-2.1+
  On Debian systems, the complete text of the GNU Lesser General
  Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
 
-Files: app/fuzzer/fuzzer.c
- app/fuzzer/rtp_fuzzer.c
- examples/example_rohc_decomp.c
+Files: examples/example_rohc_decomp.c
  examples/print_rohc_version.c
  src/common/interval.c
  src/common/interval.h
@@ -2153,12 +2353,9 @@ Files: app/fuzzer/fuzzer.c
  src/common/rohc/rohc_time.h
  src/common/rohc_add_cid.c
  src/common/rohc_add_cid.h
- src/common/rohc_buf.c
  src/common/rohc_debug.h
  src/common/rohc_internal.h
  src/common/rohc_packets.c
- src/common/rohc_stats.c
- src/common/rohc_stats.h
  src/common/rohc_utils.c
  src/common/rohc_utils.h
  src/comp/schemes/test/test_rfc4996.c
@@ -2188,15 +2385,11 @@ License: LGPL-2.1+
 
 Files: src/common/ip.c
  src/common/ip.h
- src/comp/c_generic.c
- src/comp/c_generic.h
  src/comp/c_ip.c
  src/comp/c_ip.h
  src/comp/c_udp.c
  src/comp/c_udp.h
  src/comp/c_udp_lite.c
- src/decomp/d_generic.c
- src/decomp/d_generic.h
  src/decomp/d_ip.c
  src/decomp/d_ip.h
  src/decomp/d_udp.c
@@ -2279,8 +2472,6 @@ Files: src/common/protocols/rtp.h
  src/comp/c_rtp.c
  src/comp/c_rtp.h
  src/decomp/d_rtp.c
- src/decomp/schemes/scaled_rtp_ts.c
- src/decomp/schemes/scaled_rtp_ts.h
 Copyright: 2007-2010,2012-2014, Viveris Technologies
   2007-2008, CNES
   2007-2008, Thales Alenia Space
@@ -2306,7 +2497,6 @@ Files: src/comp/schemes/rfc4996.c
  src/comp/schemes/rfc4996.h
  src/decomp/schemes/rfc4996.c
  src/decomp/schemes/rfc4996.h
- src/dllexport.h
 Copyright: 2012-2013, WBX
   2012-2014, Didier Barvaux
 License: LGPL-2.1+
@@ -2367,8 +2557,7 @@ License: LGPL-2.1+
  On Debian systems, the complete text of the GNU Lesser General
  Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
 
-Files: app/fuzzer/start_fuzzer.sh
- app/stats/rohc_stats.sh
+Files: app/stats/rohc_stats.sh
 Copyright: 2013, Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
@@ -2456,13 +2645,6 @@ License: LGPL-2.1+
  .
  On Debian systems, the complete text of the GNU Lesser General
  Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
-
-Files: src/common/protocols/udp.h
-Copyright: 1982, 1986 Regents of the University of California
-  1991-1993,1995-1997,2004,2009, Free Software Foundation, Inc
-  2012, Didier Barvaux
-License: BSD (3 clause) LGPL-2.1+
- FIXME
 
 Files: ltmain.sh
 Copyright: 1996-2001, 2003-2006
@@ -2685,7 +2867,15 @@ License: GPL-3
  On Debian systems, the complete text of the GNU General Public
  License can be found in "/usr/share/common-licenses/GPL-3".
 
-Files: test/non_regression/rfc3095/inputs/ipv4/esp/bug1089106-non-rtp-with-14-sn-bits/rohc_maxcontexts0_wlsb4_largecid.pcap
+Files: AUTHORS
+ COPYING
+ ChangeLog
+ INSTALL
+ NEWS
+ README
+ TODO
+ aclocal.m4
+ test/non_regression/rfc3095/inputs/ipv4/esp/bug1089106-non-rtp-with-14-sn-bits/rohc_maxcontexts0_wlsb4_largecid.pcap
  test/non_regression/rfc3095/inputs/ipv4/esp/bug1089106-non-rtp-with-14-sn-bits/rohc_maxcontexts0_wlsb4_largecid.sizes
  test/non_regression/rfc3095/inputs/ipv4/esp/bug1089106-non-rtp-with-14-sn-bits/rohc_maxcontexts0_wlsb4_smallcid.pcap
  test/non_regression/rfc3095/inputs/ipv4/esp/bug1089106-non-rtp-with-14-sn-bits/rohc_maxcontexts0_wlsb4_smallcid.sizes
@@ -5882,6 +6072,90 @@ Files: test/non_regression/rfc3095/inputs/ipv4/esp/bug1089106-non-rtp-with-14-sn
  test/non_regression/rfc6846/inputs/ipv6/tcp/rohc_maxcontexts1_wlsb64_smallcid.pcap
  test/non_regression/rfc6846/inputs/ipv6/tcp/rohc_maxcontexts1_wlsb64_smallcid.sizes
  test/non_regression/rfc6846/inputs/ipv6/tcp/source.pcap
+ Makefile.am
+ Makefile.in
+ app/Makefile.am
+ app/Makefile.in
+ app/performance/Makefile.am
+ app/performance/Makefile.in
+ app/sniffer/Makefile.am
+ app/sniffer/Makefile.in
+ app/stats/Makefile.am
+ app/stats/Makefile.in
+ contrib/Makefile.am
+ contrib/Makefile.in
+ doc/Makefile.am
+ doc/Makefile.in
+ examples/Makefile.am
+ examples/Makefile.in
+ linux/Makefile.am
+ linux/Makefile.in
+ src/Makefile.am
+ src/Makefile.in
+ src/common/Makefile.am
+ src/common/Makefile.in
+ src/common/protocols/Makefile.am
+ src/common/protocols/Makefile.in
+ src/common/test/Makefile.am
+ src/common/test/Makefile.in
+ src/comp/Makefile.am
+ src/comp/Makefile.in
+ src/comp/schemes/Makefile.am
+ src/comp/schemes/Makefile.in
+ src/comp/schemes/test/Makefile.am
+ src/comp/schemes/test/Makefile.in
+ src/comp/test/Makefile.am
+ src/comp/test/Makefile.in
+ src/decomp/Makefile.am
+ src/decomp/Makefile.in
+ src/decomp/schemes/Makefile.am
+ src/decomp/schemes/Makefile.in
+ src/decomp/schemes/test/Makefile.am
+ src/decomp/schemes/test/Makefile.in
+ src/decomp/test/Makefile.am
+ src/decomp/test/Makefile.in
+ src/test/Makefile.am
+ src/test/Makefile.in
+ test/Makefile.am
+ test/Makefile.in
+ test/functional/context_reuse/Makefile.am
+ test/functional/context_reuse/Makefile.in
+ test/functional/decompress_feedback_only/Makefile.am
+ test/functional/decompress_feedback_only/Makefile.in
+ test/functional/decompress_padding/Makefile.am
+ test/functional/decompress_padding/Makefile.in
+ test/functional/feedback2/Makefile.am
+ test/functional/feedback2/Makefile.in
+ test/functional/Makefile.am
+ test/functional/Makefile.in
+ test/functional/packet_types/Makefile.am
+ test/functional/packet_types/Makefile.in
+ test/functional/rtp_detection/Makefile.am
+ test/functional/rtp_detection/Makefile.in
+ test/functional/segment/Makefile.am
+ test/functional/segment/Makefile.in
+ test/interop/Makefile.am
+ test/interop/Makefile.in
+ test/non_regression/Makefile.am
+ test/non_regression/Makefile.in
+ test/non_regression/rfc3095/Makefile.am
+ test/non_regression/rfc3095/Makefile.in
+ test/non_regression/rfc6846/Makefile.am
+ test/non_regression/rfc6846/Makefile.in
+ test/robustness/damaged_packet/Makefile.am
+ test/robustness/damaged_packet/Makefile.in
+ test/robustness/empty_payload/Makefile.am
+ test/robustness/empty_payload/Makefile.in
+ test/robustness/lost_packet/Makefile.am
+ test/robustness/lost_packet/Makefile.in
+ test/robustness/Makefile.am
+ test/robustness/Makefile.in
+ test/robustness/malformed_rohc_packets/Makefile.am
+ test/robustness/malformed_rohc_packets/Makefile.in
+ test/robustness/piggybacking_feedback/Makefile.am
+ test/robustness/piggybacking_feedback/Makefile.in
+ test/robustness/reordered_packet/Makefile.am
+ test/robustness/reordered_packet/Makefile.in
 Copyright: 2007-2016 Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
@@ -5904,6 +6178,9 @@ Files: test/functional/feedback2/inputs/ack_largecid_largesn.pcap
  test/functional/feedback2/inputs/ack_largecid_smallsn.pcap
  test/functional/feedback2/inputs/ack_smallcid_largesn.pcap
  test/functional/feedback2/inputs/ack_smallcid_smallsn.pcap
+ test/robustness/damaged_packet/inputs/uo1id.pcap
+ test/robustness/empty_payload/inputs/ir.pcap
+ test/robustness/empty_payload/inputs/uor2.pcap
 Copyright: 2011 Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
@@ -5922,7 +6199,9 @@ License: LGPL-2.1+
  On Debian systems, the complete text of the GNU Lesser General
  Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
 
-Files: test/robustness/malformed_rohc_packets/inputs/ir.pcap
+Files: src/common/protocols/udp.h
+ contrib/uncrustify.cfg
+ test/robustness/malformed_rohc_packets/inputs/ir.pcap
  test/functional/context_reuse/inputs/ipv4_icmp_then_ipv4_ipv4_icmp.pcap
  test/functional/context_reuse/inputs/ipv4_icmp_then_ipv4_tcp.pcap
  test/functional/context_reuse/inputs/ipv4_icmp_then_ipv6_icmp.pcap
@@ -5982,6 +6261,8 @@ License: LGPL-2.1+
 
 Files: test/robustness/malformed_rohc_packets/inputs/ir_with_list_encoding_type1.pcap
  test/robustness/malformed_rohc_packets/inputs/truncated_uor2id.pcap
+ test/robustness/damaged_packet/inputs/uo0_repair.pcap
+ test/robustness/lost_packet/inputs/nominal_rtp.pcap
 Copyright: 2013 Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
@@ -6000,7 +6281,12 @@ License: LGPL-2.1+
  On Debian systems, the complete text of the GNU Lesser General
  Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
 
-Files: test/robustness/malformed_rohc_packets/inputs/fuzzer_crash_1200.pcap
+Files: src/common/rohc_list.c
+ src/comp/schemes/comp_list_ipv6.h
+ src/decomp/d_tcp_static.h
+ src/decomp/d_tcp_dynamic.h
+ src/decomp/schemes/decomp_list_ipv6.h
+ test/robustness/malformed_rohc_packets/inputs/fuzzer_crash_1200.pcap
  test/robustness/malformed_rohc_packets/inputs/fuzzer_crash_1229.pcap
  test/robustness/malformed_rohc_packets/inputs/fuzzer_crash_1308.pcap
  test/robustness/malformed_rohc_packets/inputs/fuzzer_crash_1749.pcap
@@ -6040,6 +6326,7 @@ Files: test/robustness/malformed_rohc_packets/inputs/fuzzer_crash_1200.pcap
  test/robustness/malformed_rohc_packets/inputs/fuzzer_crash_5632.pcap
  test/robustness/malformed_rohc_packets/inputs/fuzzer_crash_916.pcap
  test/robustness/malformed_rohc_packets/inputs/tcp_ir_01.pcap
+ test/robustness/lost_packet/test_lost_packet_13-16_16_nominal_tcp.sh
 Copyright: 2014 Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
@@ -6058,7 +6345,167 @@ License: LGPL-2.1+
  On Debian systems, the complete text of the GNU Lesser General
  Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
 
-Files: test/robustness/malformed_rohc_packets/inputs/afl00_from_1_to_2_ip_headers.pcap
+Files: src/common/rohc_list.h
+ src/comp/schemes/comp_list.h
+ src/comp/schemes/comp_list.c
+ src/comp/schemes/comp_list_ipv6.c
+ src/comp/schemes/comp_wlsb.h
+ src/comp/schemes/comp_scaled_rtp_ts.h
+ src/comp/schemes/comp_scaled_rtp_ts.c
+ src/decomp/d_tcp_irregular.h
+ src/decomp/schemes/tcp_ts.h
+ src/decomp/schemes/tcp_ts.c
+ src/decomp/schemes/tcp_sack.h
+ src/decomp/schemes/decomp_wlsb.h
+ src/decomp/schemes/decomp_list.c
+ src/decomp/schemes/decomp_list_ipv6.c
+ src/decomp/schemes/decomp_scaled_rtp_ts.h
+ src/decomp/schemes/decomp_scaled_rtp_ts.c
+ src/librohc.symbols
+Copyright: 2014-2015 Didier Barvaux
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: src/decomp/schemes/decomp_wlsb.c
+Copyright: 2014,2016 Didier Barvaux
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: src/comp/rohc_comp_rfc3095.h
+ src/comp/rohc_comp_rfc3095.c
+ src/comp/schemes/comp_wlsb.c
+ src/decomp/rohc_decomp_rfc3095.c
+ src/decomp/rohc_decomp_rfc3095.h
+ src/decomp/d_tcp_static.c
+ src/decomp/d_tcp_dynamic.c
+ src/decomp/d_tcp_irregular.c
+ src/decomp/schemes/decomp_list.h
+Copyright: 2014-2016 Didier Barvaux
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: src/common/rohc_list.h
+Copyright: 2015-2016 Didier Barvaux
+  2015 Steven Brown
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: src/decomp/schemes/tcp_sack.c
+ src/decomp/d_tcp_defines.h
+Copyright: 2014-2015 Didier Barvaux
+  2015 Klaus Warnke
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: src/comp/c_tcp_opts_list.c
+ src/comp/schemes/tcp_sack.h
+ src/comp/schemes/tcp_sack.c
+ src/decomp/d_tcp_opts_list.c
+ src/decomp/schemes/test/test_tcp_sack_opt.c
+Copyright: 2015 Didier Barvaux
+  2015 Klaus Warnke
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: src/common/protocols/ip.h
+ src/common/test/test_api_robustness.sh
+ src/common/test/test_feedback_parse.sh
+ src/comp/c_tcp_opts_list.h
+ src/comp/schemes/tcp_ts.h
+ src/comp/schemes/tcp_ts.c
+ src/comp/schemes/ip_id_offset.h
+ src/comp/schemes/ip_id_offset.c
+ src/comp/schemes/test/test_tcp_ts_opt.c
+ src/comp/schemes/test/test_tcp_ts_opt.sh
+ src/decomp/d_tcp_opts_list.h
+ src/decomp/schemes/test/test_tcp_ts_opt.c
+ src/decomp/schemes/test/test_tcp_ts_opt.sh
+ src/decomp/schemes/test/test_tcp_sack_opt.sh
+ test/robustness/malformed_rohc_packets/inputs/afl00_from_1_to_2_ip_headers.pcap
  test/robustness/malformed_rohc_packets/inputs/afl01_tcp_seq_scaled_not_initialized.pcap
  test/robustness/malformed_rohc_packets/inputs/afl02_rtp_profile_ir_without_dynamic_chain.pcap
  test/robustness/malformed_rohc_packets/inputs/afl03_from_1_to_2_ip_headers_other.pcap
@@ -6073,6 +6520,7 @@ Files: test/robustness/malformed_rohc_packets/inputs/afl00_from_1_to_2_ip_header
  test/robustness/malformed_rohc_packets/inputs/afl12_ipv6_ext_list_malformed_ins_mask.pcap
  test/robustness/malformed_rohc_packets/inputs/large_feedback.pcap
  test/robustness/malformed_rohc_packets/inputs/uo0_no_context.pcap
+ test/functional/packet_types/test_packet_types.c
  test/functional/packet_types/inputs/ipv4rnd_tcp_irdyn.pcap
  test/functional/packet_types/inputs/ipv4rnd_tcp_ir.pcap
  test/functional/packet_types/inputs/ipv4rnd_tcp_tcp-co-common.pcap
@@ -6234,7 +6682,52 @@ Files: test/robustness/malformed_rohc_packets/inputs/afl00_from_1_to_2_ip_header
  test/functional/context_reuse/inputs/many_ipv4_tcp_then_ipv6_tcp.pcap
  test/functional/context_reuse/inputs/many_ipv6_ipv6_tcp_then_ipv4_tcp.pcap
  test/functional/context_reuse/inputs/many_ipv6_tcp_then_ipv4_tcp.pcap
+ test/robustness/reordered_packet/inputs/lossy_rtp.pcap
 Copyright: 2015 Didier Barvaux
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: linux/include/bitops.h
+ src/common/test/test_feedback_parse.c
+ src/common/test/test_api_robustness.c
+Copyright: 2015-2016 Didier Barvaux
+License: LGPL-2.1+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2.1 of the License, or (at your option) any later version.
+ .
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+ .
+ You should have received a copy of the GNU Lesser General Public License
+ along with this program. If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the complete text of the GNU Lesser General
+ Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
+
+Files: AUTHORS.md
+ INSTALL.md
+ README.md
+ src/common/test/test_sdvl.c
+ src/common/test/test_sdvl.sh
+Copyright: 2016 Didier Barvaux
 License: LGPL-2.1+
  This library is free software; you can redistribute it and/or
  modify it under the terms of the GNU Lesser General Public
