@@ -205,11 +205,6 @@ int ip_parse_dynamic_ip(const struct rohc_decomp_ctxt *const context,
 {
 	size_t read = 0; /* number of bytes read from the packet */
 
-	/* remaining ROHC data */
-	const unsigned char *rohc_remain_data;
-	size_t rohc_remain_len;
-
-	/* sanity checks */
 	assert(context != NULL);
 	assert(packet != NULL);
 	assert(bits != NULL);

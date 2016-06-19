@@ -61,8 +61,3 @@ noinst_HEADERS = \
 EXTRA_DIST = \
 	rohc
 
-# extra files for releases
-EXTRA_DIST = \
-	librohc_comp.symbols \
-	rohc
-

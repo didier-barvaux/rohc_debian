@@ -130,10 +130,6 @@ static inline uint16_t ip_fast_csum(const uint8_t *iph,
                                     const size_t ihl)
 	__attribute__((nonnull(1), warn_unused_result, pure));
 
-static inline uint16_t ip_fast_csum(const uint8_t *iph,
-                                    size_t ihl)
-	__attribute__((nonnull(1), warn_unused_result, pure));
-
 /**
  * @brief This is a version of ip_compute_csum() optimized for IP headers,
  *        which always checksum on 4 octet boundaries.

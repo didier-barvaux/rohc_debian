@@ -1465,34 +1465,6 @@ static int rtp_parse_rtp_hdr_fields(const struct rohc_decomp_ctxt *const context
 
 error:
 	return -1;
-reparse:
-	return -2;
-}
-
-
-/**
- * @brief Does the UOR-2* packet need to be parsed again?
- *
- * When parsing a UOR-2* packet, if RND changes, the packet might need to be
- * parsed again with another UOR-2* packet type in mind:
- *  - UOR-2-RTP needs to be parsed again as UOR-2-ID or UOR-2-TS
- *    if one of the RND flags becomes 0.
- *  - UOR-2-ID needs to be parsed again as UOR-2-RTP
- *    if none of the RND flags is 0 anymore.
- *  - UOR-2-TS needs to be parsed again as UOR-2-RTP
- *    if none of the RND flags is 0 anymore.
- *
- * @param packet_type       The packet type
- * @param are_all_ipv4_rnd  Whether all RND values for outer and inner IP
- *                          headers are set to 1
- * @return                  Whether packet shall be parsed again or not
- */
-static inline bool is_uor2_reparse_required(const rohc_packet_t packet_type,
-                                            const int are_all_ipv4_rnd)
-{
-	return ((packet_type == ROHC_PACKET_UOR_2_RTP && !are_all_ipv4_rnd) ||
-	        (packet_type == ROHC_PACKET_UOR_2_ID && are_all_ipv4_rnd) ||
-	        (packet_type == ROHC_PACKET_UOR_2_TS && are_all_ipv4_rnd));
 }
 
 

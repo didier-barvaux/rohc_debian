@@ -37,22 +37,6 @@
 #include <assert.h>
 
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-/** Print information depending on the debug level (internal usage) */
-#define __rohc_print(trace_cb, trace_cb2, trace_cb_priv, \
-                     level, entity, profile, format, ...) \
-	do { \
-		if(trace_cb2 != NULL) { \
-			trace_cb2(trace_cb_priv, level, entity, profile, \
-			         "[%s:%d %s()] " format "\n", \
-			         __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__); \
-		} else if(trace_cb != NULL) { \
-			trace_cb(level, entity, profile, \
-			         "[%s:%d %s()] " format "\n", \
-			         __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__); \
-		} \
-	} while(0)
-#else
 /** Print information depending on the debug level (internal usage) */
 #define __rohc_print(trace_cb, trace_cb_priv, \
                      level, entity, profile, format, ...) \
@@ -63,9 +47,7 @@
 			         __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__); \
 		} \
 	} while(0)
-#endif
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 /** Print information depending on the debug level */
 #define rohc_print(entity_struct, level, entity, profile, format, ...) \
 	do { \
@@ -74,17 +56,6 @@
 		             level, entity, profile, \
 		             format, ##__VA_ARGS__); \
 	} while(0)
-#else
-/** Print information depending on the debug level */
-#define rohc_print(entity_struct, level, entity, profile, format, ...) \
-	do { \
-		assert((entity_struct) != NULL); \
-		__rohc_print((entity_struct)->trace_callback2, \
-		             (entity_struct)->trace_callback_priv, \
-		             level, entity, profile, \
-		             format, ##__VA_ARGS__); \
-	} while(0)
-#endif
 
 /** Print debug messages prefixed with the function name */
 #define rohc_debug(entity_struct, entity, profile, format, ...) \

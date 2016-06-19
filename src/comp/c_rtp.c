@@ -343,7 +343,6 @@ static bool c_rtp_check_profile(const struct rohc_comp *const comp,
 			goto bad_profile;
 		}
 	}
-#endif
 	else
 	{
 		/* no callback for advanced RTP stream detection and no UDP
@@ -358,8 +357,6 @@ bad_profile:
 	return false;
 }
 
-
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 
 /**
  * @brief Check if the IP/UDP/RTP packet belongs to the context

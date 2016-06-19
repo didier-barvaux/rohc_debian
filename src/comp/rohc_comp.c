@@ -138,8 +138,6 @@ static struct rohc_comp_ctxt *
 	__attribute__((nonnull(1), warn_unused_result));
 
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-
 /*
  * Prototypes of private functions related to ROHC feedback
  */
@@ -173,8 +171,6 @@ static bool rohc_comp_feedback_check_opts(const struct rohc_comp_ctxt *const con
  */
 
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-
 /**
  * @brief Create a new ROHC compressor
  *
@@ -206,9 +202,6 @@ static bool rohc_comp_feedback_check_opts(const struct rohc_comp_ctxt *const con
  *
  * @warning Don't forget to free compressor memory with \ref rohc_comp_free
  *          if \e rohc_comp_new2 succeeded
- *
- * @warning Don't forget to free compressor memory with
- *          \ref rohc_free_compressor if \e rohc_alloc_compressor succeeded
  *
  * @ingroup rohc_comp
  *
@@ -291,7 +284,6 @@ struct rohc_comp * rohc_comp_new2(const rohc_cid_type_t cid_type,
 	{
 		comp->enabled_profiles[i] = false;
 	}
-#endif
 
 	/* reset statistics */
 	comp->num_packets = 0;
@@ -346,16 +338,6 @@ struct rohc_comp * rohc_comp_new2(const rohc_cid_type_t cid_type,
 		goto destroy_comp;
 	}
 
-	/* set default callback for traces */
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-	/* keep same behaviour as previous 1.x.y versions: traces on by default */
-	is_fine = rohc_comp_set_traces_cb2(comp, rohc_comp_print_trace_default, NULL);
-	if(is_fine != true)
-	{
-		goto destroy_comp;
-	}
-#endif
-
 	return comp;
 
 destroy_comp:
@@ -403,8 +385,6 @@ void rohc_comp_free(struct rohc_comp *const comp)
 	}
 }
 
-
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 
 /**
  * @brief Set the callback function used to manage traces in compressor
@@ -470,87 +450,6 @@ bool rohc_comp_set_traces_cb2(struct rohc_comp *const comp,
 
 	/* replace current trace callback by the new one */
 	comp->trace_callback = callback;
-	comp->trace_callback_priv = priv_ctxt;
-
-	return true;
-
-error:
-	return false;
-}
-
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
-
-
-/**
- * @brief Set the callback function used to manage traces in compressor
- *
- * Set the user-defined callback function used to manage traces in the
- * compressor.
- *
- * The function will be called by the ROHC library every time it wants to
- * print something related to compression, from errors to debug. User may
- * thus decide what traces are interesting (filter on \e level, source
- * \e entity, or \e profile) and what to do with them (print on console,
- * storage in file, syslog...).
- *
- * @warning The callback can not be modified after library initialization
- *
- * @warning The callback set by this function will remove any callback set
- *          set with \ref rohc_comp_set_traces_cb
- *
- * @param comp       The ROHC compressor
- * @param callback   Two possible cases:
- *                     \li The callback function used to manage traces
- *                     \li NULL to remove the previous callback
- * @param priv_ctxt  An optional private context, may be NULL
- * @return           true on success, false otherwise
- *
- * @ingroup rohc_comp
- *
- * \par Example:
- * \snippet rtp_detection.c define compression traces callback
- * \code
-        ...
-\endcode
- * \snippet simple_rohc_program.c define ROHC compressor
- * \code
-        ...
-\endcode
- * \snippet simple_rohc_program.c create ROHC compressor
- * \code
-        ...
-\endcode
- * \snippet rtp_detection.c set compression traces callback
- * \code
-        ...
-\endcode
- * \snippet simple_rohc_program.c destroy ROHC compressor
- *
- */
-bool rohc_comp_set_traces_cb2(struct rohc_comp *const comp,
-                              rohc_trace_callback2_t callback,
-                              void *const priv_ctxt)
-{
-	/* check compressor validity */
-	if(comp == NULL)
-	{
-		/* cannot print a trace without a valid compressor */
-		goto error;
-	}
-
-	/* refuse to set a new trace callback if compressor is in use */
-	if(comp->num_packets > 0)
-	{
-		rohc_error(comp, ROHC_TRACE_COMP, ROHC_PROFILE_GENERAL, "unable to "
-		           "modify the trace callback after initialization");
-		goto error;
-	}
-
-	/* replace current trace callback by the new one */
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-	comp->trace_callback = NULL;
-#endif
-	comp->trace_callback2 = callback;
 	comp->trace_callback_priv = priv_ctxt;
 
 	return true;
@@ -889,8 +788,6 @@ error:
 }
 
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-
 /**
  * @brief Get the next ROHC segment if any
  *
@@ -944,88 +841,6 @@ rohc_status_t rohc_comp_get_segment2(struct rohc_comp *const comp,
                                      struct rohc_buf *const segment)
 
 {
-	struct rohc_buf __segment = rohc_buf_init_empty(segment, max_len);
-	int ret;
-
-	/* check input parameters
-	 * (other parameters checked in rohc_comp_get_segment2) */
-	if(len == NULL)
-	{
-		goto error;
-	}
-
-	/* no segment yet */
-	*len = 0;
-
-	/* use function from new API */
-	ret = rohc_comp_get_segment2(comp, &__segment);
-	if(ret == ROHC_NEED_SEGMENT || ret == ROHC_OK)
-	{
-		*len = __segment.len;
-	}
-
-	return ret;
-
-error:
-	return ROHC_ERROR;
-}
-
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
-
-
-/**
- * @brief Get the next ROHC segment if any
- *
- * Get the next ROHC segment if any.
- *
- * To get all the segments of one ROHC packet, call this function until
- * \ref ROHC_OK or \ref ROHC_ERROR is returned.
- *
- * @param comp          The ROHC compressor
- * @param[out] segment  The buffer where to store the ROHC segment
- * @return              Possible return values:
- *                       \li \ref ROHC_STATUS_SEGMENT if a ROHC segment is
- *                           returned and more segments are available,
- *                       \li \ref ROHC_STATUS_OK if a ROHC segment is returned
- *                           and no more ROHC segment is available
- *                       \li \ref ROHC_STATUS_ERROR if an error occurred
- *
- * @ingroup rohc_comp
- *
- * \par Example:
- * \snippet test_segment.c define ROHC compressor
- * \code
-        ...
-        // compress the IP packet with a small ROHC buffer
-\endcode
- * \snippet test_segment.c segment ROHC packet #1
- * \snippet test_segment.c segment ROHC packet #2
- * \code
-                        ...
-                        // decompress the ROHC segment here, the function
-                        // rohc_decompress3 shall return ROHC_STATUS_OK
-                        // and no decompressed packet
-                        ...
-\endcode
- * \snippet test_segment.c segment ROHC packet #3
- * \code
-                // decompress the final ROHC segment here, the function
-                // rohc_decompress4 shall return ROHC_STATUS_OK
-\endcode
- * \snippet test_segment.c segment ROHC packet #4
- * \code
-                // handle compression error here
-                ...
-\endcode
- *
- * @see rohc_comp_get_mrru
- * @see rohc_comp_set_mrru
- * @see rohc_compress4
- */
-rohc_status_t rohc_comp_get_segment2(struct rohc_comp *const comp,
-                                     struct rohc_buf *const segment)
-
-{
 	const size_t segment_type_len = 1; /* segment type byte */
 	size_t max_data_len;
 	rohc_status_t status;
@@ -1033,24 +848,6 @@ rohc_status_t rohc_comp_get_segment2(struct rohc_comp *const comp,
 	/* check input parameters */
 	if(comp == NULL)
 	{
-		goto error;
-	}
-	if(segment == NULL)
-	{
-		rohc_warning(comp, ROHC_TRACE_COMP, ROHC_PROFILE_GENERAL,
-		             "given segment cannot be NULL");
-		goto error;
-	}
-	if(rohc_buf_is_malformed(*segment))
-	{
-		rohc_warning(comp, ROHC_TRACE_COMP, ROHC_PROFILE_GENERAL,
-		             "given segment is malformed");
-		goto error;
-	}
-	if(!rohc_buf_is_empty(*segment))
-	{
-		rohc_warning(comp, ROHC_TRACE_COMP, ROHC_PROFILE_GENERAL,
-		             "given segment is not empty");
 		goto error;
 	}
 	if(segment == NULL)
@@ -1337,30 +1134,6 @@ bool rohc_comp_set_periodic_refreshes(struct rohc_comp *const comp,
  *                       false if the value is rejected
  *
  * @ingroup rohc_comp
- *
- * \par Example:
- * \snippet rtp_detection.c define RTP detection callback
- * \code
-        ...
-\endcode
- * \snippet simple_rohc_program.c define ROHC compressor
- * \code
-        ...
-\endcode
- * \snippet simple_rohc_program.c create ROHC compressor
- * \code
-        ...
-\endcode
- * \snippet rtp_detection.c set RTP detection callback
- * \code
-        ...
-\endcode
- * \snippet simple_rohc_program.c destroy ROHC compressor
- *
- * @see rohc_rtp_detection_callback_t
- * @see rohc_comp_add_rtp_port
- * @see rohc_comp_remove_rtp_port
- * @see rohc_comp_reset_rtp_ports
  */
 bool rohc_comp_set_list_trans_nr(struct rohc_comp *const comp,
                                  const size_t list_trans_nr)
@@ -1516,8 +1289,6 @@ error:
 }
 
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-
 /**
  * @brief Enable a compression profile for a compressor
  *
@@ -1665,15 +1436,6 @@ error:
  * If one or more of the profiles are already enabled, nothing is performed
  * and success is reported.
  *
- * If no function callback was defined for the detection of RTP streams, the
- * detection is based on a list of UDP ports dedicated for RTP streams.
- *
- * This function allows to update the list by emptying the list of UDP ports
- * dedicated for RTP traffic.
- *
- * @deprecated please do not use this function anymore,
- *             use rohc_comp_set_rtp_detection_cb() instead
- *
  * @param comp  The ROHC compressor
  * @param ...   The sequence of compression profiles to enable, the sequence
  *              shall be terminated by -1
@@ -1728,8 +1490,6 @@ error:
 	return false;
 }
 
-
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 
 /**
  * @brief Disable several compression profiles for a compressor
@@ -2034,32 +1794,6 @@ error:
  * When feedback is received by the decompressor, this function is called and
  * delivers the feedback to the right profile/context of the compressor.
  *
- * @deprecated please do not use this function anymore,
- *             use rohc_comp_deliver_feedback2() instead
- *
- * @param comp   The ROHC compressor
- * @param packet The feedback data
- * @param size   The length of the feedback packet
- *
- * @ingroup rohc_comp
- */
-void c_deliver_feedback(struct rohc_comp *comp,
-                        unsigned char *packet,
-                        int size)
-{
-	const bool is_ok __attribute__((unused)) =
-		__rohc_comp_deliver_feedback(comp, packet, size);
-}
-
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
-
-
-/**
- * @brief Deliver a feedback packet to the compressor
- *
- * When feedback is received by the decompressor, this function is called and
- * delivers the feedback to the right profile/context of the compressor.
- *
  * @param comp   The ROHC compressor
  * @param packet The feedback data
  * @param size   The length of the feedback packet
@@ -2076,22 +1810,6 @@ static bool __rohc_comp_deliver_feedback(struct rohc_comp *const comp,
 	enum rohc_feedback_type feedback_type;
 	rohc_cid_t cid;
 	size_t cid_len;
-
-	/* sanity check */
-	if(packet == NULL)
-	{
-		rohc_warning(comp, ROHC_TRACE_COMP, ROHC_PROFILE_GENERAL,
-		             "failed to deliver feedback: packet is NULL");
-		goto error;
-	}
-	if(size <= 0)
-	{
-		rohc_warning(comp, ROHC_TRACE_COMP, ROHC_PROFILE_GENERAL,
-		             "failed to deliver feedback: size is %zu", size);
-		goto error;
-	}
-
-	p = packet;
 
 	rohc_debug(comp, ROHC_TRACE_COMP, ROHC_PROFILE_GENERAL,
 	           "deliver %zu byte(s) of feedback to the right context", size);
@@ -2157,8 +1875,6 @@ error:
 }
 
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-
 /**
  * @brief Deliver a feedback packet to the compressor
  *
@@ -2172,10 +1888,6 @@ error:
  *                  false if the feedback could not be taken into account
  *
  * @ingroup rohc_comp
- *
- * @see rohc_feedback_remove_locked
- * @see rohc_feedback_unlock
- * @see rohc_feedback_avail_bytes
  */
 bool rohc_comp_deliver_feedback2(struct rohc_comp *const comp,
                                  const struct rohc_buf feedback)
@@ -2429,9 +2141,6 @@ error:
  * @return       A string that describes the given compression context state
  *
  * @ingroup rohc_comp
- *
- * @see rohc_feedback_unlock
- * @see rohc_feedback_flush
  */
 const char * rohc_comp_get_state_descr(const rohc_comp_state_t state)
 {
@@ -2448,38 +2157,6 @@ const char * rohc_comp_get_state_descr(const rohc_comp_state_t state)
 			return "no description";
 	}
 }
-
-
-/**
- * @brief Unlock all feedbacks locked during the packet build
- *
- * Unlock all feedbacks locked during the packet build, but do not remove them
- * from the compressor's context. A call to function \e rohc_feedback_unlock
- * closes the transaction started by the function \ref rohc_feedback_flush. It
- * allows the compressor to send the unlocked feedback bytes again after the
- * the program failed to send them correctly (eg. temporary network problem).
- *
- * If the feedback data was sent successfully, then the feedback data shall
- * not be unlocked, but removed with the \ref rohc_feedback_remove_locked
- * function. This way, feedback data will not be sent again later.
- *
- * @deprecated please do not use this function anymore, instead use
- *             rohc_decompress3() and handle feedback data yourself
- *
- * @param comp  The ROHC compressor
- * @return      true if action succeeded, false in case of error
- *
- * @ingroup rohc_comp
- *
- * @see rohc_feedback_remove_locked
- * @see rohc_feedback_flush
- */
-bool rohc_feedback_unlock(struct rohc_comp *const comp)
-{
-	return __rohc_feedback_unlock(comp);
-}
-
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
 
 
 /*
@@ -2898,8 +2575,6 @@ static void c_destroy_contexts(struct rohc_comp *const comp)
 	comp->contexts = NULL;
 }
 
-
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 
 /**
  * @brief Change the mode of the context.
@@ -3419,101 +3094,4 @@ static bool rohc_comp_feedback_check_opts(const struct rohc_comp_ctxt *const con
 error:
 	return false;
 }
-
-
-/**
- * @brief Set the maximal CID value the compressor should use
- *
- * @param comp  The ROHC compressor
- * @param value The new maximal CID value
- */
-static void __rohc_c_set_max_cid(struct rohc_comp *comp, int value)
-{
-	if(comp == NULL)
-	{
-		goto error;
-	}
-
-	/* check validity of the new MAX_CID */
-	if(comp->medium.cid_type == ROHC_LARGE_CID)
-	{
-		/* large CID */
-		if(value < 0 || value > ROHC_LARGE_CID_MAX)
-		{
-			goto error;
-		}
-	}
-	else /* small CID */
-	{
-		if(value < 0 || value > ROHC_SMALL_CID_MAX)
-		{
-			goto error;
-		}
-	}
-
-	if(((size_t) value) != comp->medium.max_cid)
-	{
-		/* free memory used by contexts */
-		c_destroy_contexts(comp);
-
-		/* change MAX_CID */
-		comp->medium.max_cid = value;
-
-		/* create the MAX_CID contexts */
-		if(!c_create_contexts(comp))
-		{
-			goto error;
-		}
-	}
-
-error:
-	return;
-}
-
-
-/**
- * @brief The default RTP detection callback to keep compatibility
- *
- * @param ip           The innermost IP packet
- * @param udp          The UDP header of the packet
- * @param payload      The UDP payload of the packet
- * @param payload_size The size of the UDP payload (in bytes)
- * @param rtp_private  An optional private context
- * @return             true if the packet is an RTP packet, false otherwise
- */
-static bool rohc_comp_default_rtp_cb(const unsigned char *const ip __attribute__((unused)),
-                                     const unsigned char *const udp,
-                                     const unsigned char *const payload __attribute__((unused)),
-                                     const unsigned int payload_size __attribute__((unused)),
-                                     void *const rtp_private __attribute__((unused)))
-{
-	const size_t default_rtp_ports_nr = 5;
-	unsigned int default_rtp_ports[] = { 1234, 36780, 33238, 5020, 5002 };
-	uint16_t udp_dport;
-	bool is_rtp = false;
-	size_t i;
-
-	if(udp == NULL)
-	{
-		return false;
-	}
-
-	/* get the UDP destination port */
-	memcpy(&udp_dport, udp + 2, sizeof(uint16_t));
-
-	/* is the UDP destination port in the list of ports reserved for RTP
-	 * traffic by default (for compatibility reasons) */
-	for(i = 0; i < default_rtp_ports_nr; i++)
-	{
-		if(rohc_ntoh16(udp_dport) == default_rtp_ports[i])
-		{
-			is_rtp = true;
-			break;
-		}
-	}
-
-	return is_rtp;
-}
-
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
 

@@ -444,7 +444,9 @@ rohc_common_sources = \
 	$(top_srcdir)/src/common/rohc.h \
 	$(top_srcdir)/src/common/rohc_packets.c \
 	$(top_srcdir)/src/common/rohc_packets.h \
-	$(top_srcdir)/src/common/rohc_traces.h
+	$(top_srcdir)/src/common/rohc_traces.h \
+	$(top_srcdir)/src/common/rohc_time.h \
+	$(top_srcdir)/src/common/rohc_buf.h
 
 rohc_comp_sources = \
 	$(top_srcdir)/src/comp/rohc_comp.c \

@@ -1635,9 +1635,6 @@ case $basic_machine in
 	mips*-*)
 		os=-elf
 		;;
-	or1k-*)
-		os=-elf
-		;;
 	or32-*)
 		os=-coff
 		;;

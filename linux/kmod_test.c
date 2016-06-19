@@ -147,20 +147,6 @@ static int gen_false_random_num(const struct rohc_comp *const comp,
 
 
 /**
- * @brief Generate a false random number for testing the ROHC library
- *
- * @param comp          The ROHC compressor
- * @param user_context  Should always be NULL
- * @return              Always 0
- */
-static int gen_false_random_num(const struct rohc_comp *const comp,
-                                void *const user_context)
-{
-	return 0;
-}
-
-
-/**
  * @brief Print traces emitted by the ROHC library
  *
  * @param priv_ctxt  An optional private context, may be NULL
@@ -648,7 +634,6 @@ ssize_t rohc_proc_comp_write(struct file *file,
 			rohc_err("failed to compress the IP packet\n");
 			goto error;
 		}
-		couple->rohc_size_out = rohc_packet.len;
 
 		/* unhide feedback data */
 		rohc_buf_push(&rohc_packet, couple->feedback_to_send.len);

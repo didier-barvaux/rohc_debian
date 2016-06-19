@@ -95,35 +95,6 @@ typedef enum
 
 } rohc_status_t;
 
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
-
-
-/**
- * @brief The status code of several functions in the library API
- *
- * @ingroup rohc
- */
-typedef enum
-{
-	/** The action was successful */
-	ROHC_STATUS_OK                = 0,
-	/** The action was successful but packet needs to be segmented */
-	ROHC_STATUS_SEGMENT           = 1,
-	/** The action failed due to a malformed packet */
-	ROHC_STATUS_MALFORMED         = 2,
-	/** The action failed because no matching context exists */
-	ROHC_STATUS_NO_CONTEXT        = 3,
-	/** The action failed due to a CRC failure */
-	ROHC_STATUS_BAD_CRC           = 4,
-	/** The action failed because output buffer is too small */
-	ROHC_STATUS_OUTPUT_TOO_SMALL  = 5,
-	/** The action encountered an undefined problem */
-	ROHC_STATUS_ERROR             = 6,
-
-} rohc_status_t;
-
-
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 
 /**
  * @brief ROHC operation modes

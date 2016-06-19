@@ -70,8 +70,6 @@ struct rohc_comp;
  */
 
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-
 /**
  * @brief The different ROHC compressor states
  *
@@ -80,9 +78,6 @@ struct rohc_comp;
  *
  * If you add a new compressor state, please also add the corresponding
  * textual description in \ref rohc_comp_get_state_descr.
- *
- * @deprecated do not use this type anymore, use \ref rohc_comp_state_t
- *             instead
  *
  * @ingroup rohc_comp
  *
@@ -388,10 +383,6 @@ bool ROHC_EXPORT rohc_comp_set_wlsb_window_width(struct rohc_comp *const comp,
 bool ROHC_EXPORT rohc_comp_set_periodic_refreshes(struct rohc_comp *const comp,
                                                   const size_t ir_timeout,
                                                   const size_t fo_timeout)
-	__attribute__((warn_unused_result));
-
-bool ROHC_EXPORT rohc_comp_set_list_trans_nr(struct rohc_comp *const comp,
-                                             const size_t list_trans_nr)
 	__attribute__((warn_unused_result));
 
 bool ROHC_EXPORT rohc_comp_set_list_trans_nr(struct rohc_comp *const comp,

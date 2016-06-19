@@ -648,24 +648,6 @@ if test "x$enable_rohc_tests" = "xyes" ; then
 fi
 
 
-# if ROHC tests are enabled: libcmocka is mandatory
-if test "x$enable_rohc_tests" = "xyes" ; then
-
-	PKG_CHECK_MODULES([CMOCKA], [cmocka >= 0.3.1],
-	                  [cmocka_found="yes"], [cmocka_found="no"])
-	if test "x$cmocka_found" != "xyes" ; then
-		echo
-		echo "ERROR: cmocka library/headers not found"
-		echo
-		echo "Go get it from http://www.cmocka.org/ or use the CMOCKA_* "
-		echo "variables, if you have it installed in unusual place. Also check if "
-		echo "it depends on another shared library that may be installed in an "
-		echo "unusual place."
-		exit 1
-	fi
-fi
-
-
 # check requirements for valgrind support to tests
 if test "x$enable_rohc_tests_valgrind" = "xyes" ; then
 
@@ -975,6 +957,7 @@ AC_CONFIG_FILES([ \
 	src/test/Makefile \
 	src/common/Makefile \
 	src/common/protocols/Makefile \
+	src/common/test/Makefile \
 	src/comp/Makefile \
 	src/comp/test/Makefile \
 	src/comp/schemes/Makefile \

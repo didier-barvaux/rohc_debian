@@ -296,11 +296,6 @@ int main(int argc, char *argv[])
 			/* enable quiet mode */
 			verbosity = VERBOSITY_NONE;
 		}
-		else if(!strcmp(*argv, "--compat-1-6-x"))
-		{
-			/* enable compatibility mode */
-			compat_1_6_x = true;
-		}
 		else if(!strcmp(*argv, "-o"))
 		{
 			/* get the name of the file to store the ROHC packets */

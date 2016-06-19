@@ -51,8 +51,6 @@
 #include "rohc_decomp_detect_packet.h"
 #include "crc.h"
 
-#include "config.h" /* for ROHC_ENABLE_DEPRECATED_API */
-
 #ifndef __KERNEL__
 #  include <string.h>
 #endif
@@ -352,11 +350,6 @@ static struct rohc_decomp_ctxt * context_create(struct rohc_decomp *decomp,
 	assert(decomp->num_contexts_used <= (decomp->medium.max_cid + 1));
 	decomp->num_contexts_used++;
 
-	/* decompressor got one more context (for a short moment, decompressor
-	 * might have MAX_CID + 2 contexts) */
-	assert(decomp->num_contexts_used <= (decomp->medium.max_cid + 1));
-	decomp->num_contexts_used++;
-
 	return context;
 
 destroy_context:
@@ -391,8 +384,6 @@ static void context_free(struct rohc_decomp_ctxt *const context)
 	free(context);
 }
 
-
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 
 /**
  * @brief Create a new ROHC decompressor
@@ -501,7 +492,6 @@ struct rohc_decomp * rohc_decomp_new2(const rohc_cid_type_t cid_type,
 	}
 
 	/* no trace callback during decompressor creation */
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 	decomp->trace_callback = NULL;
 	decomp->trace_callback_priv = NULL;
 
@@ -641,7 +631,6 @@ error:
 	return;
 }
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 
 /**
  * @brief Decompress the given ROHC packet into one uncompressed packet
@@ -1734,8 +1723,6 @@ error:
 }
 
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-
 /**
  * @brief Update context with decoded values
  *
@@ -1765,8 +1752,6 @@ static void rohc_decomp_update_context(struct rohc_decomp_ctxt *const context,
 		rohc_min(crc_corr->arrival_times_nr + 1, ROHC_MAX_ARRIVAL_TIMES);
 }
 
-
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 
 /**
  * @brief Build a positive ACK feedback
@@ -2390,8 +2375,6 @@ static void rohc_decomp_reset_stats(struct rohc_decomp *const decomp)
 	decomp->stats.total_uncompressed_size = 0;
 }
 
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
-
 
 /**
  * @brief Give a description for the given ROHC decompression context state
@@ -2420,10 +2403,7 @@ const char * rohc_decomp_get_state_descr(const rohc_decomp_state_t state)
 			return "Full Context";
 		case ROHC_DECOMP_STATE_UNKNOWN:
 		default:
-			assert(0);
-#if defined(__KERNEL__) || defined(ENABLE_DEAD_CODE)
 			return "no description";
-#endif
 	}
 }
 
@@ -3273,8 +3253,6 @@ error:
 }
 
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-
 /**
  * @brief Disable a decompression profile for a decompressor
  *
@@ -3336,8 +3314,6 @@ error:
 	return false;
 }
 
-
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 
 /**
  * @brief Enable several decompression profiles for a decompressor
@@ -3407,8 +3383,6 @@ error:
 }
 
 
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
-
 /**
  * @brief Disable several decompression profiles for a decompressor
  *
@@ -3465,8 +3439,6 @@ bool rohc_decomp_disable_profiles(struct rohc_decomp *const decomp,
 error:
 	return false;
 }
-
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
 
 
 /**
@@ -3986,7 +3958,6 @@ static bool rohc_decomp_parse_feedback(struct rohc_decomp *const decomp,
 			rohc_buf_append(feedback, rohc_buf_data(*rohc_data), *feedback_len);
 		}
 	}
-#endif /* !ROHC_ENABLE_DEPRECATED_API */
 
 	/* skip the feedback item in the ROHC packet */
 	rohc_buf_pull(rohc_data, *feedback_len);

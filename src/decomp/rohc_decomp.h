@@ -284,45 +284,6 @@ bool ROHC_EXPORT rohc_decomp_get_max_cid(const struct rohc_decomp *const decomp,
 bool ROHC_EXPORT rohc_decomp_set_mrru(struct rohc_decomp *const decomp,
                                       const size_t mrru)
 	__attribute__((warn_unused_result));
-bool ROHC_EXPORT rohc_decomp_get_mrru(const struct rohc_decomp *const decomp,
-                                      size_t *const mrru)
-	__attribute__((warn_unused_result));
-
-bool ROHC_EXPORT rohc_decomp_set_features(struct rohc_decomp *const decomp,
-                                          const rohc_decomp_features_t features)
-	__attribute__((warn_unused_result));
-
-
-/*
- * Functions related to decompression profiles
- */
-
-bool ROHC_EXPORT rohc_decomp_profile_enabled(const struct rohc_decomp *const decomp,
-                                             const rohc_profile_t profile)
-	__attribute__((warn_unused_result));
-
-bool ROHC_EXPORT rohc_decomp_enable_profile(struct rohc_decomp *const decomp,
-                                            const rohc_profile_t profile)
-	__attribute__((warn_unused_result));
-
-bool ROHC_EXPORT rohc_decomp_disable_profile(struct rohc_decomp *const decomp,
-                                             const rohc_profile_t profile)
-	__attribute__((warn_unused_result));
-
-bool ROHC_EXPORT rohc_decomp_enable_profiles(struct rohc_decomp *const decomp,
-                                             ...)
-	__attribute__((warn_unused_result));
-
-bool ROHC_EXPORT rohc_decomp_disable_profiles(struct rohc_decomp *const decomp,
-                                              ...)
-	__attribute__((warn_unused_result));
-
-
-/*
- * Functions related to traces
- */
-
-#if !defined(ROHC_ENABLE_DEPRECATED_API) || ROHC_ENABLE_DEPRECATED_API == 1
 
 bool ROHC_EXPORT rohc_decomp_get_mrru(const struct rohc_decomp *const decomp,
                                       size_t *const mrru)

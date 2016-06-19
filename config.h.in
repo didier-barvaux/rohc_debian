@@ -117,9 +117,6 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
-/* Whether deprecated API is enabled or not. */
-#undef ROHC_ENABLE_DEPRECATED_API
-
 /* Extra debug traces for ROHC library */
 #undef ROHC_EXTRA_DEBUG
 

@@ -405,7 +405,6 @@ sources = \
 	rohc_packets.c \
 	rohc_traces_internal.c \
 	rohc_utils.c \
-	rohc_buf.c \
 	crc.c \
 	rohc_add_cid.c \
 	interval.c \
@@ -528,7 +527,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-rohc_common.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-rohc_list.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-rohc_packets.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-rohc_stats.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-rohc_traces_internal.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-rohc_utils.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/librohc_common_la-sdvl.Plo@am__quote@
@@ -581,13 +579,6 @@ librohc_common_la-rohc_utils.lo: rohc_utils.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rohc_utils.c' object='librohc_common_la-rohc_utils.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-rohc_utils.lo `test -f 'rohc_utils.c' || echo '$(srcdir)/'`rohc_utils.c
-
-librohc_common_la-rohc_buf.lo: rohc_buf.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-rohc_buf.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-rohc_buf.Tpo -c -o librohc_common_la-rohc_buf.lo `test -f 'rohc_buf.c' || echo '$(srcdir)/'`rohc_buf.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/librohc_common_la-rohc_buf.Tpo $(DEPDIR)/librohc_common_la-rohc_buf.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='rohc_buf.c' object='librohc_common_la-rohc_buf.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -c -o librohc_common_la-rohc_buf.lo `test -f 'rohc_buf.c' || echo '$(srcdir)/'`rohc_buf.c
 
 librohc_common_la-crc.lo: crc.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(librohc_common_la_CPPFLAGS) $(CPPFLAGS) $(librohc_common_la_CFLAGS) $(CFLAGS) -MT librohc_common_la-crc.lo -MD -MP -MF $(DEPDIR)/librohc_common_la-crc.Tpo -c -o librohc_common_la-crc.lo `test -f 'crc.c' || echo '$(srcdir)/'`crc.c
