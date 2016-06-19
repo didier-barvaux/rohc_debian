@@ -1,6 +1,6 @@
 Source: rohc
 Priority: optional
-Maintainer: Simon Paillard <spaillard@debian.org>
+Maintainer: Didier Barvaux <didier@rohc-lib.org>
 Build-Depends: autotools-dev, debhelper (>= 9), pkg-config,
 # for tests and tools
  libpcap0.8-dev,
@@ -12,7 +12,7 @@ Build-Depends: autotools-dev, debhelper (>= 9), pkg-config,
  gnuplot,
 Standards-Version: 3.9.6
 Section: libs
-Homepage: http://rohc-lib.org/
+Homepage: https://rohc-lib.org/
 Vcs-Git: git://anonscm.debian.org/collab-maint/rohc.git
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/rohc.git
 
