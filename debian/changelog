@@ -1,6 +1,16 @@
+rohc (2.0.0~6768796-1) UNRELEASED; urgency=medium
+
+  * Imported Upstream version 2.0.0~6768796
+
+ -- Didier Barvaux <didier@rohc-lib.org>  Sun, 19 Jun 2016 16:27:00 +0200
+
 rohc (2.0.0~269b665-1) UNRELEASED; urgency=medium
 
   * Imported Upstream version 2.0.0~269b665
+  * Update debian packaging
+  * Add symbols file for librohc3
+  * Add library symlink in librohc-dev package
+  * Add more copyright information
 
  -- Didier Barvaux <didier@rohc-lib.org>  Sun,  5 Jun 2016 16:04:00 +0200
 
