@@ -40,7 +40,7 @@ Changing the MRRU value while library is used may lead to destruction of the cur
 struct rohc_decomp *decomp;
 rru = 500;
 
-/* create the ROHC decompressor in uni-directional mode */
+/* create the ROHC decompressor in uni\-directional mode */
 decomp = rohc_decomp_new2(ROHC_SMALL_CID, ROHC_SMALL_CID_MAX, ROHC_U_MODE);
 if(decomp == NULL)
 {

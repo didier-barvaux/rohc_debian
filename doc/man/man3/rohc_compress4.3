@@ -25,7 +25,15 @@ Compress the given uncompressed packet into a ROHC packet. The compression may s
 .PP 
 .RE
 .PP 
-Set the \fBuncomp_packet.time\fP
+Notes: 
+.PP 
+.RS
+.PP 
+\(bu ROHC segmentation: The ROHC compressor has to use ROHC segmentation if the output buffer rohc_packet was too small for the compressed ROHC packet and if the Maximum Reconstructed Reception Unit (MRRU) configured with the function \fBrohc_comp_set_mrru\fP was not exceeded. If ROHC segmentation is used, one may use the \fBrohc_comp_get_segment2\fP function to retrieve all the ROHC segments one by one. 
+.PP 
+\(bu Time\-related features in the ROHC protocol: Set the \fBuncomp_packet.time\fP parameter to 0 if arrival time of the uncompressed packet is unknown or to disable the time\-related features in the ROHC protocol.
+.PP 
+.RE
 .SH PARAMETERS
 .TP
 .B comp
@@ -83,57 +91,37 @@ Possible return values:
 
 .SH EXAMPLE
 .nf
-The ROHC compressor has to use ROHC segmentation if the output buffer rohc_packet was too small for the compressed ROHC packet and if the Maximum Reconstructed Reception Unit (MRRU) configured with the function rohc_comp_set_mrru was not exceeded. If ROHC segmentation is used, one may use the rohc_comp_get_segment2 function to retrieve all the ROHC segments one by one. parameter to 0 if arrival time of the uncompressed packet is unknown or to disable the time-related features in the ROHC protocol.        struct rohc_comp *compressor;           /* the ROHC compressor */
-        /* the buffer that will contain the IPv4 packet to compress */
-        unsigned char ip_buffer[BUFFER_SIZE];
-        struct rohc_buf ip_packet = rohc_buf_init_empty(ip_buffer, BUFFER_SIZE);
-        /* the buffer that will contain the resulting ROHC packet */
-        unsigned char rohc_buffer[BUFFER_SIZE];
-        struct rohc_buf rohc_packet = rohc_buf_init_empty(rohc_buffer, BUFFER_SIZE);
+struct rohc_comp *compressor;           /* the ROHC compressor */
+/* the buffer that will contain the IPv4 packet to compress */
+unsigned char ip_buffer[BUFFER_SIZE];
+struct rohc_buf ip_packet = rohc_buf_init_empty(ip_buffer, BUFFER_SIZE);
+/* the buffer that will contain the resulting ROHC packet */
+unsigned char rohc_buffer[BUFFER_SIZE];
+struct rohc_buf rohc_packet = rohc_buf_init_empty(rohc_buffer, BUFFER_SIZE);
 
-.cc :
-...
-:cc .
+status = rohc_compress4(compressor, ip_packet, &rohc_packet);
+if(status == ROHC_STATUS_SEGMENT)
+{
+        /* success: compression succeeded, but resulting ROHC packet was too
+         * large for the Maximum Reconstructed Reception Unit (MRRU) configured
+         * with rohc_comp_set_mrru, the rohc_packet buffer contains the
+         * first ROHC segment and rohc_comp_get_segment can be used to
+         * retrieve the next ones. */
 
-        status = rohc_compress4(compressor, ip_packet, &rohc_packet);
-        if(status == ROHC_STATUS_SEGMENT)
-        {
-                /* success: compression succeeded, but resulting ROHC packet was too
-                 * large for the Maximum Reconstructed Reception Unit (MRRU) configured
-                 * with rohc_comp_set_mrru, the rohc_packet buffer contains the
-                 * first ROHC segment and rohc_comp_get_segment can be used to
-                 * retrieve the next ones. */
+}
+else if(status == ROHC_STATUS_OK)
+{
+        /* success: compression succeeded, and resulting ROHC packet fits the
+         * Maximum Reconstructed Reception Unit (MRRU) configured with
+         * rohc_comp_set_mrru, the rohc_packet buffer contains the
+         * rohc_packet_len bytes of the ROHC packet */
 
-.cc :
-...
-:cc .
+}
+else
+{
+        /* compressor failed to compress the IP packet */
 
-        }
-        else if(status == ROHC_STATUS_OK)
-        {
-                /* success: compression succeeded, and resulting ROHC packet fits the
-                 * Maximum Reconstructed Reception Unit (MRRU) configured with
-                 * rohc_comp_set_mrru, the rohc_packet buffer contains the
-                 * rohc_packet_len bytes of the ROHC packet */
-
-.cc :
-...
-:cc .
-
-        }
-        else
-        {
-                /* compressor failed to compress the IP packet */
-
-.cc :
-...
-:cc .
-
-        }
-
-.cc :
-...
-:cc .
+}
 
 
 
@@ -143,7 +131,7 @@ The ROHC compressor has to use ROHC segmentation if the output buffer rohc_packe
 .BR rohc_comp.h (3),
 .BR ROHC_STATUS_OK (3),
 .BR ROHC_STATUS_SEGMENT (3),
+.BR rohc_comp_set_mrru (3),
 .BR rohc_comp_get_segment2 (3),
 .BR ROHC_STATUS_OUTPUT_TOO_SMALL (3),
-.BR ROHC_STATUS_ERROR (3),
-.BR rohc_comp_set_mrru (3)
+.BR ROHC_STATUS_ERROR (3)

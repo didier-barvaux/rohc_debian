@@ -29,7 +29,7 @@ Decompress the given ROHC packet into an uncompressed packet. The decompression 
 .PP 
 If \fBfeedback_send\fP is not NULL, the decompression may return some feedback information on it. In such a case, the caller is responsible to send it to the compressor through any feedback channel.
 .PP 
-Set the \fBrohc_packet.time\fP
+Time\-related features in the ROHC protocol: set the \fBrohc_packet.time\fP parameter to 0 if arrival time of the ROHC packet is unknown or to disable the time\-related features in the ROHC protocol.
 .SH PARAMETERS
 .TP
 .B decomp
@@ -77,8 +77,6 @@ The beginning of the network buffer may also be shifted forward with the \fBrohc
 .PP 
 The network buffer may be initialized manually (see below) or with the helper functions \fBrohc_buf_init_empty\fP or \fBrohc_buf_init_full\fP...
 .PP 
-...
-.PP 
  
 .sp
 .RS
@@ -115,46 +113,46 @@ Possible return values:
 
 .SH EXAMPLE
 .nf
-parameter to 0 if arrival time of the ROHC packet is unknown or to disable the time-related features in the ROHC protocol.        struct rohc_decomp *decompressor;       /* the ROHC decompressor */
-       /* the buffer that will contain the ROHC packet to decompress */
-       unsigned char rohc_buffer[BUFFER_SIZE];
-       struct rohc_buf rohc_packet = rohc_buf_init_empty(rohc_buffer, BUFFER_SIZE);
-       /* the buffer that will contain the resulting IP packet */
-       unsigned char ip_buffer[BUFFER_SIZE];
-       struct rohc_buf ip_packet = rohc_buf_init_empty(ip_buffer, BUFFER_SIZE);
-       /* we do not want to handle feedback in this simple example */
-       struct rohc_buf *rcvd_feedback = NULL;
-       struct rohc_buf *feedback_send = NULL;
-..
-       status = rohc_decompress3(decompressor, rohc_packet, &ip_packet,
-                                 rcvd_feedback, feedback_send);
-       if(status == ROHC_STATUS_OK)
-       {
-               /* decompression is successful */
-               if(!rohc_buf_is_empty(ip_packet))
-               {
-                       /* ip_packet.len bytes of decompressed IP data available in
-                        * ip_packet: dump the IP packet on the standard output */
-                       printf("IP packet resulting from the ROHC decompression:\n");
-                       dump_packet(ip_packet);
-               }
-               else
-               {
-                       /* no IP packet was decompressed because of ROHC segmentation or
-                        * feedback-only packet:
-                        *  - the ROHC packet was a non-final segment, so at least another
-                        *    ROHC segment is required to be able to decompress the full
-                        *    ROHC packet
-                        *  - the ROHC packet was a feedback-only packet, it contained only
-                        *    feedback information, so there was nothing to decompress */
-                       printf("no IP packet decompressed");
-               }
-       }
-       else
-       {
-               /* failure: decompressor failed to decompress the ROHC packet */
-               fprintf(stderr, "decompression of fake ROHC packet failed\n");
-       }
+struct rohc_decomp *decompressor;       /* the ROHC decompressor */
+/* the buffer that will contain the ROHC packet to decompress */
+unsigned char rohc_buffer[BUFFER_SIZE];
+struct rohc_buf rohc_packet = rohc_buf_init_empty(rohc_buffer, BUFFER_SIZE);
+/* the buffer that will contain the resulting IP packet */
+unsigned char ip_buffer[BUFFER_SIZE];
+struct rohc_buf ip_packet = rohc_buf_init_empty(ip_buffer, BUFFER_SIZE);
+/* we do not want to handle feedback in this simple example */
+struct rohc_buf *rcvd_feedback = NULL;
+struct rohc_buf *feedback_send = NULL;
+
+status = rohc_decompress3(decompressor, rohc_packet, &ip_packet,
+                          rcvd_feedback, feedback_send);
+if(status == ROHC_STATUS_OK)
+{
+        /* decompression is successful */
+        if(!rohc_buf_is_empty(ip_packet))
+        {
+                /* ip_packet.len bytes of decompressed IP data available in
+                 * ip_packet: dump the IP packet on the standard output */
+                printf("IP packet resulting from the ROHC decompression:\n");
+                dump_packet(ip_packet);
+        }
+        else
+        {
+                /* no IP packet was decompressed because of ROHC segmentation or
+                 * feedback\-only packet:
+                 *  \- the ROHC packet was a non\-final segment, so at least another
+                 *    ROHC segment is required to be able to decompress the full
+                 *    ROHC packet
+                 *  \- the ROHC packet was a feedback\-only packet, it contained only
+                 *    feedback information, so there was nothing to decompress */
+                printf("no IP packet decompressed");
+        }
+}
+else
+{
+        /* failure: decompressor failed to decompress the ROHC packet */
+        fprintf(stderr, "decompression of fake ROHC packet failed\n");
+}
 
 
 

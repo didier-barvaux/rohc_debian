@@ -24,9 +24,9 @@ The decompressor to destroy
 struct rohc_decomp *decompressor;       /* the ROHC decompressor */
 
 /* Create a ROHC decompressor to operate:
- *  - with large CIDs,
- *  - with the maximum of 5 streams (MAX_CID = 4),
- *  - in Unidirectional mode (U-mode).
+ *  \- with large CIDs,
+ *  \- with the maximum of 5 streams (MAX_CID = 4),
+ *  \- in Unidirectional mode (U\-mode).
  */
 decompressor = rohc_decomp_new2(ROHC_LARGE_CID, 4, ROHC_U_MODE);
 if(decompressor == NULL)
