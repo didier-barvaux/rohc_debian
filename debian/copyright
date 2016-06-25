@@ -28,8 +28,8 @@ License: LGPL-2.1+
 Files: configure.ac
  configure
  config.h.in
- config.h
  config.sub
+ config.guess
  depcomp
  missing
  install-sh
@@ -459,6 +459,7 @@ License: LGPL-2.1+
  Public License can be found in "/usr/share/common-licenses/LGPL-2.1".
 
 Files: test/robustness/lost_packet/inputs/non_sequential_rtp_ts.pcap
+ test/robustness/lost_packet/inputs/non_sequential_rtp_ts.readme
  test/functional/rtp_detection/input/rtp.pcap
 Copyright: 2012, Viveris Technologies
 License: LGPL-2.1+
@@ -699,6 +700,8 @@ Files: test/interop/test_interop.sh
  test/interop/test_interop_Aeroflex-TM500-2.sh
  test/interop/inputs/Aeroflex-TM500-1/ref_uncomp.pcap
  test/interop/inputs/Aeroflex-TM500-1/source_rohc.pcap
+ test/interop/inputs/Aeroflex-TM500-2/ref_uncomp.pcap
+ test/interop/inputs/Aeroflex-TM500-2/source_rohc.pcap
  test/robustness/lost_packet/inputs/nominal_tcp.pcap
 Copyright: 2014, Viveris Technologies
 License: LGPL-2.1+
@@ -2873,7 +2876,6 @@ Files: AUTHORS
  INSTALL
  NEWS
  README
- TODO
  aclocal.m4
  test/non_regression/rfc3095/inputs/ipv4/esp/bug1089106-non-rtp-with-14-sn-bits/rohc_maxcontexts0_wlsb4_largecid.pcap
  test/non_regression/rfc3095/inputs/ipv4/esp/bug1089106-non-rtp-with-14-sn-bits/rohc_maxcontexts0_wlsb4_largecid.sizes
