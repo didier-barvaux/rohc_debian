@@ -7,6 +7,8 @@ rohc_library \(hy The ROHC library
 .B #include <rohc/rohc.h>
 .B #include <rohc/rohc_traces.h>
 .B #include <rohc/rohc_packets.h>
+.B #include <rohc/rohc_time.h>
+.B #include <rohc/rohc_buf.h>
 .B #include <rohc/rohc_comp.h>
 .B #include <rohc/rohc_decomp.h>
 .fi

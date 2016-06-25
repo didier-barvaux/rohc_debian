@@ -35,9 +35,9 @@ true if all of the profiles exist, false if at least one of the profiles does no
 struct rohc_comp *compressor;           /* the ROHC compressor */
 
 if(!rohc_comp_enable_profiles(compressor, ROHC_PROFILE_UDP,
-                              ROHC_PROFILE_UDPLITE, -1))
+                              ROHC_PROFILE_UDPLITE, \-1))
 {
-        fprintf(stderr, "failed to enable the IP/UDP and IP/UDP-Lite "
+        fprintf(stderr, "failed to enable the IP/UDP and IP/UDP\-Lite "
                 "profiles\n");
         goto release_compressor;
 }

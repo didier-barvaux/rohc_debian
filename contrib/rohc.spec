@@ -5,7 +5,7 @@ License:  LGPLv2+
 URL:      http://rohc-lib.org/
 
 Epoch:    0
-Version:  2.0.0~6768796
+Version:  2.0.0~a6ffe53
 Release:  1.%{packager}
 
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)

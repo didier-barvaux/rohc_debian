@@ -100,16 +100,16 @@ IP/UDP/RTP, IP/UDP\-Lite/RTP and IP/TCP.
 The ROHC protocol is mainly standardized by the IETF, but some protocol
 numbers are defined by other organisms.
 .PP
-.IP IETF \(hy Internet Engineering Task Force
+.IP "IETF \(hy Internet Engineering Task Force"
 The ROHC protocol is standardized by the \fBIETF\fP. The ROHC Working Group
 was formed to specify a \fBcommon compression protocol platform\fP. Several
 Requests For Comments (RFC) were published to define the ROHC framework and a
 number of compression profiles. The RFCs are listed on the \fBSEE ALSO\fP
 section of this document.
-.IP IANA \(hy Internet Assigned Numbers Authority
+.IP "IANA \(hy Internet Assigned Numbers Authority"
 The IANA is in charge of ROHC protocol identifiers assignments for ROHC
 profiles, but also the Internet protocol number 142 to the ROHC protocol.
-.IP IEEE \(hy Institute of Electrical and Electronics Engineers
+.IP "IEEE \(hy Institute of Electrical and Electronics Engineers"
 The IEEE maintains the registry of Ethernet/802.3 protocol identification. The
 ROHC protocol is registered with value 0x22F1.
 
@@ -363,7 +363,7 @@ RFCs for more details.
 Internet Engineering Task Force <http://ietf.org/>
 .IP ROHC\ Working\ Group 3
 http://datatracker.ietf.org/wg/rohc/charter/
-.IP Requests\ For\ Comments\ (RFC)\ \(hy\ Framework\ and\ default\ profiles 3
+.IP IETF\ RFC\ \(hy\ Framework\ and\ default\ profiles 3
 RFC 3095 \(hy ROHC: Framework and four profiles: RTP, UDP, ESP, and uncompressed
 .br
 RFC 3096 \(hy Requirements for robust IP/UDP/RTP header compression
@@ -373,19 +373,19 @@ RFC 3759 \(hy ROHC: Terminology and Channel Mapping Examples
 RFC 4815 \(hy ROHC: Corrections and Clarifications to RFC 3095
 .br
 RFC 4995 \(hy The RObust Header Compression (ROHC) Framework
-.IP Requests\ For\ Comments\ (RFC)\ \(hy\ PPP
+.IP IETF\ RFC\ \(hy\ PPP
 RFC 3241 \(hy Robust Header Compression (ROHC) over PPP
-.IP Requests\ For\ Comments\ (RFC)\ \(hy\ SNMP\ /\ MIB
+.IP IETF\ RFC\ \(hy\ SNMP\ /\ MIB
 RFC 3816 \(hy Definitions of Managed Objects for RObust Header Compression (ROHC)
-.IP Requests\ For\ Comments\ (RFC)\ \(hy\ IP\-only\ compression\ profile
+.IP IETF\ RFC\ \(hy\ IP\-only\ compression\ profile
 RFC 3843 \(hy ROHC: A Compression Profile for IP
-.IP Requests\ For\ Comments\ (RFC)\ \(hy\ IP/UDP\-Lite\ and\ IP/UDP\-Lite/RTP\ compression\ profiles
+.IP IETF\ RFC\ \(hy\ IP/UDP\-Lite\ and\ IP/UDP\-Lite/RTP\ compression\ profiles
 RFC 4019 \(hy ROHC: Profiles for User Datagram Protocol (UDP) Lite
-.IP Requests\ For\ Comments\ (RFC)\ \(hy\ Context\ replication
+.IP IETF\ RFC\ \(hy\ Context\ replication
 RFC 4164 \(hy ROHC: Context Replication for ROHC Profiles
-.IP Requests\ For\ Comments\ (RFC)\ \(hy\ Packet\ reordering
+.IP IETF\ RFC\ \(hy\ Packet\ reordering
 RFC 4224 \(hy ROHC: ROHC over Channels That Can Reorder Packets
-.IP Requests\ For\ Comments\ (RFC)\ \(hy\ Link\-layer\ assistance
+.IP IETF\ RFC\ \(hy\ Link\-layer\ assistance
 RFC 3242 \(hy ROHC: A Link\-Layer Assisted Profile for IP/UDP/RTP
 .br
 RFC 3243 \(hy ROHC: Requirements and Assumptions for 0\-byte IP/UDP/RTP Compression
@@ -395,15 +395,15 @@ RFC 3409 \(hy Lower Layer Guidelines for Robust RTP/UDP/IP Header Compression
 RFC 3408 \(hy Zero\-byte Support for R\-mode in Extended Link\-Layer Assisted ROHC Profile
 .br
 RFC 4362 \(hy ROHC: A Link\-Layer Assisted Profile for IP/UDP/RTP
-.IP Requests\ For\ Comments\ (RFC)\ \(hy\ IP/TCP\ compression\ profile
+.IP IETF\ RFC\ \(hy\ IP/TCP\ compression\ profile
 RFC 4163 \(hy ROHC: Requirements on TCP/IP Header Compression
 .br
 RFC 4996 \(hy ROHC: A Profile for TCP/IP (ROHC\-TCP) [obsolete RFC]
 .br
 RFC 6846 \(hy ROHC: A Profile for TCP/IP (ROHC\-TCP)
-.IP Requests\ For\ Comments\ (RFC)\ \(hy\ ROHC\ version\ 2
+.IP IETF\ RFC\ \(hy\ ROHC\ version\ 2
 RFC 5225 \(hy ROHCv2: Profiles for RTP, UDP, IP, ESP and UDP\-Lite
-.IP Requests\ For\ Comments\ (RFC)\ \(hy\ ROHC\ &\ IPsec
+.IP IETF\ RFC\ \(hy\ ROHC\ &\ IPsec
 RFC 5856 \(hy Integration of Robust Header Compression over IPsec Security Associations
 .br
 RFC 5857 \(hy IKEv2 Extensions to Support Robust Header Compression over IPsec
