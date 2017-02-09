@@ -19,7 +19,6 @@ Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/rohc.git
 Package: librohc-dev
 Section: libdevel
 Architecture: any
-Pre-Depends: ${misc:Pre-Depends}
 Depends: librohc3 (= ${binary:Version}), ${misc:Depends}
 Description: Files for development of applications which will use the ROHC library
  The files required for the development of applications which will use the ROHC
