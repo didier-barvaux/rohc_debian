@@ -29,6 +29,7 @@ librohc.so.3 librohc3 #MINVER#
  rohc_decomp_enable_profiles@Base 1.8.0-1
  rohc_decomp_free@Base 1.8.0-1
  rohc_decomp_get_cid_type@Base 1.8.0-1
+ rohc_decomp_get_context_info@Base 2.0.0-1
  rohc_decomp_get_general_info@Base 1.8.0-1
  rohc_decomp_get_last_packet_info@Base 1.8.0-1
  rohc_decomp_get_max_cid@Base 1.8.0-1
