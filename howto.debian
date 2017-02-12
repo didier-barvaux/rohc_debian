@@ -1,0 +1,6 @@
+Import new version:
+$ git-import-orig ../rohc-x.y.z.tar.bz2
+$ vim debian/changelog # add new changelog entry for version x.y.z
+
+Build source & binary packages:
+$ LANG=C LC_ALL=C gbp buildpackage
